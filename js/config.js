@@ -35,7 +35,7 @@ export function isCloudConfigured() {
 //  Dopo averlo creato, incolla qui il suo indirizzo. Guida in README.md.
 //  Lasciato vuoto, l'app funziona lo stesso (resta l'incolla manuale).
 // ============================================================
-export const WORKER_URL = "";
+export const WORKER_URL = "https://ricette-import.marcozeta73.workers.dev";
 
 export function isImportConfigured() {
   return Boolean(WORKER_URL);
