@@ -6,16 +6,16 @@ const KEY = "ricettario.data.v1";
 function read() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { tools: [], recipes: [], shopping: [] };
+    if (!raw) return { tools: [], recipes: [], shopping: [], plan: [] };
     const data = JSON.parse(raw);
-    return { tools: data.tools || [], recipes: data.recipes || [], shopping: data.shopping || [] };
+    return { tools: data.tools || [], recipes: data.recipes || [], shopping: data.shopping || [], plan: data.plan || [] };
   } catch {
-    return { tools: [], recipes: [], shopping: [] };
+    return { tools: [], recipes: [], shopping: [], plan: [] };
   }
 }
 
 function write(state) {
-  localStorage.setItem(KEY, JSON.stringify({ tools: state.tools, recipes: state.recipes, shopping: state.shopping }));
+  localStorage.setItem(KEY, JSON.stringify({ tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan }));
 }
 
 export function createLocalAdapter() {
@@ -24,7 +24,7 @@ export function createLocalAdapter() {
 
   function commit() {
     write(state);
-    onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping] });
+    onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping], plan: [...state.plan] });
   }
 
   return {
@@ -33,7 +33,7 @@ export function createLocalAdapter() {
     async start(cb) {
       onChange = cb;
       // Emissione iniziale dello stato salvato.
-      onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping] });
+      onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping], plan: [...state.plan] });
     },
 
     async addTool(tool) {
@@ -84,10 +84,20 @@ export function createLocalAdapter() {
       commit();
     },
 
+    async addPlan(entry) {
+      state.plan.push(entry);
+      commit();
+    },
+    async deletePlan(id) {
+      state.plan = state.plan.filter((p) => p.id !== id);
+      commit();
+    },
+
     async replaceAll(data) {
       state.tools = data.tools || [];
       state.recipes = data.recipes || [];
       state.shopping = data.shopping || [];
+      state.plan = data.plan || [];
       commit();
     }
   };

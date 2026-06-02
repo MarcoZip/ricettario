@@ -36,6 +36,8 @@ let currentRoute = "strumenti";
 let currentToolId = null;
 let currentRecipeId = null;
 let detailServings = null; // porzioni scelte nella schermata ricetta
+let planYear = null; // anno mostrato nel calendario
+let planMonth = null; // mese (0-11) mostrato nel calendario
 
 // Stato locale della sezione Ricettario (per non perdere i risultati ad ogni render).
 let mealTab = "online";
@@ -144,8 +146,13 @@ function openTool(toolId) {
 function openRecipe(recipeId) {
   const r = store.getRecipe(recipeId);
   currentRecipeId = recipeId;
-  if (r && !currentToolId) currentToolId = r.toolId;
+  currentToolId = r ? r.toolId : currentToolId;
   detailServings = r && r.servings ? r.servings : null;
+  // la schermata ricetta vive nella sezione "Strumenti"
+  currentRoute = "strumenti";
+  document.querySelectorAll(".bottom-nav__btn").forEach((b) => {
+    b.classList.toggle("is-active", b.dataset.route === "strumenti");
+  });
   withTransition(() => render());
   window.scrollTo(0, 0);
 }
@@ -162,6 +169,8 @@ export function render() {
     renderRicettario();
   } else if (currentRoute === "spesa") {
     renderShopping();
+  } else if (currentRoute === "piano") {
+    renderPlan();
   } else if (currentRoute === "impostazioni") {
     renderImpostazioni();
   }
@@ -715,6 +724,146 @@ function renderShopping() {
     const ok = await confirmDialog({ title: "Svuotare la lista?", message: "Tutti gli articoli verranno rimossi.", confirmText: "Svuota", danger: true });
     if (ok) store.clearAllShopping();
   });
+}
+
+// ---------------- Schermata: Pianificazione (calendario) ----------------
+const MONTHS_IT = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+const WEEKDAYS_IT = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
+function pad2(n) { return String(n).padStart(2, "0"); }
+function ymd(y, m, d) { return `${y}-${pad2(m + 1)}-${pad2(d)}`; }
+function todayStr() { const n = new Date(); return ymd(n.getFullYear(), n.getMonth(), n.getDate()); }
+function formatDateLong(ds) { const [y, m, d] = ds.split("-").map(Number); return `${d} ${MONTHS_IT[m - 1]} ${y}`; }
+function allRecipes() { return store.getTools().flatMap((t) => store.getRecipesByTool(t.id)); }
+
+function renderPlan() {
+  const today = new Date();
+  if (planYear == null) { planYear = today.getFullYear(); planMonth = today.getMonth(); }
+  const first = new Date(planYear, planMonth, 1);
+  const startDow = (first.getDay() + 6) % 7; // lunedì = 0
+  const daysInMonth = new Date(planYear, planMonth + 1, 0).getDate();
+  const tStr = todayStr();
+
+  const wk = WEEKDAYS_IT.map((d) => `<div class="cal-wd">${d}</div>`).join("");
+  let cells = "";
+  for (let i = 0; i < startDow; i++) cells += `<div class="cal-cell cal-cell--empty"></div>`;
+  for (let day = 1; day <= daysInMonth; day++) {
+    const ds = ymd(planYear, planMonth, day);
+    const count = store.countPlanByDate(ds);
+    cells += `<button class="cal-cell ${ds === tStr ? "is-today" : ""} ${count ? "has-plan" : ""}" data-date="${ds}">
+      <span class="cal-day">${day}</span>
+      ${count ? `<span class="cal-dot">${count > 1 ? count : ""}</span>` : ""}
+    </button>`;
+  }
+
+  root.innerHTML = `
+    <h1 class="page-title">Pianificazione</h1>
+    <div class="cal-head">
+      <button class="back-btn" id="prevM">${iconHtml("caret-left")}</button>
+      <div class="cal-title">${MONTHS_IT[planMonth]} ${planYear}</div>
+      <button class="back-btn" id="nextM">${iconHtml("caret-right")}</button>
+    </div>
+    <div class="cal-grid cal-weekdays">${wk}</div>
+    <div class="cal-grid">${cells}</div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn--ghost" id="todayBtn">Oggi</button>
+      <button class="btn btn--ghost" id="monthShop">${iconHtml("shopping-cart-simple")} Spesa del mese</button>
+    </div>
+  `;
+
+  root.querySelector("#prevM").addEventListener("click", () => { planMonth--; if (planMonth < 0) { planMonth = 11; planYear--; } render(); });
+  root.querySelector("#nextM").addEventListener("click", () => { planMonth++; if (planMonth > 11) { planMonth = 0; planYear++; } render(); });
+  root.querySelector("#todayBtn").addEventListener("click", () => { planYear = today.getFullYear(); planMonth = today.getMonth(); render(); });
+  root.querySelectorAll(".cal-cell[data-date]").forEach((c) => c.addEventListener("click", () => openDaySheet(c.dataset.date)));
+  root.querySelector("#monthShop").addEventListener("click", async () => {
+    const prefix = `${planYear}-${pad2(planMonth + 1)}-`;
+    const entries = store.getPlan().filter((p) => p.date.startsWith(prefix));
+    if (!entries.length) { toast("Nessuna ricetta pianificata questo mese", "error"); return; }
+    const items = collectIngredients(entries);
+    const n = await store.addShoppingItems(items);
+    toast(`${n} ingredienti aggiunti alla spesa`, "success");
+  });
+}
+
+function collectIngredients(entries) {
+  const items = [];
+  for (const e of entries) {
+    const r = store.getRecipe(e.recipeId);
+    if (r && Array.isArray(r.ingredients)) {
+      for (const it of r.ingredients) {
+        items.push({ name: it.name, unit: it.unit || "", qty: it.qty != null ? it.qty : null, category: categorize(it.name) });
+      }
+    }
+  }
+  return items;
+}
+
+function openDaySheet(date) {
+  const entries = store.getPlanByDate(date);
+  const rows = entries.length
+    ? entries.map((e) => {
+        const r = store.getRecipe(e.recipeId);
+        const tool = r ? store.getTool(r.toolId) : null;
+        return `<div class="day-row" data-plan="${e.id}" data-recipe="${r ? r.id : ""}">
+          <span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span>
+          <span class="day-row__name">${escapeHtml(r ? r.title : "(ricetta eliminata)")}</span>
+          <button class="icon-btn icon-btn--danger" data-act="rem" title="Rimuovi">${iconHtml("trash")}</button>
+        </div>`;
+      }).join("")
+    : `<div class="hint">Nessuna ricetta per questo giorno.</div>`;
+
+  const m = openModal(`
+    <h3 class="modal__title">${formatDateLong(date)}</h3>
+    <div id="dayRows">${rows}</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+      <button class="btn btn--primary btn--block" data-act="add">${iconHtml("plus")} Aggiungi ricetta</button>
+      ${entries.length ? `<button class="btn btn--block" data-act="toshop">${iconHtml("shopping-cart-simple")} Aggiungi ingredienti alla spesa</button>` : ""}
+    </div>
+  `);
+
+  m.el.querySelectorAll(".day-row").forEach((row) => {
+    const planId = row.dataset.plan;
+    const rid = row.dataset.recipe;
+    row.querySelector('[data-act="rem"]').addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await store.deletePlan(planId);
+      m.close();
+      openDaySheet(date);
+    });
+    if (rid) row.addEventListener("click", () => { m.close(); openRecipe(rid); });
+  });
+  m.el.querySelector('[data-act="add"]').addEventListener("click", () => {
+    m.close();
+    openRecipePicker(async (recipeId) => { await store.addPlan(date, recipeId); openDaySheet(date); });
+  });
+  const ts = m.el.querySelector('[data-act="toshop"]');
+  if (ts) ts.addEventListener("click", async () => {
+    const n = await store.addShoppingItems(collectIngredients(entries));
+    m.close();
+    toast(`${n} ingredienti aggiunti alla spesa`, "success");
+  });
+}
+
+function openRecipePicker(onPick) {
+  const recipes = allRecipes();
+  if (!recipes.length) { toast("Aggiungi prima qualche ricetta", "error"); return; }
+  const build = (q = "") => {
+    const filt = recipes.filter((r) => r.title.toLowerCase().includes(q.toLowerCase()));
+    if (!filt.length) return `<div class="hint">Nessuna ricetta trovata.</div>`;
+    return filt.map((r) => {
+      const tool = store.getTool(r.toolId);
+      return `<button class="pick-row" data-id="${r.id}"><span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span><span class="day-row__name">${escapeHtml(r.title)}</span></button>`;
+    }).join("");
+  };
+  const m = openModal(`
+    <h3 class="modal__title">Scegli una ricetta</h3>
+    <div class="field"><input type="search" id="pickSearch" placeholder="Cerca..." /></div>
+    <div id="pickList">${build()}</div>
+  `);
+  const search = m.el.querySelector("#pickSearch");
+  const listEl = m.el.querySelector("#pickList");
+  const attach = () => listEl.querySelectorAll(".pick-row").forEach((b) => b.addEventListener("click", () => { m.close(); onPick(b.dataset.id); }));
+  attach();
+  search.addEventListener("input", () => { listEl.innerHTML = build(search.value); attach(); });
 }
 
 // ---------------- Schermata: Impostazioni ----------------

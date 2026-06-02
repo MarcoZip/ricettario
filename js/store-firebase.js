@@ -17,14 +17,16 @@ export async function createFirebaseAdapter(uid) {
   const toolsCol = collection(db, "users", uid, "tools");
   const recipesCol = collection(db, "users", uid, "recipes");
   const shoppingCol = collection(db, "users", uid, "shopping");
+  const planCol = collection(db, "users", uid, "plan");
 
   let tools = [];
   let recipes = [];
   let shopping = [];
+  let plan = [];
   let onChange = () => {};
 
   function emit() {
-    onChange({ tools: [...tools], recipes: [...recipes], shopping: [...shopping] });
+    onChange({ tools: [...tools], recipes: [...recipes], shopping: [...shopping], plan: [...plan] });
   }
 
   return {
@@ -44,6 +46,10 @@ export async function createFirebaseAdapter(uid) {
       });
       onSnapshot(shoppingCol, (snap) => {
         shopping = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        emit();
+      });
+      onSnapshot(planCol, (snap) => {
+        plan = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         emit();
       });
     },
@@ -92,6 +98,14 @@ export async function createFirebaseAdapter(uid) {
       await batch.commit();
     },
 
+    async addPlan(entry) {
+      const { id, ...data } = entry;
+      await setDoc(doc(planCol, id), data);
+    },
+    async deletePlan(id) {
+      await deleteDoc(doc(planCol, id));
+    },
+
     async replaceAll(data) {
       const batch = writeBatch(db);
       (data.tools || []).forEach((t) => {
@@ -105,6 +119,10 @@ export async function createFirebaseAdapter(uid) {
       (data.shopping || []).forEach((s) => {
         const { id, ...rest } = s;
         batch.set(doc(shoppingCol, id), rest);
+      });
+      (data.plan || []).forEach((p) => {
+        const { id, ...rest } = p;
+        batch.set(doc(planCol, id), rest);
       });
       await batch.commit();
     }

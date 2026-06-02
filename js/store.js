@@ -5,7 +5,7 @@ import { createLocalAdapter } from "./store-local.js";
 import { combine, categorize } from "./ingredients.js";
 
 let adapter = null;
-let state = { tools: [], recipes: [], shopping: [] };
+let state = { tools: [], recipes: [], shopping: [], plan: [] };
 const subscribers = new Set();
 
 function notify() {
@@ -175,9 +175,26 @@ export async function clearAllShopping() {
   if (ids.length) await adapter.clearShopping(ids);
 }
 
+// ---- Piano settimanale / calendario ----
+export function getPlan() {
+  return [...state.plan];
+}
+export function getPlanByDate(date) {
+  return state.plan.filter((p) => p.date === date);
+}
+export function countPlanByDate(date) {
+  return state.plan.filter((p) => p.date === date).length;
+}
+export async function addPlan(date, recipeId) {
+  await adapter.addPlan({ id: newId(), date, recipeId, createdAt: now() });
+}
+export async function deletePlan(id) {
+  await adapter.deletePlan(id);
+}
+
 // ---- Esporta / Importa (backup manuale) ----
 export function exportData() {
-  return { version: 2, exportedAt: now(), tools: state.tools, recipes: state.recipes, shopping: state.shopping };
+  return { version: 3, exportedAt: now(), tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan };
 }
 
 export async function importData(data, { merge = false } = {}) {
@@ -190,6 +207,6 @@ export async function importData(data, { merge = false } = {}) {
     for (const t of data.tools) if (!existingTools.has(t.id)) await adapter.addTool(t);
     for (const r of data.recipes) if (!existingRecipes.has(r.id)) await adapter.addRecipe(r);
   } else {
-    await adapter.replaceAll({ tools: data.tools, recipes: data.recipes, shopping: data.shopping || [] });
+    await adapter.replaceAll({ tools: data.tools, recipes: data.recipes, shopping: data.shopping || [], plan: data.plan || [] });
   }
 }

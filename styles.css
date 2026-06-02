@@ -153,11 +153,12 @@ a { color: var(--primary-2); }
   align-items: center;
   justify-content: center;
   gap: 3px;
-  font-size: 0.68rem;
+  font-size: 0.6rem;
   font-weight: 700;
-  padding: 6px 0;
+  padding: 6px 2px;
 }
-.bottom-nav__icon { font-size: 1.4rem; opacity: 0.75; transition: 0.2s; }
+.bottom-nav__label { white-space: nowrap; }
+.bottom-nav__icon { font-size: 1.35rem; opacity: 0.75; transition: 0.2s; }
 .bottom-nav__btn.is-active { color: var(--primary-2); }
 .bottom-nav__btn.is-active .bottom-nav__icon { opacity: 1; transform: translateY(-1px); }
 
@@ -593,6 +594,23 @@ a { color: var(--primary-2); }
 .shop-row__amt { color: var(--text-soft); font-weight: 700; font-size: 0.85rem; margin-left: 4px; }
 .shop-row.is-checked .shop-row__name { text-decoration: line-through; color: var(--text-soft); }
 .shop-row__del { width: 32px; height: 32px; }
+
+/* ---------- Calendario / pianificazione ---------- */
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin: 6px 0 16px; }
+.cal-title { font-size: 1.15rem; font-weight: 800; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.cal-weekdays { margin-bottom: 6px; }
+.cal-wd { text-align: center; font-size: 0.72rem; font-weight: 700; color: var(--text-soft); padding: 2px 0; }
+.cal-cell { position: relative; aspect-ratio: 1; border: 1px solid var(--border); background: var(--surface); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--text); font-weight: 600; font-size: 0.95rem; transition: transform 0.1s; }
+.cal-cell:active { transform: scale(0.93); }
+.cal-cell--empty { border: none; background: transparent; }
+.cal-cell.is-today { border-color: var(--primary); color: var(--primary-2); box-shadow: 0 0 0 1px var(--primary) inset; }
+.cal-cell.has-plan { background: linear-gradient(160deg, #2a2118, #1d1a16); border-color: rgba(255, 160, 90, 0.35); }
+.cal-dot { position: absolute; top: 5px; right: 6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 9px; background: var(--primary-grad); color: #2a1606; font-size: 0.6rem; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+
+.day-row, .pick-row { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 11px 12px; margin-bottom: 8px; color: var(--text); font-size: 1rem; }
+.day-row__icon { width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: var(--surface-2); font-size: 1.1rem; color: var(--primary-2); }
+.day-row__name { flex: 1; font-weight: 600; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
