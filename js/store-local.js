@@ -97,6 +97,11 @@ export function createLocalAdapter() {
       state.pantry.push(item);
       commit();
     },
+    async updatePantry(id, patch) {
+      const p = state.pantry.find((x) => x.id === id);
+      if (p) Object.assign(p, patch);
+      commit();
+    },
     async deletePantry(id) {
       state.pantry = state.pantry.filter((p) => p.id !== id);
       commit();

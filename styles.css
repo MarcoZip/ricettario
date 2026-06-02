@@ -685,6 +685,17 @@ a { color: var(--primary-2); }
 /* lettura vocale attiva */
 .cook__close.is-on { background: var(--primary); border-color: transparent; }
 
+/* ---------- Dispensa: scadenze & suggerimenti ---------- */
+.pan-add { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.pan-add input[type="text"], .pan-add input[type="date"] { width: 100%; border: 1px solid var(--surface-3); border-radius: var(--radius-sm); padding: 13px; font-size: 1rem; background: #15161b; color: var(--text); }
+.pan-add input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(255, 122, 61, 0.16); }
+.pan-add__row { display: flex; gap: 8px; }
+.pan-add__row input[type="date"] { flex: 1; }
+.exp { font-size: 0.74rem; font-weight: 800; padding: 4px 9px; border-radius: 999px; background: var(--surface-2); color: var(--text-soft); white-space: nowrap; }
+.exp--warn { background: rgba(255, 184, 107, 0.16); color: #ffcf94; }
+.exp--bad { background: rgba(255, 94, 108, 0.16); color: #ffb3bb; }
+.have-badge { display: inline-block; margin-left: 8px; font-size: 0.75rem; font-weight: 800; color: var(--primary-2); background: rgba(255, 184, 107, 0.14); border-radius: 999px; padding: 2px 9px; }
+
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideup { from { transform: translateY(34px); opacity: 0.5; } to { transform: translateY(0); opacity: 1; } }

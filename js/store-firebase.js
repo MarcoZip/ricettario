@@ -116,6 +116,9 @@ export async function createFirebaseAdapter(uid) {
       const { id, ...data } = item;
       await setDoc(doc(pantryCol, id), data);
     },
+    async updatePantry(id, patch) {
+      await setDoc(doc(pantryCol, id), patch, { merge: true });
+    },
     async deletePantry(id) {
       await deleteDoc(doc(pantryCol, id));
     },

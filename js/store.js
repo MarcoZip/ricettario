@@ -241,14 +241,36 @@ function inPantry(name) {
     return pn && (pn === n || n.includes(pn) || pn.includes(n));
   });
 }
-export async function addPantryItem(name) {
+export async function addPantryItem(name, expiry = null) {
   const clean = (name || "").trim();
   if (!clean) return;
-  if (state.pantry.some((p) => (p.name || "").toLowerCase().trim() === clean.toLowerCase())) return;
-  await adapter.addPantry({ id: newId(), name: clean, createdAt: now() });
+  const existing = state.pantry.find((p) => (p.name || "").toLowerCase().trim() === clean.toLowerCase());
+  if (existing) {
+    if (expiry && existing.expiry !== expiry) await adapter.updatePantry(existing.id, { expiry });
+    return;
+  }
+  await adapter.addPantry({ id: newId(), name: clean, expiry: expiry || null, createdAt: now() });
+}
+export async function setPantryExpiry(id, expiry) {
+  await adapter.updatePantry(id, { expiry: expiry || null });
 }
 export async function deletePantryItem(id) {
   await adapter.deletePantry(id);
+}
+
+// Suggerisce ricette in base a ciò che è in dispensa.
+export function suggestFromPantry() {
+  if (!state.pantry.length) return [];
+  const res = [];
+  for (const r of state.recipes) {
+    const ings = r.ingredients || [];
+    if (!ings.length) continue;
+    let have = 0;
+    for (const it of ings) if (inPantry(it.name)) have++;
+    if (have > 0) res.push({ recipe: r, have, total: ings.length });
+  }
+  res.sort((a, b) => b.have / b.total - a.have / a.total || b.have - a.have);
+  return res;
 }
 
 // ---- Esporta / Importa (backup manuale) ----

@@ -501,6 +501,27 @@ function recipeShareText(r) {
   return lines.join("\n");
 }
 
+// Finestra per scegliere dove inserire il testo riconosciuto via OCR.
+function openOcrChooser(text, form) {
+  const om = openModal(`
+    <h3 class="modal__title">Testo riconosciuto</h3>
+    <p class="hint" style="margin-top:-8px;margin-bottom:10px">Controlla il testo e scegli dove inserirlo.</p>
+    <div class="field"><textarea id="ocrText" rows="9">${escapeHtml(text)}</textarea></div>
+    <div class="modal__actions">
+      <button class="btn" data-act="ing">Negli ingredienti</button>
+      <button class="btn btn--primary" data-act="steps">Nella preparazione</button>
+    </div>
+  `);
+  const getText = () => om.el.querySelector("#ocrText").value;
+  om.el.querySelector('[data-act="ing"]').onclick = () => { appendToField(form, "#rIngredients", getText()); om.close(); toast("Aggiunto agli ingredienti", "success"); };
+  om.el.querySelector('[data-act="steps"]').onclick = () => { appendToField(form, "#rSteps", getText()); om.close(); toast("Aggiunto alla preparazione", "success"); };
+}
+function appendToField(form, sel, text) {
+  const ta = form.el.querySelector(sel);
+  if (!ta) return;
+  ta.value = (ta.value.trim() ? ta.value.trim() + "\n" : "") + text.trim();
+}
+
 // Messaggio per gli aggiunti alla spesa (tenendo conto di ciò che è in dispensa).
 function shoppingToast(res) {
   const n = res && typeof res === "object" ? res.added : res;
@@ -731,6 +752,8 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
     <div class="field">
       <label>Ingredienti (uno per riga)</label>
       <textarea id="rIngredients" rows="6" placeholder="200 g di farina&#10;2 uova&#10;1 bustina di lievito&#10;sale q.b.">${escapeHtml(ingText)}</textarea>
+      <button type="button" class="btn btn--ghost" id="rOcr" style="margin-top:8px">${iconHtml("image")} Scansiona da una foto</button>
+      <input type="file" id="rOcrFile" accept="image/*" capture="environment" hidden />
     </div>
     <div class="field">
       <label>Preparazione (un passo per riga)</label>
@@ -791,6 +814,28 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
     if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(tagInput.value); tagInput.value = ""; }
   });
   renderTags();
+
+  // --- OCR: scansiona da una foto ---
+  const ocrBtn = m.el.querySelector("#rOcr");
+  const ocrFile = m.el.querySelector("#rOcrFile");
+  ocrBtn.addEventListener("click", () => ocrFile.click());
+  ocrFile.addEventListener("change", async () => {
+    const f = ocrFile.files[0];
+    ocrFile.value = "";
+    if (!f) return;
+    const old = ocrBtn.innerHTML;
+    ocrBtn.disabled = true; ocrBtn.textContent = "Scansione… 0%";
+    try {
+      const { ocrImage } = await import("./ocr.js");
+      const text = await ocrImage(f, (p) => { ocrBtn.textContent = `Scansione… ${Math.round(p * 100)}%`; });
+      ocrBtn.disabled = false; ocrBtn.innerHTML = old;
+      if (!text) { toast("Nessun testo riconosciuto", "error"); return; }
+      openOcrChooser(text, m);
+    } catch (e) {
+      ocrBtn.disabled = false; ocrBtn.innerHTML = old;
+      toast(e.message || "Scansione fallita", "error");
+    }
+  });
 
   const rImport = m.el.querySelector("#rImport");
   if (rImport) rImport.addEventListener("click", async () => {
@@ -1072,39 +1117,83 @@ function renderShoppingList() {
   });
 }
 
+function daysUntil(ds) {
+  const [y, m, d] = ds.split("-").map(Number);
+  const t = new Date();
+  const today = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  const target = new Date(y, m - 1, d);
+  return Math.round((target - today) / 86400000);
+}
+function expiryBadge(ds) {
+  if (!ds) return "";
+  const d = daysUntil(ds);
+  if (d < 0) return `<span class="exp exp--bad">scaduto</span>`;
+  if (d === 0) return `<span class="exp exp--warn">scade oggi</span>`;
+  if (d <= 3) return `<span class="exp exp--warn">tra ${d} g</span>`;
+  const [, m, day] = ds.split("-");
+  return `<span class="exp">${day}/${m}</span>`;
+}
+function pantryRow(p) {
+  return `<div class="shop-row" data-id="${p.id}">
+    <span class="day-row__icon">${iconHtml("basket")}</span>
+    <span class="shop-row__name">${escapeHtml(p.name)}</span>
+    ${expiryBadge(p.expiry)}
+    <button class="icon-btn icon-btn--danger shop-row__del" data-act="del">${iconHtml("trash")}</button>
+  </div>`;
+}
+
 function renderPantry() {
   const wrap = root.querySelector("#spesaBody");
-  const pantry = store.getPantry().sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const pantry = store.getPantry().slice().sort((a, b) => {
+    if (a.expiry && b.expiry) return a.expiry.localeCompare(b.expiry);
+    if (a.expiry) return -1;
+    if (b.expiry) return 1;
+    return (a.name || "").localeCompare(b.name || "");
+  });
   const list = pantry.length
-    ? pantry.map((p) => `
-        <div class="shop-row" data-id="${p.id}">
-          <span class="day-row__icon">${iconHtml("basket")}</span>
-          <span class="shop-row__name">${escapeHtml(p.name)}</span>
-          <button class="icon-btn icon-btn--danger shop-row__del" data-act="del">${iconHtml("trash")}</button>
-        </div>`).join("")
+    ? pantry.map(pantryRow).join("")
     : `<div class="empty"><span class="empty__emoji">${iconHtml("basket")}</span>Dispensa vuota.<br>Aggiungi ciò che hai già in casa: non verrà inserito nella spesa.</div>`;
 
   wrap.innerHTML = `
-    <div class="hint" style="margin-bottom:10px">Quello che metti qui non verrà aggiunto alla lista della spesa.</div>
-    <div class="search-bar">
-      <input type="text" id="panAdd" placeholder="Es. olio, sale, farina..." />
-      <button class="btn btn--primary" id="panAddBtn">${iconHtml("plus")}</button>
+    <div class="hint" style="margin-bottom:10px">Quello che metti qui non verrà aggiunto alla lista della spesa. La data di scadenza è facoltativa.</div>
+    <button class="btn btn--primary btn--block" id="cookSuggest" style="margin-bottom:14px">${iconHtml("fork-knife")} Cosa posso cucinare con questi?</button>
+    <div class="pan-add">
+      <input type="text" id="panAdd" placeholder="Aggiungi un alimento..." />
+      <div class="pan-add__row">
+        <input type="date" id="panExp" title="Scadenza (facoltativa)" />
+        <button class="btn btn--primary" id="panAddBtn">${iconHtml("plus")} Aggiungi</button>
+      </div>
     </div>
     <div>${list}</div>
   `;
 
   const addInput = wrap.querySelector("#panAdd");
+  const expInput = wrap.querySelector("#panExp");
   const doAdd = async () => {
     const v = addInput.value.trim();
     if (!v) return;
-    addInput.value = "";
-    for (const part of v.split(",")) await store.addPantryItem(part.trim());
+    const exp = expInput.value || null;
+    addInput.value = ""; expInput.value = "";
+    for (const part of v.split(",")) await store.addPantryItem(part.trim(), exp);
   };
   wrap.querySelector("#panAddBtn").addEventListener("click", doAdd);
   addInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdd(); });
+  wrap.querySelector("#cookSuggest").addEventListener("click", openCookSuggestions);
   wrap.querySelectorAll(".shop-row").forEach((rowEl) => {
     rowEl.querySelector('[data-act="del"]').addEventListener("click", () => store.deletePantryItem(rowEl.dataset.id));
   });
+}
+
+function openCookSuggestions() {
+  const list = store.suggestFromPantry();
+  const body = list.length
+    ? list.map(({ recipe, have, total }) => {
+        const tool = store.getTool(recipe.toolId);
+        return `<button class="pick-row" data-id="${recipe.id}"><span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span><span class="day-row__name">${escapeHtml(recipe.title)}<span class="have-badge">${have}/${total} ingredienti</span></span></button>`;
+      }).join("")
+    : `<div class="empty"><span class="empty__emoji">${iconHtml("fork-knife")}</span>Nessun suggerimento.<br>Aggiungi alimenti in dispensa e ricette con ingredienti, poi riprova.</div>`;
+  const m = openModal(`<h3 class="modal__title">Cosa posso cucinare</h3><div>${body}</div>`);
+  m.el.querySelectorAll(".pick-row").forEach((b) => b.addEventListener("click", () => { m.close(); openRecipe(b.dataset.id); }));
 }
 
 // ---------------- Schermata: Pianificazione (calendario) ----------------
