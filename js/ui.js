@@ -1111,10 +1111,7 @@ function renderShoppingList() {
   });
 
   const tp = wrap.querySelector("#toPantry");
-  if (tp) tp.addEventListener("click", async () => {
-    const n = await store.moveCheckedToPantry();
-    toast(`${n} ${n === 1 ? "articolo messo" : "articoli messi"} in dispensa`, "success");
-  });
+  if (tp) tp.addEventListener("click", () => openPutInPantry(store.getShopping().filter((s) => s.checked)));
   const cd = wrap.querySelector("#clearDone");
   if (cd) cd.addEventListener("click", () => store.clearCheckedShopping());
   const ca = wrap.querySelector("#clearAll");
@@ -1147,6 +1144,33 @@ function pantryRow(p) {
     ${expiryBadge(p.expiry)}
     <button class="icon-btn icon-btn--danger shop-row__del" data-act="del">${iconHtml("trash")}</button>
   </div>`;
+}
+
+// Finestra "Spesa fatta": mette i presi in dispensa, con scadenza facoltativa.
+function openPutInPantry(checked) {
+  if (!checked.length) return;
+  const rows = checked.map((s) => `
+    <div class="put-row" data-name="${escapeHtml(s.name)}">
+      <span class="put-row__name">${iconHtml("basket")} ${escapeHtml(s.name)}</span>
+      <input type="date" class="put-row__date" title="Scadenza (facoltativa)" />
+    </div>`).join("");
+  const m = openModal(`
+    <h3 class="modal__title">Metti in dispensa</h3>
+    <p class="hint" style="margin-top:-8px;margin-bottom:12px">La scadenza è facoltativa: lasciala vuota se non la sai.</p>
+    <div>${rows}</div>
+    <div class="modal__actions">
+      <button class="btn" data-act="cancel">Annulla</button>
+      <button class="btn btn--primary" data-act="ok">Conferma</button>
+    </div>
+  `);
+  m.el.querySelector('[data-act="cancel"]').onclick = m.close;
+  m.el.querySelector('[data-act="ok"]').onclick = async () => {
+    const rowEls = [...m.el.querySelectorAll(".put-row")];
+    for (const r of rowEls) await store.addPantryItem(r.dataset.name, r.querySelector(".put-row__date").value || null);
+    await store.clearCheckedShopping();
+    m.close();
+    toast(`${rowEls.length} ${rowEls.length === 1 ? "articolo messo" : "articoli messi"} in dispensa`, "success");
+  };
 }
 
 function renderPantry() {

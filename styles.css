@@ -695,6 +695,12 @@ a { color: var(--primary-2); }
 .exp--warn { background: rgba(255, 184, 107, 0.16); color: #ffcf94; }
 .exp--bad { background: rgba(255, 94, 108, 0.16); color: #ffb3bb; }
 .have-badge { display: inline-block; margin-left: 8px; font-size: 0.75rem; font-weight: 800; color: var(--primary-2); background: rgba(255, 184, 107, 0.14); border-radius: 999px; padding: 2px 9px; }
+.put-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.put-row:last-child { border-bottom: none; }
+.put-row__name { flex: 1; font-weight: 600; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.put-row__name .ic { color: var(--primary-2); flex-shrink: 0; }
+.put-row__date { border: 1px solid var(--surface-3); border-radius: 10px; padding: 8px 10px; background: #15161b; color: var(--text); font-size: 0.85rem; flex-shrink: 0; }
+.put-row__date:focus { outline: none; border-color: var(--primary); }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
