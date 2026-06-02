@@ -1,0 +1,12 @@
+// Regole di sicurezza per Firestore.
+// Da incollare nella console Firebase:  Firestore Database > Regole > Pubblica.
+// Garantiscono che ogni utente possa leggere/scrivere SOLO i propri dati.
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

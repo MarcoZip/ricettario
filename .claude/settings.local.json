@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(git --version)",
+      "PowerShell($cmds = 'node','npm','python','py','firebase'; foreach\\($c in $cmds\\){ $p = \\(Get-Command $c -ErrorAction SilentlyContinue\\).Source; if\\($p\\){ \"$c -> $p\" } else { \"$c -> NOT FOUND\" } })",
+      "mcp__Claude_Preview__preview_start",
+      "PowerShell(git init -b main)",
+      "PowerShell(git add -A)",
+      "PowerShell(\"--- log ---\")"
+    ]
+  }
+}

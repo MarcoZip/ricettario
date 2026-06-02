@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#e8632a" />
+  <title>Ricettario</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Ricettario" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Header -->
+  <header class="app-header">
+    <div class="app-header__title">
+      <span class="app-header__logo">🍳</span>
+      <span>Ricettario</span>
+    </div>
+    <div class="app-header__status">
+      <span id="syncBadge" class="badge badge--local" title="Stato salvataggio">Locale</span>
+    </div>
+  </header>
+
+  <!-- Contenuto principale -->
+  <main id="view" class="view"></main>
+
+  <!-- Navigazione in basso -->
+  <nav class="bottom-nav">
+    <button class="bottom-nav__btn is-active" data-route="strumenti">
+      <span class="bottom-nav__icon">🍲</span>
+      <span class="bottom-nav__label">Strumenti</span>
+    </button>
+    <button class="bottom-nav__btn" data-route="ricettario">
+      <span class="bottom-nav__icon">📖</span>
+      <span class="bottom-nav__label">Ricettario</span>
+    </button>
+    <button class="bottom-nav__btn" data-route="impostazioni">
+      <span class="bottom-nav__icon">⚙️</span>
+      <span class="bottom-nav__label">Impostazioni</span>
+    </button>
+  </nav>
+
+  <!-- Contenitore finestre modali -->
+  <div id="modalRoot"></div>
+
+  <!-- Notifiche toast -->
+  <div id="toastRoot" class="toast-root" aria-live="polite"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
