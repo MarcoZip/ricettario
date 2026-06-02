@@ -6,16 +6,16 @@ const KEY = "ricettario.data.v1";
 function read() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { tools: [], recipes: [], shopping: [], plan: [] };
+    if (!raw) return { tools: [], recipes: [], shopping: [], plan: [], pantry: [] };
     const data = JSON.parse(raw);
-    return { tools: data.tools || [], recipes: data.recipes || [], shopping: data.shopping || [], plan: data.plan || [] };
+    return { tools: data.tools || [], recipes: data.recipes || [], shopping: data.shopping || [], plan: data.plan || [], pantry: data.pantry || [] };
   } catch {
-    return { tools: [], recipes: [], shopping: [], plan: [] };
+    return { tools: [], recipes: [], shopping: [], plan: [], pantry: [] };
   }
 }
 
 function write(state) {
-  localStorage.setItem(KEY, JSON.stringify({ tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan }));
+  localStorage.setItem(KEY, JSON.stringify({ tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan, pantry: state.pantry }));
 }
 
 export function createLocalAdapter() {
@@ -24,7 +24,7 @@ export function createLocalAdapter() {
 
   function commit() {
     write(state);
-    onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping], plan: [...state.plan] });
+    onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping], plan: [...state.plan], pantry: [...state.pantry] });
   }
 
   return {
@@ -33,7 +33,7 @@ export function createLocalAdapter() {
     async start(cb) {
       onChange = cb;
       // Emissione iniziale dello stato salvato.
-      onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping], plan: [...state.plan] });
+      onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping], plan: [...state.plan], pantry: [...state.pantry] });
     },
 
     async addTool(tool) {
@@ -93,11 +93,21 @@ export function createLocalAdapter() {
       commit();
     },
 
+    async addPantry(item) {
+      state.pantry.push(item);
+      commit();
+    },
+    async deletePantry(id) {
+      state.pantry = state.pantry.filter((p) => p.id !== id);
+      commit();
+    },
+
     async replaceAll(data) {
       state.tools = data.tools || [];
       state.recipes = data.recipes || [];
       state.shopping = data.shopping || [];
       state.plan = data.plan || [];
+      state.pantry = data.pantry || [];
       commit();
     }
   };

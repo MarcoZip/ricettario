@@ -5,7 +5,7 @@ import { createLocalAdapter } from "./store-local.js";
 import { combine, categorize } from "./ingredients.js";
 
 let adapter = null;
-let state = { tools: [], recipes: [], shopping: [], plan: [] };
+let state = { tools: [], recipes: [], shopping: [], plan: [], pantry: [] };
 const subscribers = new Set();
 
 function notify() {
@@ -105,7 +105,7 @@ export async function deleteTool(id) {
   await adapter.deleteTool(id);
 }
 
-export async function addRecipe({ toolId, title, url, notes, ingredients, servings }) {
+export async function addRecipe({ toolId, title, url, notes, ingredients, servings, steps, favorite, rating }) {
   await adapter.addRecipe({
     id: newId(),
     toolId,
@@ -114,9 +114,28 @@ export async function addRecipe({ toolId, title, url, notes, ingredients, servin
     notes: (notes || "").trim(),
     ingredients: Array.isArray(ingredients) ? ingredients : [],
     servings: servings || null,
+    steps: Array.isArray(steps) ? steps : [],
+    favorite: Boolean(favorite),
+    rating: rating || 0,
     createdAt: now(),
     updatedAt: now()
   });
+}
+
+// Tutte le ricette (per ricerca e selettori).
+export function getAllRecipes() {
+  return [...state.recipes];
+}
+export function getFavorites() {
+  return state.recipes.filter((r) => r.favorite);
+}
+export function searchRecipes(q) {
+  const s = q.toLowerCase().trim();
+  if (!s) return [];
+  return state.recipes.filter((r) =>
+    (r.title || "").toLowerCase().includes(s) ||
+    (r.ingredients || []).some((i) => (i.name || "").toLowerCase().includes(s))
+  );
 }
 
 export async function updateRecipe(id, patch) {
@@ -139,7 +158,10 @@ function shopKey(it) {
 // Aggiunge una lista di ingredienti, unendo quelli uguali (anche con l'esistente).
 export async function addShoppingItems(rawItems) {
   const merged = combine(rawItems.filter((i) => i && i.name));
+  let added = 0;
+  let skipped = 0;
   for (const it of merged) {
+    if (inPantry(it.name)) { skipped++; continue; } // già in dispensa
     const key = shopKey(it);
     const existing = state.shopping.find((s) => !s.checked && shopKey(s) === key);
     if (existing) {
@@ -156,8 +178,9 @@ export async function addShoppingItems(rawItems) {
         createdAt: now()
       });
     }
+    added++;
   }
-  return merged.length;
+  return { added, skipped };
 }
 
 export async function toggleShoppingItem(id, checked) {
@@ -185,16 +208,38 @@ export function getPlanByDate(date) {
 export function countPlanByDate(date) {
   return state.plan.filter((p) => p.date === date).length;
 }
-export async function addPlan(date, recipeId) {
-  await adapter.addPlan({ id: newId(), date, recipeId, createdAt: now() });
+export async function addPlan(date, recipeId, slot = null) {
+  await adapter.addPlan({ id: newId(), date, recipeId, slot: slot || null, createdAt: now() });
 }
 export async function deletePlan(id) {
   await adapter.deletePlan(id);
 }
 
+// ---- Dispensa ----
+export function getPantry() {
+  return [...state.pantry];
+}
+function inPantry(name) {
+  const n = (name || "").toLowerCase().trim();
+  if (!n) return false;
+  return state.pantry.some((p) => {
+    const pn = (p.name || "").toLowerCase().trim();
+    return pn && (pn === n || n.includes(pn) || pn.includes(n));
+  });
+}
+export async function addPantryItem(name) {
+  const clean = (name || "").trim();
+  if (!clean) return;
+  if (state.pantry.some((p) => (p.name || "").toLowerCase().trim() === clean.toLowerCase())) return;
+  await adapter.addPantry({ id: newId(), name: clean, createdAt: now() });
+}
+export async function deletePantryItem(id) {
+  await adapter.deletePantry(id);
+}
+
 // ---- Esporta / Importa (backup manuale) ----
 export function exportData() {
-  return { version: 3, exportedAt: now(), tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan };
+  return { version: 4, exportedAt: now(), tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan, pantry: state.pantry };
 }
 
 export async function importData(data, { merge = false } = {}) {
@@ -207,6 +252,6 @@ export async function importData(data, { merge = false } = {}) {
     for (const t of data.tools) if (!existingTools.has(t.id)) await adapter.addTool(t);
     for (const r of data.recipes) if (!existingRecipes.has(r.id)) await adapter.addRecipe(r);
   } else {
-    await adapter.replaceAll({ tools: data.tools, recipes: data.recipes, shopping: data.shopping || [], plan: data.plan || [] });
+    await adapter.replaceAll({ tools: data.tools, recipes: data.recipes, shopping: data.shopping || [], plan: data.plan || [], pantry: data.pantry || [] });
   }
 }

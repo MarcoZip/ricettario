@@ -16,6 +16,13 @@ function normalize(meal) {
     const meas = (meal["strMeasure" + i] || "").trim();
     if (ing) ingredients.push((meas ? meas + " " : "") + ing);
   }
+  // Passi di preparazione (in inglese) da strInstructions.
+  let steps = [];
+  const instr = (meal.strInstructions || "").trim();
+  if (instr) {
+    steps = instr.split(/\r?\n+/).map((s) => s.trim()).filter(Boolean);
+    if (steps.length <= 1) steps = instr.split(/(?<=[.!?])\s+(?=[A-Z0-9])/).map((s) => s.trim()).filter(Boolean);
+  }
   return {
     id: meal.idMeal,
     title: meal.strMeal,
@@ -23,7 +30,8 @@ function normalize(meal) {
     category: meal.strCategory || "",
     area: meal.strArea || "",
     link,
-    ingredients // righe di testo grezze (in inglese)
+    ingredients, // righe di testo grezze (in inglese)
+    steps
   };
 }
 

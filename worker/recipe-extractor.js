@@ -99,5 +99,14 @@ function normalize(n) {
     image = (img && (img.url || img)) || "";
   }
 
-  return { title: n.name || "", image: image || "", servings, ingredients };
+  // Passi di preparazione da recipeInstructions (testo, lista o HowToStep).
+  let steps = [];
+  const ri = n.recipeInstructions;
+  if (typeof ri === "string") {
+    steps = ri.split(/\r?\n+/).map((s) => s.trim()).filter(Boolean);
+  } else if (Array.isArray(ri)) {
+    steps = ri.map((s) => (typeof s === "string" ? s : (s && (s.text || s.name)) || "")).map((s) => String(s).trim()).filter(Boolean);
+  }
+
+  return { title: n.name || "", image: image || "", servings, ingredients, steps };
 }

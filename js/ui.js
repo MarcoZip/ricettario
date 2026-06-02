@@ -38,6 +38,9 @@ let currentRecipeId = null;
 let detailServings = null; // porzioni scelte nella schermata ricetta
 let planYear = null; // anno mostrato nel calendario
 let planMonth = null; // mese (0-11) mostrato nel calendario
+let homeQuery = ""; // ricerca nella home
+let homeFav = false; // filtro preferiti nella home
+let shopTab = "lista"; // scheda Spesa: "lista" | "dispensa"
 
 // Stato locale della sezione Ricettario (per non perdere i risultati ad ogni render).
 let mealTab = "online";
@@ -129,6 +132,8 @@ export function navigate(route) {
   currentRoute = route;
   currentToolId = null;
   currentRecipeId = null;
+  homeQuery = "";
+  homeFav = false;
   document.querySelectorAll(".bottom-nav__btn").forEach((b) => {
     b.classList.toggle("is-active", b.dataset.route === route);
   });
@@ -177,6 +182,46 @@ export function render() {
 }
 
 // ---------------- Schermata: Strumenti ----------------
+function recipeResultRow(r) {
+  const tool = store.getTool(r.toolId);
+  const fav = r.favorite ? ` <span class="meta-fav">${iconHtml("heart")}</span>` : "";
+  const rate = r.rating ? ` <span class="meta-star">${iconHtml("star")} ${r.rating}</span>` : "";
+  return `<button class="pick-row" data-id="${r.id}"><span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span><span class="day-row__name">${escapeHtml(r.title)}${fav}${rate}</span></button>`;
+}
+
+function renderHomeBody() {
+  const body = root.querySelector("#homeBody");
+  if (!body) return;
+  const searching = homeQuery.trim() || homeFav;
+  if (searching) {
+    const results = homeFav ? store.getFavorites() : store.searchRecipes(homeQuery);
+    body.innerHTML = results.length
+      ? results.map(recipeResultRow).join("")
+      : `<div class="empty"><span class="empty__emoji">${iconHtml(homeFav ? "heart" : "magnifying-glass")}</span>${homeFav ? "Nessun preferito. Tocca il cuore in una ricetta per aggiungerla." : "Nessuna ricetta trovata."}</div>`;
+    body.querySelectorAll(".pick-row").forEach((b) => b.addEventListener("click", () => openRecipe(b.dataset.id)));
+  } else {
+    const tools = store.getTools();
+    const cards = tools
+      .map((t, i) => {
+        const n = store.countRecipes(t.id);
+        return `
+        <button class="tool-card stagger" data-tool="${t.id}" style="--ac:${ACCENTS[i % ACCENTS.length]};--i:${i}">
+          <span class="tool-card__emoji">${iconHtml(t.icon)}</span>
+          <span class="tool-card__name">${escapeHtml(t.name)}</span>
+          <span class="tool-card__count">${n} ${n === 1 ? "ricetta" : "ricette"}</span>
+        </button>`;
+      })
+      .join("");
+    body.innerHTML = `<div class="tool-grid">${cards}
+      <button class="add-card stagger" id="addTool" style="--i:${tools.length}">
+        <span class="add-card__plus">${iconHtml("plus")}</span>
+        <span>Aggiungi strumento</span>
+      </button></div>`;
+    body.querySelectorAll(".tool-card").forEach((c) => c.addEventListener("click", () => openTool(c.dataset.tool)));
+    body.querySelector("#addTool").addEventListener("click", () => openToolForm());
+  }
+}
+
 function renderStrumenti() {
   const tools = store.getTools();
   const info = handlers.getAccountInfo();
@@ -184,18 +229,6 @@ function renderStrumenti() {
     !info.configured
       ? `<div class="banner">💡 <div>Stai usando il salvataggio <b>solo su questo telefono</b>. Per attivare il <b>backup nel cloud</b> apri <b>Impostazioni</b>.</div></div>`
       : "";
-
-  const cards = tools
-    .map((t, i) => {
-      const n = store.countRecipes(t.id);
-      return `
-      <button class="tool-card stagger" data-tool="${t.id}" style="--ac:${ACCENTS[i % ACCENTS.length]};--i:${i}">
-        <span class="tool-card__emoji">${iconHtml(t.icon)}</span>
-        <span class="tool-card__name">${escapeHtml(t.name)}</span>
-        <span class="tool-card__count">${n} ${n === 1 ? "ricetta" : "ricette"}</span>
-      </button>`;
-    })
-    .join("");
 
   const total = tools.reduce((s, t) => s + store.countRecipes(t.id), 0);
 
@@ -209,20 +242,22 @@ function renderStrumenti() {
       <button class="home-hero__btn" id="heroAdd">${iconHtml("plus")} Nuova ricetta</button>
     </div>
     ${banner}
-    <div class="tool-grid">
-      ${cards}
-      <button class="add-card stagger" id="addTool" style="--i:${tools.length}">
-        <span class="add-card__plus">${iconHtml("plus")}</span>
-        <span>Aggiungi strumento</span>
-      </button>
+    <div class="search-bar">
+      <input type="search" id="homeSearch" placeholder="Cerca tra le tue ricette..." value="${escapeHtml(homeQuery)}" />
+      <button class="btn ${homeFav ? "btn--primary" : ""}" id="favToggle" title="Preferiti">${iconHtml("heart")}</button>
     </div>
+    <div id="homeBody"></div>
   `;
 
-  root.querySelectorAll(".tool-card").forEach((c) =>
-    c.addEventListener("click", () => openTool(c.dataset.tool))
-  );
-  root.querySelector("#addTool").addEventListener("click", () => openToolForm());
   root.querySelector("#heroAdd").addEventListener("click", () => openRecipeForm({}));
+  const search = root.querySelector("#homeSearch");
+  search.addEventListener("input", () => { homeQuery = search.value; homeFav = false; root.querySelector("#favToggle").classList.remove("btn--primary"); renderHomeBody(); });
+  root.querySelector("#favToggle").addEventListener("click", (e) => {
+    homeFav = !homeFav; homeQuery = ""; search.value = "";
+    e.currentTarget.classList.toggle("btn--primary", homeFav);
+    renderHomeBody();
+  });
+  renderHomeBody();
   countUp(root.querySelector("#heroNum"), total);
 }
 
@@ -236,6 +271,8 @@ function renderToolDetail() {
     ? recipes
         .map((r, i) => {
           const meta = [];
+          if (r.favorite) meta.push(`<span class="meta-fav">${iconHtml("heart")}</span>`);
+          if (r.rating) meta.push(`<span class="meta-star">${iconHtml("star")} ${r.rating}</span>`);
           if (r.ingredients && r.ingredients.length) meta.push(`${iconHtml("list-bullets")} ${r.ingredients.length} ingr.`);
           if (r.servings) meta.push(`${iconHtml("fork-knife")} per ${r.servings}`);
           if (safeUrl(r.url)) meta.push(iconHtml("link-simple"));
@@ -317,6 +354,7 @@ function renderRecipeDetail() {
   if (!r) { currentRecipeId = null; return render(); }
   const tool = store.getTool(r.toolId);
   const ingredients = Array.isArray(r.ingredients) ? r.ingredients : [];
+  const steps = Array.isArray(r.steps) ? r.steps : [];
   const base = r.servings || null;
   if (detailServings == null) detailServings = base;
   const factor = base && detailServings ? detailServings / base : 1;
@@ -335,17 +373,25 @@ function renderRecipeDetail() {
 
   const ingList = ingredients.length
     ? `<div class="ing-list">${ingredients
-        .map((it) => `<div class="ing-row"><span class="ing-dot" style="--ac:${ACCENTS[0]}"></span>${escapeHtml(ingredientText(it, factor))}</div>`)
+        .map((it, i) => `<div class="ing-row"><span class="ing-dot" style="--ac:${ACCENTS[i % ACCENTS.length]}"></span>${escapeHtml(ingredientText(it, factor))}</div>`)
         .join("")}</div>
        <button class="btn btn--primary btn--block" id="addToCart" style="margin-top:14px">${iconHtml("shopping-cart-simple")} Aggiungi alla lista della spesa</button>`
     : `<div class="hint">Nessun ingrediente salvato. Aggiungili con <b>Modifica</b>.</div>`;
 
+  const ratingRow = `<div class="rating" id="rating">${[1, 2, 3, 4, 5]
+    .map((v) => `<button class="star ${v <= (r.rating || 0) ? "is-on" : ""}" data-v="${v}">${iconHtml("star")}</button>`)
+    .join("")}</div>`;
+
   root.innerHTML = `
     <div class="toolbar">
       <button class="back-btn" id="back">${iconHtml("arrow-left")}</button>
-      <div class="toolbar__title">${escapeHtml(r.title)}</div>
+      <div class="toolbar__title" style="flex:1">${escapeHtml(r.title)}</div>
+      <button class="back-btn fav-btn ${r.favorite ? "is-fav" : ""}" id="favBtn" title="Preferito">${iconHtml("heart")}</button>
     </div>
-    ${tool ? `<div class="recipe-tool-chip">${iconHtml(tool.icon)} ${escapeHtml(tool.name)}</div>` : ""}
+    <div class="detail-top">
+      ${tool ? `<span class="recipe-tool-chip" style="margin:0">${iconHtml(tool.icon)} ${escapeHtml(tool.name)}</span>` : "<span></span>"}
+      ${ratingRow}
+    </div>
     ${url ? `<a class="btn btn--block" id="openLink" href="${escapeHtml(url)}" target="_blank" rel="noopener" style="margin-bottom:16px">${iconHtml("arrow-square-out")} Apri la ricetta</a>` : ""}
 
     <div class="section-card">
@@ -353,6 +399,12 @@ function renderRecipeDetail() {
       ${stepper}
       ${ingList}
     </div>
+
+    ${steps.length ? `<div class="section-card">
+      <h3 class="section-title">${iconHtml("fork-knife")} Preparazione</h3>
+      <ol class="steps-list">${steps.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ol>
+      <button class="btn btn--primary btn--block" id="cookBtn" style="margin-top:6px">${iconHtml("fire")} Modalità cucina</button>
+    </div>` : ""}
 
     ${r.notes ? `<div class="section-card"><h3 class="section-title">${iconHtml("note-pencil")} Note</h3><div class="recipe-item__notes" style="margin-top:0">${escapeHtml(r.notes)}</div></div>` : ""}
 
@@ -368,6 +420,12 @@ function renderRecipeDetail() {
   if (pMinus) pMinus.addEventListener("click", () => { detailServings = Math.max(1, (detailServings || base || 1) - 1); render(); });
   if (pPlus) pPlus.addEventListener("click", () => { detailServings = (detailServings || base || 1) + 1; render(); });
 
+  root.querySelector("#favBtn").addEventListener("click", () => store.updateRecipe(r.id, { favorite: !r.favorite }));
+  root.querySelectorAll("#rating .star").forEach((st) => st.addEventListener("click", () => {
+    const v = parseInt(st.dataset.v, 10);
+    store.updateRecipe(r.id, { rating: v === r.rating ? 0 : v });
+  }));
+
   const addToCart = root.querySelector("#addToCart");
   if (addToCart) addToCart.addEventListener("click", async () => {
     const items = ingredients.map((it) => ({
@@ -376,15 +434,120 @@ function renderRecipeDetail() {
       qty: it.qty != null ? it.qty * factor : null,
       category: categorize(it.name)
     }));
-    const n = await store.addShoppingItems(items);
-    toast(`${n} ingredienti aggiunti alla spesa`, "success");
+    const res = await store.addShoppingItems(items);
+    toast(shoppingToast(res), "success");
   });
+
+  const cookBtn = root.querySelector("#cookBtn");
+  if (cookBtn) cookBtn.addEventListener("click", () => openCookingMode(r));
 
   root.querySelector("#editRecipe").addEventListener("click", () => openRecipeForm({ recipe: r }));
   root.querySelector("#delRecipe").addEventListener("click", async () => {
     const ok = await confirmDialog({ title: "Eliminare la ricetta?", message: `"${r.title}" verrà eliminata.`, confirmText: "Elimina", danger: true });
     if (ok) { await store.deleteRecipe(r.id); currentRecipeId = null; toast("Ricetta eliminata"); withTransition(() => render()); }
   });
+}
+
+// Messaggio per gli aggiunti alla spesa (tenendo conto di ciò che è in dispensa).
+function shoppingToast(res) {
+  const n = res && typeof res === "object" ? res.added : res;
+  const skipped = res && typeof res === "object" ? res.skipped : 0;
+  let msg = `${n} ingredienti aggiunti alla spesa`;
+  if (skipped) msg += ` · ${skipped} già in dispensa`;
+  return msg;
+}
+
+// ---------------- Modalità cucina ----------------
+function openCookingMode(recipe) {
+  const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
+  if (!steps.length) return;
+  let idx = 0;
+  let wakeLock = null;
+  let timer = null;
+  let remaining = 0; // secondi
+
+  const host = document.getElementById("modalRoot");
+  const el = document.createElement("div");
+  el.className = "cook";
+  host.appendChild(el);
+
+  // Tieni acceso lo schermo, se supportato.
+  async function lock() {
+    try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request("screen"); } catch {}
+  }
+  function release() {
+    try { if (wakeLock) { wakeLock.release(); wakeLock = null; } } catch {}
+  }
+  document.addEventListener("visibilitychange", onVis);
+  function onVis() { if (document.visibilityState === "visible" && !wakeLock) lock(); }
+  lock();
+
+  function fmt(s) { const m = Math.floor(s / 60); const ss = s % 60; return `${m}:${String(ss).padStart(2, "0")}`; }
+  function tick() {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(timer); timer = null; remaining = 0;
+      beep();
+      toast("Timer finito! ⏰", "success");
+    }
+    paintTimer();
+  }
+  function paintTimer() {
+    const t = el.querySelector("#ckTime");
+    if (t) t.textContent = fmt(remaining);
+    const tg = el.querySelector("#ckToggle");
+    if (tg) tg.textContent = timer ? "Pausa" : "Avvia";
+  }
+  function beep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination); o.type = "sine"; o.frequency.value = 880;
+      o.start(); g.gain.setValueAtTime(0.3, ctx.currentTime);
+      o.stop(ctx.currentTime + 0.6);
+    } catch {}
+  }
+
+  function draw() {
+    el.innerHTML = `
+      <div class="cook__bar">
+        <button class="cook__close" id="ckClose">${iconHtml("x")}</button>
+        <div class="cook__progress">Passo ${idx + 1} di ${steps.length}</div>
+        <div style="width:42px"></div>
+      </div>
+      <div class="cook__track"><div class="cook__fill" style="width:${((idx + 1) / steps.length) * 100}%"></div></div>
+      <div class="cook__body"><div class="cook__step">${escapeHtml(steps[idx])}</div></div>
+      <div class="cook__timer">
+        <button class="cook__tbtn" id="ckMinus">−1′</button>
+        <span class="cook__time" id="ckTime">${fmt(remaining)}</span>
+        <button class="cook__tbtn" id="ckPlus">+1′</button>
+        <button class="btn btn--primary cook__toggle" id="ckToggle">${timer ? "Pausa" : "Avvia"}</button>
+      </div>
+      <div class="cook__nav">
+        <button class="btn btn--block" id="ckPrev" ${idx === 0 ? "disabled" : ""}>${iconHtml("caret-left")} Indietro</button>
+        <button class="btn btn--primary btn--block" id="ckNext">${idx === steps.length - 1 ? "Fine " + iconHtml("check") : "Avanti " + iconHtml("caret-right")}</button>
+      </div>
+    `;
+    el.querySelector("#ckClose").onclick = close;
+    el.querySelector("#ckPrev").onclick = () => { if (idx > 0) { idx--; draw(); } };
+    el.querySelector("#ckNext").onclick = () => { if (idx < steps.length - 1) { idx++; draw(); } else close(); };
+    el.querySelector("#ckMinus").onclick = () => { remaining = Math.max(0, remaining - 60); paintTimer(); };
+    el.querySelector("#ckPlus").onclick = () => { remaining += 60; paintTimer(); };
+    el.querySelector("#ckToggle").onclick = () => {
+      if (timer) { clearInterval(timer); timer = null; }
+      else if (remaining > 0) { timer = setInterval(tick, 1000); }
+      paintTimer();
+    };
+  }
+
+  function close() {
+    if (timer) clearInterval(timer);
+    release();
+    document.removeEventListener("visibilitychange", onVis);
+    el.remove();
+  }
+
+  draw();
 }
 
 // ---------------- Form: strumento ----------------
@@ -458,6 +621,9 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
   const ingText = recipe
     ? (recipe.ingredients || []).map((i) => i.raw || ingredientText(i)).join("\n")
     : (prefill && prefill.ingredients ? prefill.ingredients.join("\n") : "");
+  const stepsText = recipe
+    ? (recipe.steps || []).join("\n")
+    : (prefill && prefill.steps ? prefill.steps.join("\n") : "");
 
   const importBtn = isImportConfigured()
     ? `<button type="button" class="btn btn--ghost" id="rImport" style="margin-top:8px">${iconHtml("download-simple")} Importa ingredienti dal link</button>`
@@ -487,6 +653,10 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       <textarea id="rIngredients" rows="6" placeholder="200 g di farina&#10;2 uova&#10;1 bustina di lievito&#10;sale q.b.">${escapeHtml(ingText)}</textarea>
     </div>
     <div class="field">
+      <label>Preparazione (un passo per riga)</label>
+      <textarea id="rSteps" rows="5" placeholder="Accendi il forno a 180°&#10;Mescola gli ingredienti secchi&#10;Inforna per 30 minuti">${escapeHtml(stepsText)}</textarea>
+    </div>
+    <div class="field">
       <label>Note (facoltativo)</label>
       <textarea id="rNotes" placeholder="Tempi, temperatura, varianti, voti...">${escapeHtml(notes)}</textarea>
     </div>
@@ -510,7 +680,8 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       if (data.title && !titleInput.value.trim()) titleInput.value = data.title;
       if (data.servings) m.el.querySelector("#rServings").value = data.servings;
       if (data.ingredients && data.ingredients.length) m.el.querySelector("#rIngredients").value = data.ingredients.join("\n");
-      toast("Ingredienti importati", "success");
+      if (data.steps && data.steps.length) m.el.querySelector("#rSteps").value = data.steps.join("\n");
+      toast("Ricetta importata", "success");
     } catch (e) {
       toast(e.message || "Import non riuscito", "error");
     }
@@ -525,7 +696,8 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       url: m.el.querySelector("#rUrl").value.trim(),
       notes: m.el.querySelector("#rNotes").value.trim(),
       ingredients: parseList(m.el.querySelector("#rIngredients").value),
-      servings: parseInt(m.el.querySelector("#rServings").value, 10) || null
+      servings: parseInt(m.el.querySelector("#rServings").value, 10) || null,
+      steps: m.el.querySelector("#rSteps").value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)
     };
     if (!data.title) { toast("Inserisci un titolo", "error"); return; }
     try {
@@ -609,7 +781,7 @@ function renderOnlineTab() {
   body.querySelectorAll(".meal-card").forEach((card) => {
     const data = JSON.parse(card.dataset.meal);
     card.querySelector('[data-act="save"]').addEventListener("click", () =>
-      openRecipeForm({ prefill: { title: data.title, url: data.link, ingredients: data.ingredients || [] } })
+      openRecipeForm({ prefill: { title: data.title, url: data.link, ingredients: data.ingredients || [], steps: data.steps || [] } })
     );
   });
 }
@@ -657,13 +829,28 @@ function shopRow(it) {
 }
 
 function renderShopping() {
+  root.innerHTML = `
+    <h1 class="page-title">Spesa</h1>
+    <div class="tabs">
+      <button class="tab-btn ${shopTab === "lista" ? "is-active" : ""}" data-tab="lista">${iconHtml("shopping-cart-simple")} Da comprare</button>
+      <button class="tab-btn ${shopTab === "dispensa" ? "is-active" : ""}" data-tab="dispensa">${iconHtml("basket")} Dispensa</button>
+    </div>
+    <div id="spesaBody"></div>
+  `;
+  root.querySelectorAll(".tab-btn").forEach((b) => b.addEventListener("click", () => { shopTab = b.dataset.tab; renderShopping(); }));
+  if (shopTab === "lista") renderShoppingList();
+  else renderPantry();
+}
+
+function renderShoppingList() {
+  const wrap = root.querySelector("#spesaBody");
   const items = store.getShopping();
   const active = items.filter((i) => !i.checked);
   const done = items.filter((i) => i.checked);
 
   let body;
   if (!items.length) {
-    body = `<div class="empty"><span class="empty__emoji">${iconHtml("shopping-cart-simple")}</span>La lista è vuota.<br>Aggiungi gli ingredienti da una ricetta (pulsante <b>Aggiungi alla lista della spesa</b>) o scrivili qui sotto.</div>`;
+    body = `<div class="empty"><span class="empty__emoji">${iconHtml("shopping-cart-simple")}</span>La lista è vuota.<br>Aggiungi gli ingredienti da una ricetta o scrivili qui sotto.</div>`;
   } else {
     const groups = {};
     active.forEach((it) => { const c = it.category || "Altro"; (groups[c] = groups[c] || []).push(it); });
@@ -684,8 +871,7 @@ function renderShopping() {
     body = (groupsHtml || `<div class="hint">Tutto preso! 🎉</div>`) + doneHtml;
   }
 
-  root.innerHTML = `
-    <h1 class="page-title">Lista della spesa</h1>
+  wrap.innerHTML = `
     <div class="search-bar">
       <input type="text" id="shopAdd" placeholder="Aggiungi un articolo..." />
       <button class="btn btn--primary" id="shopAddBtn">${iconHtml("plus")}</button>
@@ -697,18 +883,19 @@ function renderShopping() {
     </div>` : ""}
   `;
 
-  const addInput = root.querySelector("#shopAdd");
+  const addInput = wrap.querySelector("#shopAdd");
   const doAdd = async () => {
     const v = addInput.value.trim();
     if (!v) return;
     const parsed = parseList(v).map((p) => ({ ...p, category: categorize(p.name) }));
     addInput.value = "";
-    await store.addShoppingItems(parsed);
+    const res = await store.addShoppingItems(parsed);
+    if (res.added === 0 && res.skipped) toast("È già in dispensa", "error");
   };
-  root.querySelector("#shopAddBtn").addEventListener("click", doAdd);
+  wrap.querySelector("#shopAddBtn").addEventListener("click", doAdd);
   addInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdd(); });
 
-  root.querySelectorAll(".shop-row").forEach((rowEl) => {
+  wrap.querySelectorAll(".shop-row").forEach((rowEl) => {
     const id = rowEl.dataset.id;
     rowEl.querySelector('[data-act="check"]').addEventListener("click", () => {
       const it = store.getShopping().find((s) => s.id === id);
@@ -717,12 +904,47 @@ function renderShopping() {
     rowEl.querySelector('[data-act="del"]').addEventListener("click", () => store.deleteShoppingItem(id));
   });
 
-  const cd = root.querySelector("#clearDone");
+  const cd = wrap.querySelector("#clearDone");
   if (cd) cd.addEventListener("click", () => store.clearCheckedShopping());
-  const ca = root.querySelector("#clearAll");
+  const ca = wrap.querySelector("#clearAll");
   if (ca) ca.addEventListener("click", async () => {
     const ok = await confirmDialog({ title: "Svuotare la lista?", message: "Tutti gli articoli verranno rimossi.", confirmText: "Svuota", danger: true });
     if (ok) store.clearAllShopping();
+  });
+}
+
+function renderPantry() {
+  const wrap = root.querySelector("#spesaBody");
+  const pantry = store.getPantry().sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const list = pantry.length
+    ? pantry.map((p) => `
+        <div class="shop-row" data-id="${p.id}">
+          <span class="day-row__icon">${iconHtml("basket")}</span>
+          <span class="shop-row__name">${escapeHtml(p.name)}</span>
+          <button class="icon-btn icon-btn--danger shop-row__del" data-act="del">${iconHtml("trash")}</button>
+        </div>`).join("")
+    : `<div class="empty"><span class="empty__emoji">${iconHtml("basket")}</span>Dispensa vuota.<br>Aggiungi ciò che hai già in casa: non verrà inserito nella spesa.</div>`;
+
+  wrap.innerHTML = `
+    <div class="hint" style="margin-bottom:10px">Quello che metti qui non verrà aggiunto alla lista della spesa.</div>
+    <div class="search-bar">
+      <input type="text" id="panAdd" placeholder="Es. olio, sale, farina..." />
+      <button class="btn btn--primary" id="panAddBtn">${iconHtml("plus")}</button>
+    </div>
+    <div>${list}</div>
+  `;
+
+  const addInput = wrap.querySelector("#panAdd");
+  const doAdd = async () => {
+    const v = addInput.value.trim();
+    if (!v) return;
+    addInput.value = "";
+    for (const part of v.split(",")) await store.addPantryItem(part.trim());
+  };
+  wrap.querySelector("#panAddBtn").addEventListener("click", doAdd);
+  addInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdd(); });
+  wrap.querySelectorAll(".shop-row").forEach((rowEl) => {
+    rowEl.querySelector('[data-act="del"]').addEventListener("click", () => store.deletePantryItem(rowEl.dataset.id));
   });
 }
 
@@ -779,8 +1001,8 @@ function renderPlan() {
     const entries = store.getPlan().filter((p) => p.date.startsWith(prefix));
     if (!entries.length) { toast("Nessuna ricetta pianificata questo mese", "error"); return; }
     const items = collectIngredients(entries);
-    const n = await store.addShoppingItems(items);
-    toast(`${n} ingredienti aggiunti alla spesa`, "success");
+    const res = await store.addShoppingItems(items);
+    toast(shoppingToast(res), "success");
   });
 }
 
@@ -797,27 +1019,39 @@ function collectIngredients(entries) {
   return items;
 }
 
+const SLOTS = [{ key: "pranzo", label: "Pranzo", icon: "sparkle" }, { key: "cena", label: "Cena", icon: "sparkle" }, { key: null, label: "Altro", icon: "fork-knife" }];
+
+function dayRowHtml(e) {
+  const r = store.getRecipe(e.recipeId);
+  const tool = r ? store.getTool(r.toolId) : null;
+  return `<div class="day-row" data-plan="${e.id}" data-recipe="${r ? r.id : ""}">
+    <span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span>
+    <span class="day-row__name">${escapeHtml(r ? r.title : "(ricetta eliminata)")}</span>
+    <button class="icon-btn icon-btn--danger" data-act="rem" title="Rimuovi">${iconHtml("trash")}</button>
+  </div>`;
+}
+
 function openDaySheet(date) {
   const entries = store.getPlanByDate(date);
-  const rows = entries.length
-    ? entries.map((e) => {
-        const r = store.getRecipe(e.recipeId);
-        const tool = r ? store.getTool(r.toolId) : null;
-        return `<div class="day-row" data-plan="${e.id}" data-recipe="${r ? r.id : ""}">
-          <span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span>
-          <span class="day-row__name">${escapeHtml(r ? r.title : "(ricetta eliminata)")}</span>
-          <button class="icon-btn icon-btn--danger" data-act="rem" title="Rimuovi">${iconHtml("trash")}</button>
-        </div>`;
-      }).join("")
-    : `<div class="hint">Nessuna ricetta per questo giorno.</div>`;
+  let groupsHtml = "";
+  if (entries.length) {
+    for (const s of SLOTS) {
+      const list = entries.filter((e) => (e.slot || null) === s.key);
+      if (!list.length) continue;
+      groupsHtml += `<div class="day-slot"><div class="day-slot__title">${s.label}</div>${list.map(dayRowHtml).join("")}</div>`;
+    }
+  } else {
+    groupsHtml = `<div class="hint">Nessuna ricetta per questo giorno.</div>`;
+  }
 
   const m = openModal(`
     <h3 class="modal__title">${formatDateLong(date)}</h3>
-    <div id="dayRows">${rows}</div>
-    <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
-      <button class="btn btn--primary btn--block" data-act="add">${iconHtml("plus")} Aggiungi ricetta</button>
-      ${entries.length ? `<button class="btn btn--block" data-act="toshop">${iconHtml("shopping-cart-simple")} Aggiungi ingredienti alla spesa</button>` : ""}
+    <div id="dayRows">${groupsHtml}</div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn--primary" style="flex:1" data-slot="pranzo">${iconHtml("plus")} Pranzo</button>
+      <button class="btn btn--primary" style="flex:1" data-slot="cena">${iconHtml("plus")} Cena</button>
     </div>
+    ${entries.length ? `<button class="btn btn--block" data-act="toshop" style="margin-top:8px">${iconHtml("shopping-cart-simple")} Aggiungi ingredienti alla spesa</button>` : ""}
   `);
 
   m.el.querySelectorAll(".day-row").forEach((row) => {
@@ -831,15 +1065,16 @@ function openDaySheet(date) {
     });
     if (rid) row.addEventListener("click", () => { m.close(); openRecipe(rid); });
   });
-  m.el.querySelector('[data-act="add"]').addEventListener("click", () => {
+  m.el.querySelectorAll("[data-slot]").forEach((btn) => btn.addEventListener("click", () => {
+    const slot = btn.dataset.slot;
     m.close();
-    openRecipePicker(async (recipeId) => { await store.addPlan(date, recipeId); openDaySheet(date); });
-  });
+    openRecipePicker(async (recipeId) => { await store.addPlan(date, recipeId, slot); openDaySheet(date); });
+  }));
   const ts = m.el.querySelector('[data-act="toshop"]');
   if (ts) ts.addEventListener("click", async () => {
-    const n = await store.addShoppingItems(collectIngredients(entries));
+    const res = await store.addShoppingItems(collectIngredients(entries));
     m.close();
-    toast(`${n} ingredienti aggiunti alla spesa`, "success");
+    toast(shoppingToast(res), "success");
   });
 }
 
