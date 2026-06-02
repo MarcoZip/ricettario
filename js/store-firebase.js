@@ -16,13 +16,15 @@ export async function createFirebaseAdapter(uid) {
   const db = getFirestore(getApp());
   const toolsCol = collection(db, "users", uid, "tools");
   const recipesCol = collection(db, "users", uid, "recipes");
+  const shoppingCol = collection(db, "users", uid, "shopping");
 
   let tools = [];
   let recipes = [];
+  let shopping = [];
   let onChange = () => {};
 
   function emit() {
-    onChange({ tools: [...tools], recipes: [...recipes] });
+    onChange({ tools: [...tools], recipes: [...recipes], shopping: [...shopping] });
   }
 
   return {
@@ -38,6 +40,10 @@ export async function createFirebaseAdapter(uid) {
       });
       onSnapshot(recipesCol, (snap) => {
         recipes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        emit();
+      });
+      onSnapshot(shoppingCol, (snap) => {
+        shopping = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         emit();
       });
     },
@@ -70,6 +76,22 @@ export async function createFirebaseAdapter(uid) {
       await deleteDoc(doc(recipesCol, id));
     },
 
+    async addShopping(item) {
+      const { id, ...data } = item;
+      await setDoc(doc(shoppingCol, id), data);
+    },
+    async updateShopping(id, patch) {
+      await setDoc(doc(shoppingCol, id), patch, { merge: true });
+    },
+    async deleteShopping(id) {
+      await deleteDoc(doc(shoppingCol, id));
+    },
+    async clearShopping(ids) {
+      const batch = writeBatch(db);
+      ids.forEach((id) => batch.delete(doc(shoppingCol, id)));
+      await batch.commit();
+    },
+
     async replaceAll(data) {
       const batch = writeBatch(db);
       (data.tools || []).forEach((t) => {
@@ -79,6 +101,10 @@ export async function createFirebaseAdapter(uid) {
       (data.recipes || []).forEach((r) => {
         const { id, ...rest } = r;
         batch.set(doc(recipesCol, id), rest);
+      });
+      (data.shopping || []).forEach((s) => {
+        const { id, ...rest } = s;
+        batch.set(doc(shoppingCol, id), rest);
       });
       await batch.commit();
     }

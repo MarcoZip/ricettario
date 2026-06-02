@@ -3,6 +3,9 @@ import * as store from "./store.js";
 import * as mealdb from "./mealdb.js";
 import { ITALIAN_SITES } from "./sites.js";
 import { iconHtml, rawIcon, ICON_PICKER, resolveIcon } from "./icons.js";
+import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from "./ingredients.js";
+import { importFromUrl } from "./import-recipe.js";
+import { isImportConfigured } from "./config.js";
 
 // Animazioni: rispetta la preferenza di sistema "riduci animazioni".
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -31,6 +34,8 @@ function countUp(el, to) {
 let root = null;
 let currentRoute = "strumenti";
 let currentToolId = null;
+let currentRecipeId = null;
+let detailServings = null; // porzioni scelte nella schermata ricetta
 
 // Stato locale della sezione Ricettario (per non perdere i risultati ad ogni render).
 let mealTab = "online";
@@ -121,6 +126,7 @@ export function mount(rootEl) {
 export function navigate(route) {
   currentRoute = route;
   currentToolId = null;
+  currentRecipeId = null;
   document.querySelectorAll(".bottom-nav__btn").forEach((b) => {
     b.classList.toggle("is-active", b.dataset.route === route);
   });
@@ -130,6 +136,16 @@ export function navigate(route) {
 
 function openTool(toolId) {
   currentToolId = toolId;
+  currentRecipeId = null;
+  withTransition(() => render());
+  window.scrollTo(0, 0);
+}
+
+function openRecipe(recipeId) {
+  const r = store.getRecipe(recipeId);
+  currentRecipeId = recipeId;
+  if (r && !currentToolId) currentToolId = r.toolId;
+  detailServings = r && r.servings ? r.servings : null;
   withTransition(() => render());
   window.scrollTo(0, 0);
 }
@@ -139,9 +155,13 @@ export function render() {
   // Schermata di login (gestita da app.js tramite renderLogin)
   if (loginMode) return; // login viene renderizzato a parte
   if (currentRoute === "strumenti") {
-    currentToolId ? renderToolDetail() : renderStrumenti();
+    if (currentRecipeId) renderRecipeDetail();
+    else if (currentToolId) renderToolDetail();
+    else renderStrumenti();
   } else if (currentRoute === "ricettario") {
     renderRicettario();
+  } else if (currentRoute === "spesa") {
+    renderShopping();
   } else if (currentRoute === "impostazioni") {
     renderImpostazioni();
   }
@@ -206,15 +226,16 @@ function renderToolDetail() {
   const list = recipes.length
     ? recipes
         .map((r, i) => {
-          const url = safeUrl(r.url);
-          const link = url
-            ? `<a class="recipe-item__link" href="${escapeHtml(url)}" target="_blank" rel="noopener">${iconHtml("link-simple")} ${escapeHtml(r.url)}</a>`
-            : "";
-          const notes = r.notes
-            ? `<div class="recipe-item__notes">${escapeHtml(r.notes)}</div>`
+          const meta = [];
+          if (r.ingredients && r.ingredients.length) meta.push(`${iconHtml("list-bullets")} ${r.ingredients.length} ingr.`);
+          if (r.servings) meta.push(`${iconHtml("fork-knife")} per ${r.servings}`);
+          if (safeUrl(r.url)) meta.push(iconHtml("link-simple"));
+          if (r.notes) meta.push(iconHtml("note-pencil"));
+          const metaHtml = meta.length
+            ? `<div class="recipe-item__meta">${meta.join('<span class="dot">·</span>')}</div>`
             : "";
           return `
-          <div class="recipe-item stagger" data-recipe="${r.id}" style="--i:${i}">
+          <div class="recipe-item recipe-item--tap stagger" data-recipe="${r.id}" style="--i:${i}">
             <div class="recipe-item__top">
               <h3 class="recipe-item__title">${escapeHtml(r.title)}</h3>
               <div class="recipe-item__actions">
@@ -222,8 +243,7 @@ function renderToolDetail() {
                 <button class="icon-btn icon-btn--danger" data-act="del" title="Elimina">${iconHtml("trash")}</button>
               </div>
             </div>
-            ${link}
-            ${notes}
+            ${metaHtml}
           </div>`;
         })
         .join("")
@@ -263,10 +283,13 @@ function renderToolDetail() {
 
   root.querySelectorAll(".recipe-item").forEach((item) => {
     const id = item.dataset.recipe;
-    item.querySelector('[data-act="edit"]').addEventListener("click", () => {
+    item.addEventListener("click", () => openRecipe(id));
+    item.querySelector('[data-act="edit"]').addEventListener("click", (e) => {
+      e.stopPropagation();
       openRecipeForm({ recipe: store.getRecipe(id) });
     });
-    item.querySelector('[data-act="del"]').addEventListener("click", async () => {
+    item.querySelector('[data-act="del"]').addEventListener("click", async (e) => {
+      e.stopPropagation();
       const r = store.getRecipe(id);
       const ok = await confirmDialog({
         title: "Eliminare la ricetta?",
@@ -276,6 +299,82 @@ function renderToolDetail() {
       });
       if (ok) { await store.deleteRecipe(id); toast("Ricetta eliminata"); render(); }
     });
+  });
+}
+
+// ---------------- Schermata: dettaglio ricetta ----------------
+function renderRecipeDetail() {
+  const r = store.getRecipe(currentRecipeId);
+  if (!r) { currentRecipeId = null; return render(); }
+  const tool = store.getTool(r.toolId);
+  const ingredients = Array.isArray(r.ingredients) ? r.ingredients : [];
+  const base = r.servings || null;
+  if (detailServings == null) detailServings = base;
+  const factor = base && detailServings ? detailServings / base : 1;
+  const url = safeUrl(r.url);
+
+  const stepper = ingredients.length
+    ? `<div class="portions">
+        <span class="portions__lbl">${iconHtml("fork-knife")} Porzioni</span>
+        <div class="stepper">
+          <button class="stepper__btn" id="pMinus" ${(detailServings || 1) <= 1 ? "disabled" : ""}>−</button>
+          <span class="stepper__val" id="pVal">${detailServings || "—"}</span>
+          <button class="stepper__btn" id="pPlus">+</button>
+        </div>
+      </div>${!base ? `<div class="hint">Imposta le porzioni nella ricetta (modifica) per ricalcolare le quantità.</div>` : ""}`
+    : "";
+
+  const ingList = ingredients.length
+    ? `<div class="ing-list">${ingredients
+        .map((it) => `<div class="ing-row"><span class="ing-dot" style="--ac:${ACCENTS[0]}"></span>${escapeHtml(ingredientText(it, factor))}</div>`)
+        .join("")}</div>
+       <button class="btn btn--primary btn--block" id="addToCart" style="margin-top:14px">${iconHtml("shopping-cart-simple")} Aggiungi alla lista della spesa</button>`
+    : `<div class="hint">Nessun ingrediente salvato. Aggiungili con <b>Modifica</b>.</div>`;
+
+  root.innerHTML = `
+    <div class="toolbar">
+      <button class="back-btn" id="back">${iconHtml("arrow-left")}</button>
+      <div class="toolbar__title">${escapeHtml(r.title)}</div>
+    </div>
+    ${tool ? `<div class="recipe-tool-chip">${iconHtml(tool.icon)} ${escapeHtml(tool.name)}</div>` : ""}
+    ${url ? `<a class="btn btn--block" id="openLink" href="${escapeHtml(url)}" target="_blank" rel="noopener" style="margin-bottom:16px">${iconHtml("arrow-square-out")} Apri la ricetta</a>` : ""}
+
+    <div class="section-card">
+      <h3 class="section-title">${iconHtml("list-bullets")} Ingredienti</h3>
+      ${stepper}
+      ${ingList}
+    </div>
+
+    ${r.notes ? `<div class="section-card"><h3 class="section-title">${iconHtml("note-pencil")} Note</h3><div class="recipe-item__notes" style="margin-top:0">${escapeHtml(r.notes)}</div></div>` : ""}
+
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn--ghost" id="editRecipe">${iconHtml("pencil-simple")} Modifica</button>
+      <button class="btn btn--ghost" id="delRecipe" style="color:var(--danger)">${iconHtml("trash")} Elimina</button>
+    </div>
+  `;
+
+  root.querySelector("#back").addEventListener("click", () => { currentRecipeId = null; detailServings = null; withTransition(() => render()); });
+  const pMinus = root.querySelector("#pMinus");
+  const pPlus = root.querySelector("#pPlus");
+  if (pMinus) pMinus.addEventListener("click", () => { detailServings = Math.max(1, (detailServings || base || 1) - 1); render(); });
+  if (pPlus) pPlus.addEventListener("click", () => { detailServings = (detailServings || base || 1) + 1; render(); });
+
+  const addToCart = root.querySelector("#addToCart");
+  if (addToCart) addToCart.addEventListener("click", async () => {
+    const items = ingredients.map((it) => ({
+      name: it.name,
+      unit: it.unit || "",
+      qty: it.qty != null ? it.qty * factor : null,
+      category: categorize(it.name)
+    }));
+    const n = await store.addShoppingItems(items);
+    toast(`${n} ingredienti aggiunti alla spesa`, "success");
+  });
+
+  root.querySelector("#editRecipe").addEventListener("click", () => openRecipeForm({ recipe: r }));
+  root.querySelector("#delRecipe").addEventListener("click", async () => {
+    const ok = await confirmDialog({ title: "Eliminare la ricetta?", message: `"${r.title}" verrà eliminata.`, confirmText: "Elimina", danger: true });
+    if (ok) { await store.deleteRecipe(r.id); currentRecipeId = null; toast("Ricetta eliminata"); withTransition(() => render()); }
   });
 }
 
@@ -346,6 +445,14 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
   const title = recipe ? recipe.title : prefill ? prefill.title : "";
   const url = recipe ? recipe.url : prefill ? prefill.url : "";
   const notes = recipe ? recipe.notes : "";
+  const servings = recipe ? (recipe.servings || "") : (prefill && prefill.servings ? prefill.servings : "");
+  const ingText = recipe
+    ? (recipe.ingredients || []).map((i) => i.raw || ingredientText(i)).join("\n")
+    : (prefill && prefill.ingredients ? prefill.ingredients.join("\n") : "");
+
+  const importBtn = isImportConfigured()
+    ? `<button type="button" class="btn btn--ghost" id="rImport" style="margin-top:8px">${iconHtml("download-simple")} Importa ingredienti dal link</button>`
+    : "";
 
   const m = openModal(`
     <h3 class="modal__title">${editing ? "Modifica ricetta" : "Nuova ricetta"}</h3>
@@ -360,6 +467,15 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
     <div class="field">
       <label>Link della ricetta (facoltativo)</label>
       <input type="url" id="rUrl" inputmode="url" placeholder="https://..." value="${escapeHtml(url)}" />
+      ${importBtn}
+    </div>
+    <div class="field">
+      <label>Per quante persone? (facoltativo)</label>
+      <input type="number" id="rServings" inputmode="numeric" min="1" placeholder="Es. 4" value="${escapeHtml(servings)}" />
+    </div>
+    <div class="field">
+      <label>Ingredienti (uno per riga)</label>
+      <textarea id="rIngredients" rows="6" placeholder="200 g di farina&#10;2 uova&#10;1 bustina di lievito&#10;sale q.b.">${escapeHtml(ingText)}</textarea>
     </div>
     <div class="field">
       <label>Note (facoltativo)</label>
@@ -373,13 +489,34 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
 
   const titleInput = m.el.querySelector("#rTitle");
   setTimeout(() => titleInput.focus(), 50);
+
+  const rImport = m.el.querySelector("#rImport");
+  if (rImport) rImport.addEventListener("click", async () => {
+    const u = m.el.querySelector("#rUrl").value.trim();
+    if (!u) { toast("Inserisci prima il link", "error"); return; }
+    const old = rImport.innerHTML;
+    rImport.disabled = true; rImport.textContent = "Importo...";
+    try {
+      const data = await importFromUrl(u);
+      if (data.title && !titleInput.value.trim()) titleInput.value = data.title;
+      if (data.servings) m.el.querySelector("#rServings").value = data.servings;
+      if (data.ingredients && data.ingredients.length) m.el.querySelector("#rIngredients").value = data.ingredients.join("\n");
+      toast("Ingredienti importati", "success");
+    } catch (e) {
+      toast(e.message || "Import non riuscito", "error");
+    }
+    rImport.disabled = false; rImport.innerHTML = old;
+  });
+
   m.el.querySelector('[data-act="cancel"]').onclick = m.close;
   m.el.querySelector('[data-act="save"]').onclick = async () => {
     const data = {
       title: titleInput.value.trim(),
       toolId: m.el.querySelector("#rTool").value,
       url: m.el.querySelector("#rUrl").value.trim(),
-      notes: m.el.querySelector("#rNotes").value.trim()
+      notes: m.el.querySelector("#rNotes").value.trim(),
+      ingredients: parseList(m.el.querySelector("#rIngredients").value),
+      servings: parseInt(m.el.querySelector("#rServings").value, 10) || null
     };
     if (!data.title) { toast("Inserisci un titolo", "error"); return; }
     try {
@@ -463,7 +600,7 @@ function renderOnlineTab() {
   body.querySelectorAll(".meal-card").forEach((card) => {
     const data = JSON.parse(card.dataset.meal);
     card.querySelector('[data-act="save"]').addEventListener("click", () =>
-      openRecipeForm({ prefill: { title: data.title, url: data.link } })
+      openRecipeForm({ prefill: { title: data.title, url: data.link, ingredients: data.ingredients || [] } })
     );
   });
 }
@@ -496,6 +633,88 @@ function renderSitiTab() {
       </span>
     </a>`
   ).join("");
+}
+
+// ---------------- Schermata: Lista della spesa ----------------
+function shopRow(it) {
+  const qty = it.qty != null ? formatQty(it.qty) : "";
+  const amount = [qty, it.unit && it.unit !== "q.b." ? it.unit : (it.unit === "q.b." ? "q.b." : "")].filter(Boolean).join(" ");
+  return `
+    <div class="shop-row ${it.checked ? "is-checked" : ""}" data-id="${it.id}">
+      <button class="check" data-act="check">${it.checked ? iconHtml("check") : ""}</button>
+      <span class="shop-row__name">${escapeHtml(it.name)}${amount ? ` <span class="shop-row__amt">${escapeHtml(amount)}</span>` : ""}</span>
+      <button class="icon-btn icon-btn--danger shop-row__del" data-act="del">${iconHtml("trash")}</button>
+    </div>`;
+}
+
+function renderShopping() {
+  const items = store.getShopping();
+  const active = items.filter((i) => !i.checked);
+  const done = items.filter((i) => i.checked);
+
+  let body;
+  if (!items.length) {
+    body = `<div class="empty"><span class="empty__emoji">${iconHtml("shopping-cart-simple")}</span>La lista è vuota.<br>Aggiungi gli ingredienti da una ricetta (pulsante <b>Aggiungi alla lista della spesa</b>) o scrivili qui sotto.</div>`;
+  } else {
+    const groups = {};
+    active.forEach((it) => { const c = it.category || "Altro"; (groups[c] = groups[c] || []).push(it); });
+    const orderedCats = CATEGORY_ORDER.filter((c) => groups[c]);
+    const groupsHtml = orderedCats
+      .map((cat) => `
+        <div class="shop-group">
+          <div class="shop-group__title">${escapeHtml(cat)}</div>
+          ${groups[cat].map(shopRow).join("")}
+        </div>`)
+      .join("");
+    const doneHtml = done.length
+      ? `<div class="shop-group shop-group--done">
+          <div class="shop-group__title">Presi (${done.length})</div>
+          ${done.map(shopRow).join("")}
+        </div>`
+      : "";
+    body = (groupsHtml || `<div class="hint">Tutto preso! 🎉</div>`) + doneHtml;
+  }
+
+  root.innerHTML = `
+    <h1 class="page-title">Lista della spesa</h1>
+    <div class="search-bar">
+      <input type="text" id="shopAdd" placeholder="Aggiungi un articolo..." />
+      <button class="btn btn--primary" id="shopAddBtn">${iconHtml("plus")}</button>
+    </div>
+    <div id="shopBody">${body}</div>
+    ${items.length ? `<div style="display:flex;gap:8px;margin-top:18px">
+      <button class="btn btn--ghost" id="clearDone">Svuota presi</button>
+      <button class="btn btn--ghost" id="clearAll" style="color:var(--danger)">Svuota tutto</button>
+    </div>` : ""}
+  `;
+
+  const addInput = root.querySelector("#shopAdd");
+  const doAdd = async () => {
+    const v = addInput.value.trim();
+    if (!v) return;
+    const parsed = parseList(v).map((p) => ({ ...p, category: categorize(p.name) }));
+    addInput.value = "";
+    await store.addShoppingItems(parsed);
+  };
+  root.querySelector("#shopAddBtn").addEventListener("click", doAdd);
+  addInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdd(); });
+
+  root.querySelectorAll(".shop-row").forEach((rowEl) => {
+    const id = rowEl.dataset.id;
+    rowEl.querySelector('[data-act="check"]').addEventListener("click", () => {
+      const it = store.getShopping().find((s) => s.id === id);
+      store.toggleShoppingItem(id, !(it && it.checked));
+    });
+    rowEl.querySelector('[data-act="del"]').addEventListener("click", () => store.deleteShoppingItem(id));
+  });
+
+  const cd = root.querySelector("#clearDone");
+  if (cd) cd.addEventListener("click", () => store.clearCheckedShopping());
+  const ca = root.querySelector("#clearAll");
+  if (ca) ca.addEventListener("click", async () => {
+    const ok = await confirmDialog({ title: "Svuotare la lista?", message: "Tutti gli articoli verranno rimossi.", confirmText: "Svuota", danger: true });
+    if (ok) store.clearAllShopping();
+  });
 }
 
 // ---------------- Schermata: Impostazioni ----------------

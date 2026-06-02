@@ -2,9 +2,10 @@
 // dietro c'è il salvataggio locale o quello cloud.
 
 import { createLocalAdapter } from "./store-local.js";
+import { combine, categorize } from "./ingredients.js";
 
 let adapter = null;
-let state = { tools: [], recipes: [] };
+let state = { tools: [], recipes: [], shopping: [] };
 const subscribers = new Set();
 
 function notify() {
@@ -104,13 +105,15 @@ export async function deleteTool(id) {
   await adapter.deleteTool(id);
 }
 
-export async function addRecipe({ toolId, title, url, notes }) {
+export async function addRecipe({ toolId, title, url, notes, ingredients, servings }) {
   await adapter.addRecipe({
     id: newId(),
     toolId,
     title: title.trim(),
     url: (url || "").trim(),
     notes: (notes || "").trim(),
+    ingredients: Array.isArray(ingredients) ? ingredients : [],
+    servings: servings || null,
     createdAt: now(),
     updatedAt: now()
   });
@@ -124,9 +127,57 @@ export async function deleteRecipe(id) {
   await adapter.deleteRecipe(id);
 }
 
+// ---- Lista della spesa ----
+export function getShopping() {
+  return [...state.shopping];
+}
+
+function shopKey(it) {
+  return (it.name || "").toLowerCase().trim() + "|" + (it.unit || "").toLowerCase();
+}
+
+// Aggiunge una lista di ingredienti, unendo quelli uguali (anche con l'esistente).
+export async function addShoppingItems(rawItems) {
+  const merged = combine(rawItems.filter((i) => i && i.name));
+  for (const it of merged) {
+    const key = shopKey(it);
+    const existing = state.shopping.find((s) => !s.checked && shopKey(s) === key);
+    if (existing) {
+      const qty = existing.qty != null && it.qty != null ? existing.qty + it.qty : (existing.qty != null ? existing.qty : it.qty);
+      await adapter.updateShopping(existing.id, { qty });
+    } else {
+      await adapter.addShopping({
+        id: newId(),
+        name: it.name,
+        qty: it.qty != null ? it.qty : null,
+        unit: it.unit || "",
+        category: it.category || categorize(it.name),
+        checked: false,
+        createdAt: now()
+      });
+    }
+  }
+  return merged.length;
+}
+
+export async function toggleShoppingItem(id, checked) {
+  await adapter.updateShopping(id, { checked });
+}
+export async function deleteShoppingItem(id) {
+  await adapter.deleteShopping(id);
+}
+export async function clearCheckedShopping() {
+  const ids = state.shopping.filter((s) => s.checked).map((s) => s.id);
+  if (ids.length) await adapter.clearShopping(ids);
+}
+export async function clearAllShopping() {
+  const ids = state.shopping.map((s) => s.id);
+  if (ids.length) await adapter.clearShopping(ids);
+}
+
 // ---- Esporta / Importa (backup manuale) ----
 export function exportData() {
-  return { version: 1, exportedAt: now(), tools: state.tools, recipes: state.recipes };
+  return { version: 2, exportedAt: now(), tools: state.tools, recipes: state.recipes, shopping: state.shopping };
 }
 
 export async function importData(data, { merge = false } = {}) {
@@ -139,6 +190,6 @@ export async function importData(data, { merge = false } = {}) {
     for (const t of data.tools) if (!existingTools.has(t.id)) await adapter.addTool(t);
     for (const r of data.recipes) if (!existingRecipes.has(r.id)) await adapter.addRecipe(r);
   } else {
-    await adapter.replaceAll({ tools: data.tools, recipes: data.recipes });
+    await adapter.replaceAll({ tools: data.tools, recipes: data.recipes, shopping: data.shopping || [] });
   }
 }

@@ -26,3 +26,17 @@ export const firebaseConfig = {
 export function isCloudConfigured() {
   return Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
 }
+
+// ============================================================
+//  IMPORT INGREDIENTI DA LINK (opzionale)
+// ------------------------------------------------------------
+//  Per importare automaticamente gli ingredienti dai link delle ricette
+//  (es. GialloZafferano) serve un piccolo "ponte" gratuito (Cloudflare Worker).
+//  Dopo averlo creato, incolla qui il suo indirizzo. Guida in README.md.
+//  Lasciato vuoto, l'app funziona lo stesso (resta l'incolla manuale).
+// ============================================================
+export const WORKER_URL = "";
+
+export function isImportConfigured() {
+  return Boolean(WORKER_URL);
+}

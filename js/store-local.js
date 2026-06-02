@@ -6,16 +6,16 @@ const KEY = "ricettario.data.v1";
 function read() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { tools: [], recipes: [] };
+    if (!raw) return { tools: [], recipes: [], shopping: [] };
     const data = JSON.parse(raw);
-    return { tools: data.tools || [], recipes: data.recipes || [] };
+    return { tools: data.tools || [], recipes: data.recipes || [], shopping: data.shopping || [] };
   } catch {
-    return { tools: [], recipes: [] };
+    return { tools: [], recipes: [], shopping: [] };
   }
 }
 
 function write(state) {
-  localStorage.setItem(KEY, JSON.stringify({ tools: state.tools, recipes: state.recipes }));
+  localStorage.setItem(KEY, JSON.stringify({ tools: state.tools, recipes: state.recipes, shopping: state.shopping }));
 }
 
 export function createLocalAdapter() {
@@ -24,7 +24,7 @@ export function createLocalAdapter() {
 
   function commit() {
     write(state);
-    onChange({ tools: [...state.tools], recipes: [...state.recipes] });
+    onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping] });
   }
 
   return {
@@ -33,7 +33,7 @@ export function createLocalAdapter() {
     async start(cb) {
       onChange = cb;
       // Emissione iniziale dello stato salvato.
-      onChange({ tools: [...state.tools], recipes: [...state.recipes] });
+      onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping] });
     },
 
     async addTool(tool) {
@@ -65,9 +65,29 @@ export function createLocalAdapter() {
       commit();
     },
 
+    async addShopping(item) {
+      state.shopping.push(item);
+      commit();
+    },
+    async updateShopping(id, patch) {
+      const s = state.shopping.find((x) => x.id === id);
+      if (s) Object.assign(s, patch);
+      commit();
+    },
+    async deleteShopping(id) {
+      state.shopping = state.shopping.filter((s) => s.id !== id);
+      commit();
+    },
+    async clearShopping(ids) {
+      const set = new Set(ids);
+      state.shopping = state.shopping.filter((s) => !set.has(s.id));
+      commit();
+    },
+
     async replaceAll(data) {
       state.tools = data.tools || [];
       state.recipes = data.recipes || [];
+      state.shopping = data.shopping || [];
       commit();
     }
   };

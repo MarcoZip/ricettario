@@ -554,6 +554,46 @@ a { color: var(--primary-2); }
 @media (prefers-reduced-motion: no-preference) { .sk { animation: shimmer 1.3s ease infinite; } }
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
 
+/* ---------- Ricetta: anteprima & dettaglio ---------- */
+.recipe-item--tap { cursor: pointer; }
+.recipe-item__meta { display: flex; align-items: center; gap: 8px; color: var(--text-soft); font-size: 0.82rem; margin-top: 8px; }
+.recipe-item__meta .dot { opacity: 0.5; }
+
+.recipe-tool-chip { display: inline-flex; align-items: center; gap: 7px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 6px 13px; font-size: 0.85rem; font-weight: 700; color: var(--text-soft); margin-bottom: 14px; }
+.recipe-tool-chip .ic { font-size: 1.1em; }
+
+.section-card { background: linear-gradient(160deg, #22232b, #191a20); border: 1px solid var(--surface-3); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 14px; }
+.section-title { display: flex; align-items: center; gap: 8px; font-size: 1rem; font-weight: 800; margin: 0 0 12px; }
+.section-title .ic { color: var(--primary-2); }
+
+.portions { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 2px 0 14px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+.portions__lbl { display: flex; align-items: center; gap: 7px; font-weight: 700; color: var(--text-soft); }
+.portions__lbl .ic { color: var(--primary-2); }
+.stepper { display: flex; align-items: center; background: #15161b; border: 1px solid var(--surface-3); border-radius: 12px; overflow: hidden; }
+.stepper__btn { width: 44px; height: 42px; border: none; background: transparent; color: var(--primary-2); font-size: 1.5rem; font-weight: 700; line-height: 1; }
+.stepper__btn:disabled { opacity: 0.3; }
+.stepper__btn:active { background: rgba(255, 122, 61, 0.14); }
+.stepper__val { min-width: 42px; text-align: center; font-weight: 800; font-size: 1.1rem; }
+
+.ing-list { display: flex; flex-direction: column; }
+.ing-row { display: flex; align-items: center; gap: 11px; padding: 9px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.04); font-size: 0.96rem; }
+.ing-row:last-child { border-bottom: none; }
+.ing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ac, var(--primary)); flex-shrink: 0; box-shadow: 0 0 10px -2px var(--ac, var(--primary)); }
+
+.hint { color: var(--text-soft); font-size: 0.84rem; padding: 6px 0; }
+
+/* ---------- Lista della spesa ---------- */
+.shop-group { margin-bottom: 18px; }
+.shop-group__title { font-size: 0.74rem; letter-spacing: 0.5px; text-transform: uppercase; color: var(--primary-2); font-weight: 800; margin-bottom: 9px; }
+.shop-group--done .shop-group__title { color: var(--text-soft); }
+.shop-row { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 11px 12px; margin-bottom: 8px; }
+.shop-row .check { width: 27px; height: 27px; flex-shrink: 0; border-radius: 50%; border: 2px solid var(--surface-3); background: transparent; display: flex; align-items: center; justify-content: center; color: #06231d; font-size: 0.9rem; transition: 0.15s; }
+.shop-row.is-checked .check { background: var(--accent); border-color: var(--accent); }
+.shop-row__name { flex: 1; font-weight: 600; }
+.shop-row__amt { color: var(--text-soft); font-weight: 700; font-size: 0.85rem; margin-left: 4px; }
+.shop-row.is-checked .shop-row__name { text-decoration: line-through; color: var(--text-soft); }
+.shop-row__del { width: 32px; height: 32px; }
+
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideup { from { transform: translateY(34px); opacity: 0.5; } to { transform: translateY(0); opacity: 1; } }

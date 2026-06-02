@@ -9,13 +9,21 @@ function normalize(meal) {
     (meal.strSource && meal.strSource.trim()) ||
     (meal.strYoutube && meal.strYoutube.trim()) ||
     `https://www.themealdb.com/meal/${meal.idMeal}`;
+  // Ingredienti: strIngredient1..20 + strMeasure1..20 → righe "misura ingrediente".
+  const ingredients = [];
+  for (let i = 1; i <= 20; i++) {
+    const ing = (meal["strIngredient" + i] || "").trim();
+    const meas = (meal["strMeasure" + i] || "").trim();
+    if (ing) ingredients.push((meas ? meas + " " : "") + ing);
+  }
   return {
     id: meal.idMeal,
     title: meal.strMeal,
     thumb: meal.strMealThumb,
     category: meal.strCategory || "",
     area: meal.strArea || "",
-    link
+    link,
+    ingredients // righe di testo grezze (in inglese)
   };
 }
 
