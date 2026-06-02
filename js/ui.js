@@ -126,6 +126,15 @@ export function mount(rootEl) {
   document.querySelectorAll(".bottom-nav__btn").forEach((btn) => {
     btn.addEventListener("click", () => navigate(btn.dataset.route));
   });
+  const help = document.getElementById("helpBtn");
+  if (help) help.addEventListener("click", () => openGuide());
+  // Guida al primo avvio.
+  try {
+    if (!localStorage.getItem("ricettario.guide.v1")) {
+      localStorage.setItem("ricettario.guide.v1", "1");
+      setTimeout(() => openGuide(true), 500);
+    }
+  } catch {}
 }
 
 export function navigate(route) {
@@ -816,6 +825,40 @@ function renderSitiTab() {
   ).join("");
 }
 
+// ---------------- Guida / aiuto ----------------
+const GUIDE_SECTIONS = [
+  { icon: "cooking-pot", title: "Strumenti & ricette", text: "Organizza le ricette per strumento di cottura. Crea uno strumento (forno, friggitrice ad aria…) e salva sotto le ricette con link, ingredienti, porzioni e passi." },
+  { icon: "download-simple", title: "Importa dai link", text: "Nel form di una ricetta incolla il link e tocca \"Importa\": ingredienti e preparazione si compilano da soli (sui siti che lo permettono)." },
+  { icon: "book-open", title: "Ricettario", text: "Cerca idee online o tra i siti italiani; tocca \"Salva\" per aggiungerle a uno dei tuoi strumenti." },
+  { icon: "fork-knife", title: "Porzioni su misura", text: "Apri una ricetta e cambia il numero di persone con + e −: le quantità degli ingredienti si ricalcolano da sole." },
+  { icon: "shopping-cart-simple", title: "Spesa & Dispensa", text: "Aggiungi gli ingredienti alla lista della spesa (uniti e divisi per reparto). In \"Dispensa\" metti ciò che hai già in casa: non verrà rimesso nella spesa." },
+  { icon: "fire", title: "Modalità cucina", text: "Nelle ricette con i passi, tocca \"Modalità cucina\": istruzioni passo-passo, timer e schermo che resta acceso mentre cucini." },
+  { icon: "heart", title: "Preferiti, voti e ricerca", text: "Metti il cuore alle ricette migliori, dai un voto a stelle e cercale per nome o ingrediente dalla schermata Strumenti." },
+  { icon: "calendar-dots", title: "Pianificazione", text: "Nel calendario assegna le ricette ai giorni (pranzo o cena) e genera la lista della spesa dell'intero mese." },
+  { icon: "cloud-check", title: "Tutto al sicuro", text: "Con l'accesso le ricette sono salvate nel cloud e sincronizzate su tutti i dispositivi. Da Opzioni puoi anche esportare un backup." }
+];
+
+function openGuide(firstRun = false) {
+  const host = document.getElementById("modalRoot");
+  const el = document.createElement("div");
+  el.className = "guide";
+  el.innerHTML = `
+    <div class="guide__head">
+      <div class="guide__brand">${iconHtml("cooking-pot")} <b>Come funziona</b></div>
+      <button class="cook__close" id="gClose">${iconHtml("x")}</button>
+    </div>
+    <div class="guide__body">
+      ${firstRun ? `<div class="guide__hero"><img class="brand-logo" src="icons/icon.svg" alt="" /><h2 style="margin:0 0 4px">Benvenuta! 👋</h2><p style="color:var(--text-soft);margin:0">Ecco tutto quello che puoi fare.</p></div>` : ""}
+      ${GUIDE_SECTIONS.map((s) => `<div class="guide-card"><span class="guide-card__ic">${iconHtml(s.icon)}</span><div><div class="guide-card__t">${escapeHtml(s.title)}</div><div class="guide-card__x">${escapeHtml(s.text)}</div></div></div>`).join("")}
+    </div>
+    <div class="guide__foot"><button class="btn btn--primary btn--block" id="gOk">${firstRun ? "Inizia a cucinare" : "Ho capito"}</button></div>
+  `;
+  host.appendChild(el);
+  const close = () => el.remove();
+  el.querySelector("#gClose").onclick = close;
+  el.querySelector("#gOk").onclick = close;
+}
+
 // ---------------- Schermata: Lista della spesa ----------------
 function shopRow(it) {
   const qty = it.qty != null ? formatQty(it.qty) : "";
@@ -1141,6 +1184,15 @@ function renderImpostazioni() {
     <div class="setting-group">
       <div class="setting-row">
         <div>
+          <div class="setting-row__label">Come funziona l'app</div>
+          <div class="setting-row__desc">Rivedi la guida con tutte le funzioni.</div>
+        </div>
+        <button class="btn" id="guideBtn">Apri</button>
+      </div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-row">
+        <div>
           <div class="setting-row__label">Esporta backup</div>
           <div class="setting-row__desc">Salva tutte le ricette in un file.</div>
         </div>
@@ -1174,6 +1226,8 @@ function renderImpostazioni() {
     const ok = await confirmDialog({ title: "Uscire dall'account?", message: "Potrai rientrare con email e password.", confirmText: "Esci" });
     if (ok) await handlers.onLogout();
   });
+
+  root.querySelector("#guideBtn").addEventListener("click", () => openGuide());
 
   root.querySelector("#exportBtn").addEventListener("click", () => {
     const data = store.exportData();
@@ -1230,7 +1284,7 @@ export function renderLogin() {
   const draw = () => {
     root.innerHTML = `
       <div style="max-width:380px;margin:8vh auto 0;text-align:center">
-        <div class="login-logo">🍳</div>
+        <img class="brand-logo" src="icons/icon.svg" alt="" />
         <h1 class="page-title" style="text-align:center">Ricettario</h1>
         <p class="page-sub" style="text-align:center">${isRegister ? "Crea il tuo account per il backup nel cloud." : "Accedi per sincronizzare le tue ricette."}</p>
         <div class="setting-group" style="text-align:left;padding:16px">

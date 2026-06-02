@@ -68,7 +68,8 @@ a { color: var(--primary-2); }
   z-index: 50;
 }
 .app-header__title { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 1.2rem; letter-spacing: -0.3px; }
-.app-header__logo { font-size: 1.35rem; }
+.app-header__logo { width: 28px; height: 28px; border-radius: 8px; display: block; }
+.brand-logo { width: 76px; height: 76px; border-radius: 20px; display: block; margin: 0 auto 4px; box-shadow: var(--glow); }
 .app-header__name {
   background: var(--primary-grad);
   -webkit-background-clip: text;
@@ -641,6 +642,23 @@ a { color: var(--primary-2); }
 .cook__time { font-size: 2rem; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 92px; text-align: center; }
 .cook__toggle { padding: 12px 18px; }
 .cook__nav { display: flex; gap: 10px; }
+
+/* ---------- Pulsante guida nell'header ---------- */
+.app-header__status { display: flex; align-items: center; gap: 10px; }
+.header-btn { width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.08); color: var(--text); font-weight: 800; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; }
+
+/* ---------- Guida ---------- */
+.guide { position: fixed; inset: 0; z-index: 320; background: radial-gradient(120% 80% at 50% -10%, #2a2018, #0e0f13 55%); display: flex; flex-direction: column; animation: fade 0.2s ease; }
+.guide__head { display: flex; align-items: center; justify-content: space-between; padding: calc(var(--safe-top) + 12px) 18px 10px; }
+.guide__brand { display: flex; align-items: center; gap: 8px; font-size: 1.1rem; }
+.guide__brand .ic { color: var(--primary-2); font-size: 1.3rem; }
+.guide__body { flex: 1; overflow-y: auto; padding: 6px 18px 10px; max-width: 640px; margin: 0 auto; width: 100%; }
+.guide__hero { text-align: center; padding: 10px 0 18px; }
+.guide-card { display: flex; gap: 13px; align-items: flex-start; background: linear-gradient(160deg, #22232b, #191a20); border: 1px solid var(--surface-3); border-radius: 16px; padding: 14px; margin-bottom: 10px; }
+.guide-card__ic { width: 40px; height: 40px; flex-shrink: 0; border-radius: 11px; display: flex; align-items: center; justify-content: center; background: var(--surface-2); color: var(--primary-2); font-size: 1.25rem; }
+.guide-card__t { font-weight: 800; margin-bottom: 3px; }
+.guide-card__x { color: var(--text-soft); font-size: 0.9rem; line-height: 1.45; }
+.guide__foot { padding: 12px 18px calc(var(--safe-bottom) + 16px); max-width: 640px; margin: 0 auto; width: 100%; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }

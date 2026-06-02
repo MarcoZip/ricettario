@@ -1,21 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#f0773a"/>
-      <stop offset="1" stop-color="#d9501a"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffa64d"/>
+      <stop offset="1" stop-color="#df5117"/>
     </linearGradient>
+    <clipPath id="sq"><rect x="0" y="0" width="512" height="512" rx="115"/></clipPath>
   </defs>
-  <rect x="0" y="0" width="512" height="512" rx="113" fill="url(#bg)"/>
-  <g fill="#ffffff">
-    <circle cx="256" cy="216" r="80"/>
-    <circle cx="176" cy="240" r="62"/>
-    <circle cx="336" cy="240" r="62"/>
-    <rect x="168" y="224" width="176" height="88" />
-    <rect x="168" y="296" width="176" height="72" rx="14"/>
+  <rect x="0" y="0" width="512" height="512" rx="115" fill="url(#bg)"/>
+  <g clip-path="url(#sq)">
+    <ellipse cx="256" cy="36" rx="392" ry="248" fill="#ffffff" opacity="0.18"/>
   </g>
-  <g stroke="#d9501a" stroke-width="9" stroke-linecap="round">
-    <line x1="216" y1="312" x2="216" y2="352"/>
-    <line x1="256" y1="312" x2="256" y2="352"/>
-    <line x1="296" y1="312" x2="296" y2="352"/>
+  <g fill="#ffffff">
+    <circle cx="256" cy="214" r="78"/>
+    <circle cx="176" cy="237" r="61"/>
+    <circle cx="336" cy="237" r="61"/>
+    <rect x="169" y="222" width="174" height="91"/>
+    <rect x="180" y="301" width="152" height="64" rx="19"/>
+  </g>
+  <g stroke="#df5117" stroke-width="8" stroke-linecap="round">
+    <line x1="222" y1="317" x2="222" y2="351"/>
+    <line x1="256" y1="317" x2="256" y2="351"/>
+    <line x1="290" y1="317" x2="290" y2="351"/>
   </g>
 </svg>
