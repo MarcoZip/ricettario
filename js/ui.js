@@ -22,6 +22,9 @@ export const handlers = {
   getAccountInfo: () => ({ cloud: false, configured: false, email: null })
 };
 
+// Colori di "bagliore" assegnati a rotazione agli strumenti.
+const ACCENTS = ["#ff5e7e", "#ff9a3d", "#5ea8ff", "#36d1b7", "#b06cff", "#ffd166", "#ff7a3d", "#4dd0a0"];
+
 const COOKING_EMOJIS = [
   "🍟", "🔥", "⚡", "🍳", "♨️", "⏲️", "🥘", "🍲", "🫕", "🍞", "🥖", "🧁",
   "🍰", "🥧", "🍕", "🍝", "🥩", "🍗", "🐟", "🥦", "🥕", "🧂", "☕", "🍵",
@@ -133,19 +136,28 @@ function renderStrumenti() {
       : "";
 
   const cards = tools
-    .map(
-      (t) => `
-      <button class="tool-card" data-tool="${t.id}">
+    .map((t, i) => {
+      const n = store.countRecipes(t.id);
+      return `
+      <button class="tool-card" data-tool="${t.id}" style="--ac:${ACCENTS[i % ACCENTS.length]}">
         <span class="tool-card__emoji">${escapeHtml(t.icon || "🍽️")}</span>
         <span class="tool-card__name">${escapeHtml(t.name)}</span>
-        <span class="tool-card__count">${store.countRecipes(t.id)} ricette</span>
-      </button>`
-    )
+        <span class="tool-card__count">${n} ${n === 1 ? "ricetta" : "ricette"}</span>
+      </button>`;
+    })
     .join("");
+
+  const total = tools.reduce((s, t) => s + store.countRecipes(t.id), 0);
 
   root.innerHTML = `
     <h1 class="page-title">Strumenti di cottura</h1>
-    <p class="page-sub">Scegli uno strumento per vedere e aggiungere le ricette.</p>
+    <div class="home-hero">
+      <div>
+        <div class="home-hero__num">${total}</div>
+        <div class="home-hero__lbl">${total === 1 ? "ricetta salvata" : "ricette salvate"}</div>
+      </div>
+      <button class="home-hero__btn" id="heroAdd">＋ Nuova ricetta</button>
+    </div>
     ${banner}
     <div class="tool-grid">
       ${cards}
@@ -160,6 +172,7 @@ function renderStrumenti() {
     c.addEventListener("click", () => openTool(c.dataset.tool))
   );
   root.querySelector("#addTool").addEventListener("click", () => openToolForm());
+  root.querySelector("#heroAdd").addEventListener("click", () => openRecipeForm({}));
 }
 
 // ---------------- Schermata: dettaglio strumento ----------------
@@ -590,7 +603,7 @@ export function renderLogin() {
   const draw = () => {
     root.innerHTML = `
       <div style="max-width:380px;margin:8vh auto 0;text-align:center">
-        <div style="font-size:3rem">🍳</div>
+        <div class="login-logo">🍳</div>
         <h1 class="page-title" style="text-align:center">Ricettario</h1>
         <p class="page-sub" style="text-align:center">${isRegister ? "Crea il tuo account per il backup nel cloud." : "Accedi per sincronizzare le tue ricette."}</p>
         <div class="setting-group" style="text-align:left;padding:16px">
