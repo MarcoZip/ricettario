@@ -6,6 +6,10 @@ import { iconHtml, rawIcon, ICON_PICKER, resolveIcon } from "./icons.js";
 import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from "./ingredients.js";
 import { importFromUrl } from "./import-recipe.js";
 import { isImportConfigured } from "./config.js";
+import { fileToDataUrl } from "./image.js";
+
+// Tag suggeriti nel form ricetta.
+const TAG_SUGGESTIONS = ["Primi", "Secondi", "Contorni", "Antipasti", "Dolci", "Veloce", "Vegetariano", "Pesce", "Per ospiti"];
 
 // Animazioni: rispetta la preferenza di sistema "riduci animazioni".
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -40,6 +44,7 @@ let planYear = null; // anno mostrato nel calendario
 let planMonth = null; // mese (0-11) mostrato nel calendario
 let homeQuery = ""; // ricerca nella home
 let homeFav = false; // filtro preferiti nella home
+let homeTag = ""; // filtro per categoria nella home
 let shopTab = "lista"; // scheda Spesa: "lista" | "dispensa"
 
 // Stato locale della sezione Ricettario (per non perdere i risultati ad ogni render).
@@ -143,6 +148,7 @@ export function navigate(route) {
   currentRecipeId = null;
   homeQuery = "";
   homeFav = false;
+  homeTag = "";
   document.querySelectorAll(".bottom-nav__btn").forEach((b) => {
     b.classList.toggle("is-active", b.dataset.route === route);
   });
@@ -201,9 +207,9 @@ function recipeResultRow(r) {
 function renderHomeBody() {
   const body = root.querySelector("#homeBody");
   if (!body) return;
-  const searching = homeQuery.trim() || homeFav;
+  const searching = homeQuery.trim() || homeFav || homeTag;
   if (searching) {
-    const results = homeFav ? store.getFavorites() : store.searchRecipes(homeQuery);
+    const results = homeTag ? store.getByTag(homeTag) : (homeFav ? store.getFavorites() : store.searchRecipes(homeQuery));
     body.innerHTML = results.length
       ? results.map(recipeResultRow).join("")
       : `<div class="empty"><span class="empty__emoji">${iconHtml(homeFav ? "heart" : "magnifying-glass")}</span>${homeFav ? "Nessun preferito. Tocca il cuore in una ricetta per aggiungerla." : "Nessuna ricetta trovata."}</div>`;
@@ -240,6 +246,7 @@ function renderStrumenti() {
       : "";
 
   const total = tools.reduce((s, t) => s + store.countRecipes(t.id), 0);
+  const allTags = store.getAllTags();
 
   root.innerHTML = `
     <h1 class="page-title">Strumenti di cottura</h1>
@@ -255,17 +262,23 @@ function renderStrumenti() {
       <input type="search" id="homeSearch" placeholder="Cerca tra le tue ricette..." value="${escapeHtml(homeQuery)}" />
       <button class="btn ${homeFav ? "btn--primary" : ""}" id="favToggle" title="Preferiti">${iconHtml("heart")}</button>
     </div>
+    ${allTags.length ? `<div class="home-tags">${allTags.map((t) => `<button class="filter-chip ${homeTag === t ? "is-on" : ""}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}</div>` : ""}
     <div id="homeBody"></div>
   `;
 
   root.querySelector("#heroAdd").addEventListener("click", () => openRecipeForm({}));
   const search = root.querySelector("#homeSearch");
-  search.addEventListener("input", () => { homeQuery = search.value; homeFav = false; root.querySelector("#favToggle").classList.remove("btn--primary"); renderHomeBody(); });
-  root.querySelector("#favToggle").addEventListener("click", (e) => {
-    homeFav = !homeFav; homeQuery = ""; search.value = "";
-    e.currentTarget.classList.toggle("btn--primary", homeFav);
+  search.addEventListener("input", () => {
+    homeQuery = search.value; homeFav = false; homeTag = "";
+    root.querySelector("#favToggle").classList.remove("btn--primary");
+    root.querySelectorAll(".filter-chip").forEach((c) => c.classList.remove("is-on"));
     renderHomeBody();
   });
+  root.querySelector("#favToggle").addEventListener("click", () => { homeFav = !homeFav; homeQuery = ""; homeTag = ""; renderStrumenti(); });
+  root.querySelectorAll(".filter-chip").forEach((c) => c.addEventListener("click", () => {
+    homeTag = homeTag === c.dataset.tag ? "" : c.dataset.tag; homeFav = false; homeQuery = "";
+    renderStrumenti();
+  }));
   renderHomeBody();
   countUp(root.querySelector("#heroNum"), total);
 }
@@ -290,15 +303,18 @@ function renderToolDetail() {
             ? `<div class="recipe-item__meta">${meta.join('<span class="dot">·</span>')}</div>`
             : "";
           return `
-          <div class="recipe-item recipe-item--tap stagger" data-recipe="${r.id}" style="--i:${i}">
-            <div class="recipe-item__top">
-              <h3 class="recipe-item__title">${escapeHtml(r.title)}</h3>
-              <div class="recipe-item__actions">
-                <button class="icon-btn" data-act="edit" title="Modifica">${iconHtml("pencil-simple")}</button>
-                <button class="icon-btn icon-btn--danger" data-act="del" title="Elimina">${iconHtml("trash")}</button>
+          <div class="recipe-item recipe-item--tap stagger ${r.photo ? "has-thumb" : ""}" data-recipe="${r.id}" style="--i:${i}">
+            ${r.photo ? `<img class="recipe-thumb" src="${escapeHtml(r.photo)}" alt="" />` : ""}
+            <div class="recipe-item__main">
+              <div class="recipe-item__top">
+                <h3 class="recipe-item__title">${escapeHtml(r.title)}</h3>
+                <div class="recipe-item__actions">
+                  <button class="icon-btn" data-act="edit" title="Modifica">${iconHtml("pencil-simple")}</button>
+                  <button class="icon-btn icon-btn--danger" data-act="del" title="Elimina">${iconHtml("trash")}</button>
+                </div>
               </div>
+              ${metaHtml}
             </div>
-            ${metaHtml}
           </div>`;
         })
         .join("")
@@ -364,6 +380,7 @@ function renderRecipeDetail() {
   const tool = store.getTool(r.toolId);
   const ingredients = Array.isArray(r.ingredients) ? r.ingredients : [];
   const steps = Array.isArray(r.steps) ? r.steps : [];
+  const tagsArr = Array.isArray(r.tags) ? r.tags : [];
   const base = r.servings || null;
   if (detailServings == null) detailServings = base;
   const factor = base && detailServings ? detailServings / base : 1;
@@ -397,10 +414,12 @@ function renderRecipeDetail() {
       <div class="toolbar__title" style="flex:1">${escapeHtml(r.title)}</div>
       <button class="back-btn fav-btn ${r.favorite ? "is-fav" : ""}" id="favBtn" title="Preferito">${iconHtml("heart")}</button>
     </div>
+    ${r.photo ? `<img class="recipe-photo" src="${escapeHtml(r.photo)}" alt="" />` : ""}
     <div class="detail-top">
       ${tool ? `<span class="recipe-tool-chip" style="margin:0">${iconHtml(tool.icon)} ${escapeHtml(tool.name)}</span>` : "<span></span>"}
       ${ratingRow}
     </div>
+    ${tagsArr.length ? `<div class="tag-row">${tagsArr.map((t) => `<span class="tagchip tagchip--ro">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
     ${url ? `<a class="btn btn--block" id="openLink" href="${escapeHtml(url)}" target="_blank" rel="noopener" style="margin-bottom:16px">${iconHtml("arrow-square-out")} Apri la ricetta</a>` : ""}
 
     <div class="section-card">
@@ -419,6 +438,7 @@ function renderRecipeDetail() {
 
     <div style="display:flex;gap:8px;margin-top:4px">
       <button class="btn btn--ghost" id="editRecipe">${iconHtml("pencil-simple")} Modifica</button>
+      <button class="btn btn--ghost" id="shareRecipe">${iconHtml("arrow-square-out")} Condividi</button>
       <button class="btn btn--ghost" id="delRecipe" style="color:var(--danger)">${iconHtml("trash")} Elimina</button>
     </div>
   `;
@@ -451,10 +471,34 @@ function renderRecipeDetail() {
   if (cookBtn) cookBtn.addEventListener("click", () => openCookingMode(r));
 
   root.querySelector("#editRecipe").addEventListener("click", () => openRecipeForm({ recipe: r }));
+  root.querySelector("#shareRecipe").addEventListener("click", async () => {
+    const text = recipeShareText(r);
+    try {
+      if (navigator.share) await navigator.share({ title: r.title, text });
+      else { await navigator.clipboard.writeText(text); toast("Ricetta copiata negli appunti", "success"); }
+    } catch (e) { /* condivisione annullata */ }
+  });
   root.querySelector("#delRecipe").addEventListener("click", async () => {
     const ok = await confirmDialog({ title: "Eliminare la ricetta?", message: `"${r.title}" verrà eliminata.`, confirmText: "Elimina", danger: true });
     if (ok) { await store.deleteRecipe(r.id); currentRecipeId = null; toast("Ricetta eliminata"); withTransition(() => render()); }
   });
+}
+
+// Testo condivisibile di una ricetta.
+function recipeShareText(r) {
+  const lines = [r.title];
+  if (r.servings) lines.push(`Per ${r.servings} persone`);
+  if (r.ingredients && r.ingredients.length) {
+    lines.push("", "Ingredienti:");
+    r.ingredients.forEach((i) => lines.push("- " + (i.raw || ingredientText(i))));
+  }
+  if (r.steps && r.steps.length) {
+    lines.push("", "Preparazione:");
+    r.steps.forEach((s, i) => lines.push(`${i + 1}. ${s}`));
+  }
+  if (r.url) lines.push("", r.url);
+  lines.push("", "— da Fornelli");
+  return lines.join("\n");
 }
 
 // Messaggio per gli aggiunti alla spesa (tenendo conto di ciò che è in dispensa).
@@ -474,11 +518,23 @@ function openCookingMode(recipe) {
   let wakeLock = null;
   let timer = null;
   let remaining = 0; // secondi
+  let speak = false; // lettura vocale
 
   const host = document.getElementById("modalRoot");
   const el = document.createElement("div");
   el.className = "cook";
   host.appendChild(el);
+
+  function speakStep() {
+    if (!speak || !window.speechSynthesis) return;
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(steps[idx]);
+      u.lang = "it-IT";
+      window.speechSynthesis.speak(u);
+    } catch {}
+  }
+  function stopSpeak() { try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch {} }
 
   // Tieni acceso lo schermo, se supportato.
   async function lock() {
@@ -522,7 +578,7 @@ function openCookingMode(recipe) {
       <div class="cook__bar">
         <button class="cook__close" id="ckClose">${iconHtml("x")}</button>
         <div class="cook__progress">Passo ${idx + 1} di ${steps.length}</div>
-        <div style="width:42px"></div>
+        <button class="cook__close ${speak ? "is-on" : ""}" id="ckSpeak" title="Leggi ad alta voce">🔊</button>
       </div>
       <div class="cook__track"><div class="cook__fill" style="width:${((idx + 1) / steps.length) * 100}%"></div></div>
       <div class="cook__body"><div class="cook__step">${escapeHtml(steps[idx])}</div></div>
@@ -538,8 +594,9 @@ function openCookingMode(recipe) {
       </div>
     `;
     el.querySelector("#ckClose").onclick = close;
-    el.querySelector("#ckPrev").onclick = () => { if (idx > 0) { idx--; draw(); } };
-    el.querySelector("#ckNext").onclick = () => { if (idx < steps.length - 1) { idx++; draw(); } else close(); };
+    el.querySelector("#ckSpeak").onclick = () => { speak = !speak; if (speak) speakStep(); else stopSpeak(); el.querySelector("#ckSpeak").classList.toggle("is-on", speak); };
+    el.querySelector("#ckPrev").onclick = () => { if (idx > 0) { idx--; draw(); speakStep(); } };
+    el.querySelector("#ckNext").onclick = () => { if (idx < steps.length - 1) { idx++; draw(); speakStep(); } else close(); };
     el.querySelector("#ckMinus").onclick = () => { remaining = Math.max(0, remaining - 60); paintTimer(); };
     el.querySelector("#ckPlus").onclick = () => { remaining += 60; paintTimer(); };
     el.querySelector("#ckToggle").onclick = () => {
@@ -552,6 +609,7 @@ function openCookingMode(recipe) {
   function close() {
     if (timer) clearInterval(timer);
     release();
+    stopSpeak();
     document.removeEventListener("visibilitychange", onVis);
     el.remove();
   }
@@ -633,6 +691,8 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
   const stepsText = recipe
     ? (recipe.steps || []).join("\n")
     : (prefill && prefill.steps ? prefill.steps.join("\n") : "");
+  let photo = recipe ? (recipe.photo || "") : (prefill && prefill.image ? prefill.image : "");
+  let tags = recipe ? [...(recipe.tags || [])] : [];
 
   const importBtn = isImportConfigured()
     ? `<button type="button" class="btn btn--ghost" id="rImport" style="margin-top:8px">${iconHtml("download-simple")} Importa ingredienti dal link</button>`
@@ -645,8 +705,19 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       <input type="text" id="rTitle" placeholder="Es. Pollo al limone" value="${escapeHtml(title)}" />
     </div>
     <div class="field">
+      <label>Foto (facoltativa)</label>
+      <div id="photoBox"></div>
+      <input type="file" id="rPhoto" accept="image/*" capture="environment" hidden />
+    </div>
+    <div class="field">
       <label>Strumento di cottura</label>
       <select id="rTool">${opts}</select>
+    </div>
+    <div class="field">
+      <label>Categorie (facoltative)</label>
+      <div class="tagedit" id="tagEdit"></div>
+      <input type="text" id="rTagInput" placeholder="Aggiungi e premi Invio" />
+      <div class="tag-suggest" id="tagSuggest"></div>
     </div>
     <div class="field">
       <label>Link della ricetta (facoltativo)</label>
@@ -678,6 +749,49 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
   const titleInput = m.el.querySelector("#rTitle");
   setTimeout(() => titleInput.focus(), 50);
 
+  // --- Foto ---
+  const photoBox = m.el.querySelector("#photoBox");
+  const photoInput = m.el.querySelector("#rPhoto");
+  function renderPhoto() {
+    if (photo) {
+      photoBox.innerHTML = `<div class="photo-prev"><img src="${escapeHtml(photo)}" alt="" /><button type="button" class="icon-btn icon-btn--danger" id="photoDel">${iconHtml("trash")}</button></div>`;
+      photoBox.querySelector("#photoDel").addEventListener("click", () => { photo = ""; renderPhoto(); });
+    } else {
+      photoBox.innerHTML = `<button type="button" class="btn" id="photoAdd">${iconHtml("image")} Aggiungi foto</button>`;
+      photoBox.querySelector("#photoAdd").addEventListener("click", () => photoInput.click());
+    }
+  }
+  photoInput.addEventListener("change", async () => {
+    const f = photoInput.files[0];
+    if (!f) return;
+    try { photo = await fileToDataUrl(f); renderPhoto(); } catch (e) { toast("Foto non valida", "error"); }
+    photoInput.value = "";
+  });
+  renderPhoto();
+
+  // --- Categorie / tag ---
+  const tagEdit = m.el.querySelector("#tagEdit");
+  const tagInput = m.el.querySelector("#rTagInput");
+  const tagSuggest = m.el.querySelector("#tagSuggest");
+  function addTag(t) {
+    const v = (t || "").trim();
+    if (v && !tags.some((x) => x.toLowerCase() === v.toLowerCase())) tags.push(v);
+    renderTags();
+  }
+  function renderTags() {
+    tagEdit.innerHTML = tags.length
+      ? tags.map((t, i) => `<span class="tagchip" data-i="${i}">${escapeHtml(t)} <b>×</b></span>`).join("")
+      : "";
+    tagEdit.querySelectorAll(".tagchip").forEach((c) => c.addEventListener("click", () => { tags.splice(parseInt(c.dataset.i, 10), 1); renderTags(); }));
+    const avail = TAG_SUGGESTIONS.filter((s) => !tags.some((t) => t.toLowerCase() === s.toLowerCase()));
+    tagSuggest.innerHTML = avail.map((s) => `<button type="button" class="tag-add" data-t="${escapeHtml(s)}">+ ${escapeHtml(s)}</button>`).join("");
+    tagSuggest.querySelectorAll(".tag-add").forEach((b) => b.addEventListener("click", () => addTag(b.dataset.t)));
+  }
+  tagInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(tagInput.value); tagInput.value = ""; }
+  });
+  renderTags();
+
   const rImport = m.el.querySelector("#rImport");
   if (rImport) rImport.addEventListener("click", async () => {
     const u = m.el.querySelector("#rUrl").value.trim();
@@ -706,7 +820,9 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       notes: m.el.querySelector("#rNotes").value.trim(),
       ingredients: parseList(m.el.querySelector("#rIngredients").value),
       servings: parseInt(m.el.querySelector("#rServings").value, 10) || null,
-      steps: m.el.querySelector("#rSteps").value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)
+      steps: m.el.querySelector("#rSteps").value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean),
+      photo: photo,
+      tags: tags
     };
     if (!data.title) { toast("Inserisci un titolo", "error"); return; }
     try {
@@ -1216,7 +1332,7 @@ function renderImpostazioni() {
       </div>
     </div>
     <p style="text-align:center;color:var(--text-soft);font-size:0.78rem;margin-top:24px">
-      Ricettario · v1 · Ricette online da TheMealDB
+      Fornelli · Ricette online da TheMealDB
     </p>
     <input type="file" id="importFile" accept="application/json,.json" style="display:none" />
   `;
@@ -1285,7 +1401,7 @@ export function renderLogin() {
     root.innerHTML = `
       <div style="max-width:380px;margin:8vh auto 0;text-align:center">
         <img class="brand-logo" src="icons/icon.svg" alt="" />
-        <h1 class="page-title" style="text-align:center">Ricettario</h1>
+        <h1 class="page-title" style="text-align:center">Fornelli</h1>
         <p class="page-sub" style="text-align:center">${isRegister ? "Crea il tuo account per il backup nel cloud." : "Accedi per sincronizzare le tue ricette."}</p>
         <div class="setting-group" style="text-align:left;padding:16px">
           <div class="field">

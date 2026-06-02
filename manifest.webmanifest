@@ -1,7 +1,7 @@
 {
-  "name": "Ricettario",
-  "short_name": "Ricettario",
-  "description": "Le ricette di casa organizzate per strumento di cottura.",
+  "name": "Fornelli",
+  "short_name": "Fornelli",
+  "description": "Le ricette di casa, organizzate per strumento di cottura.",
   "lang": "it",
   "start_url": "./index.html",
   "scope": "./",

@@ -1,4 +1,4 @@
-# 🍳 Ricettario
+# 🍳 Fornelli
 
 App (PWA) per organizzare le ricette di casa **per strumento di cottura**
 (friggitrice ad aria, forno, induzione, gas, vaporiera, ecc.).

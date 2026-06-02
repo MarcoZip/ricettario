@@ -105,7 +105,7 @@ export async function deleteTool(id) {
   await adapter.deleteTool(id);
 }
 
-export async function addRecipe({ toolId, title, url, notes, ingredients, servings, steps, favorite, rating }) {
+export async function addRecipe({ toolId, title, url, notes, ingredients, servings, steps, favorite, rating, photo, tags }) {
   await adapter.addRecipe({
     id: newId(),
     toolId,
@@ -117,9 +117,18 @@ export async function addRecipe({ toolId, title, url, notes, ingredients, servin
     steps: Array.isArray(steps) ? steps : [],
     favorite: Boolean(favorite),
     rating: rating || 0,
+    photo: photo || "",
+    tags: Array.isArray(tags) ? tags : [],
     createdAt: now(),
     updatedAt: now()
   });
+}
+
+// Tutti i tag usati (per i filtri).
+export function getAllTags() {
+  const set = new Set();
+  for (const r of state.recipes) for (const t of r.tags || []) set.add(t);
+  return [...set].sort((a, b) => a.localeCompare(b));
 }
 
 // Tutte le ricette (per ricerca e selettori).
@@ -134,8 +143,13 @@ export function searchRecipes(q) {
   if (!s) return [];
   return state.recipes.filter((r) =>
     (r.title || "").toLowerCase().includes(s) ||
+    (r.tags || []).some((t) => (t || "").toLowerCase().includes(s)) ||
     (r.ingredients || []).some((i) => (i.name || "").toLowerCase().includes(s))
   );
+}
+export function getByTag(tag) {
+  const t = (tag || "").toLowerCase();
+  return state.recipes.filter((r) => (r.tags || []).some((x) => (x || "").toLowerCase() === t));
 }
 
 export async function updateRecipe(id, patch) {
