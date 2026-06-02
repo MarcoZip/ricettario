@@ -135,8 +135,8 @@ export function mount(rootEl) {
   if (help) help.addEventListener("click", () => openGuide());
   // Guida al primo avvio.
   try {
-    if (!localStorage.getItem("ricettario.guide.v1")) {
-      localStorage.setItem("ricettario.guide.v1", "1");
+    if (!localStorage.getItem("ricettario.guide.v2")) {
+      localStorage.setItem("ricettario.guide.v2", "1");
       setTimeout(() => openGuide(true), 500);
     }
   } catch {}
@@ -988,14 +988,15 @@ function renderSitiTab() {
 
 // ---------------- Guida / aiuto ----------------
 const GUIDE_SECTIONS = [
-  { icon: "cooking-pot", title: "Strumenti & ricette", text: "Organizza le ricette per strumento di cottura. Crea uno strumento (forno, friggitrice ad aria…) e salva sotto le ricette con link, ingredienti, porzioni e passi." },
-  { icon: "download-simple", title: "Importa dai link", text: "Nel form di una ricetta incolla il link e tocca \"Importa\": ingredienti e preparazione si compilano da soli (sui siti che lo permettono)." },
+  { icon: "cooking-pot", title: "Strumenti & ricette", text: "Organizza le ricette per strumento di cottura. Crea uno strumento (forno, friggitrice ad aria…) e salva sotto le ricette con foto, link, ingredienti, porzioni, passi e categorie." },
+  { icon: "image", title: "Aggiungi senza fatica", text: "Tre scorciatoie nel form ricetta: incolla un link e tocca \"Importa\" (ingredienti e passi si compilano da soli), oppure \"Scansiona da una foto\" per leggere una ricetta da un libro o quaderno, o salva dal Ricettario online." },
   { icon: "book-open", title: "Ricettario", text: "Cerca idee online o tra i siti italiani; tocca \"Salva\" per aggiungerle a uno dei tuoi strumenti." },
   { icon: "fork-knife", title: "Porzioni su misura", text: "Apri una ricetta e cambia il numero di persone con + e −: le quantità degli ingredienti si ricalcolano da sole." },
-  { icon: "shopping-cart-simple", title: "Spesa & Dispensa", text: "Aggiungi gli ingredienti alla lista della spesa (uniti e divisi per reparto). In \"Dispensa\" metti ciò che hai già in casa: non verrà rimesso nella spesa." },
-  { icon: "fire", title: "Modalità cucina", text: "Nelle ricette con i passi, tocca \"Modalità cucina\": istruzioni passo-passo, timer e schermo che resta acceso mentre cucini." },
-  { icon: "heart", title: "Preferiti, voti e ricerca", text: "Metti il cuore alle ricette migliori, dai un voto a stelle e cercale per nome o ingrediente dalla schermata Strumenti." },
-  { icon: "calendar-dots", title: "Pianificazione", text: "Nel calendario assegna le ricette ai giorni (pranzo o cena) e genera la lista della spesa dell'intero mese." },
+  { icon: "heart", title: "Preferiti, voti e ricerca", text: "Metti il cuore alle ricette migliori e dai un voto a stelle. Dalla schermata Strumenti cercale per nome o ingrediente e filtrale per categoria (Primi, Dolci, Veloce…)." },
+  { icon: "shopping-cart-simple", title: "Spesa & Dispensa", text: "Aggiungi gli ingredienti alla lista della spesa (uniti e divisi per reparto). In \"Dispensa\" metti ciò che hai già — con la scadenza — e non verrà rimesso nella spesa. Il pulsante \"Cosa posso cucinare\" ti suggerisce le ricette con quello che hai." },
+  { icon: "fire", title: "Modalità cucina", text: "Nelle ricette con i passi, tocca \"Modalità cucina\": istruzioni passo-passo, timer, lettura vocale (🔊) e schermo sempre acceso mentre cucini." },
+  { icon: "calendar-dots", title: "Pianificazione", text: "Nel calendario assegna le ricette ai giorni in pranzo o cena, e genera la lista della spesa dell'intero mese." },
+  { icon: "arrow-square-out", title: "Condividi", text: "Da una ricetta tocca \"Condividi\" per inviarla a qualcuno (WhatsApp, email…) con ingredienti e preparazione." },
   { icon: "cloud-check", title: "Tutto al sicuro", text: "Con l'accesso le ricette sono salvate nel cloud e sincronizzate su tutti i dispositivi. Da Opzioni puoi anche esportare un backup." }
 ];
 
