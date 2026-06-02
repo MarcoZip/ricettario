@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ricettario — Stili icone a confronto</title>
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/duotone/style.css">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+  body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;background:#0e0f13;color:#ece7df;padding:26px 16px 70px;max-width:560px;margin:0 auto}
+  body::before{content:"";position:fixed;top:0;left:0;right:0;height:340px;background:radial-gradient(120% 90% at 50% -20%,rgba(255,150,70,.22),transparent 70%);pointer-events:none;z-index:0}
+  .wrap{position:relative;z-index:1}
+  h1{font-size:24px;font-weight:800;letter-spacing:-.5px}
+  .lead{color:#8b8478;margin:8px 0 24px;font-size:14.5px;line-height:1.5}
+
+  .opt{background:linear-gradient(160deg,#22232b,#191a20);border:1px solid #2c2d36;border-radius:22px;padding:18px;margin-bottom:18px}
+  .opt h2{font-size:13px;letter-spacing:.5px;font-weight:800;color:#ffd9a8;text-transform:uppercase;margin-bottom:4px}
+  .opt .note{font-size:12.5px;color:#8b8478;margin-bottom:16px}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .cell{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+  .tile{width:58px;height:58px;border-radius:16px;display:flex;align-items:center;justify-content:center;
+        background:radial-gradient(closest-side,color-mix(in srgb,var(--ac) 32%,#22232b),#1a1b21);
+        box-shadow:0 0 24px -6px var(--ac);color:var(--ac)}
+  .tile i.ph-duotone{font-size:30px}
+  .tile svg{width:30px;height:30px}
+  .tile .em{font-size:1.7rem}
+  .lbl{font-size:11px;color:#b8b1a6;line-height:1.15}
+
+  .barlbl{font-size:11px;color:#8b8478;margin:18px 0 8px;letter-spacing:.5px;text-transform:uppercase}
+  .bar{display:flex;align-items:center;gap:18px;justify-content:center;color:#ffb86b}
+  .bar i.ph-duotone{font-size:26px}
+  .bar svg{width:26px;height:26px}
+  .bar .em{font-size:1.4rem}
+  .fab{margin-left:auto;background:linear-gradient(135deg,#ffb86b,#ff7a3d);color:#2a1606;border-radius:14px;height:42px;padding:0 16px;display:flex;align-items:center;gap:7px;font-weight:800;font-size:14px;box-shadow:0 0 26px -6px rgba(255,140,60,.7)}
+  .fab i.ph-duotone, .fab svg{font-size:18px;width:18px;height:18px}
+
+  .pick{background:rgba(255,184,107,.1);border:1px solid rgba(255,184,107,.25);color:#ffd9a8;border-radius:14px;padding:14px;font-size:14px;line-height:1.5}
+</style></head>
+<body><div class="wrap">
+  <h1>🎨 Stili icone a confronto</h1>
+  <p class="lead">Gli stessi strumenti nei tre stili, sul tema scuro. Guarda quale ti piace di più e dimmi <b>A</b>, <b>B</b> o <b>C</b>.</p>
+
+  <!-- A: Phosphor duotone -->
+  <div class="opt">
+    <h2>Opzione A — Phosphor “duotone”</h2>
+    <div class="note">Due tonalità, stile vicino alle SF Symbols di Apple. Calde ed eleganti.</div>
+    <div class="grid">
+      <div class="cell"><div class="tile" style="--ac:#ff5e7e"><i class="ph-duotone ph-fan"></i></div><div class="lbl">Friggitrice<br>ad aria</div></div>
+      <div class="cell"><div class="tile" style="--ac:#ff9a3d"><i class="ph-duotone ph-oven"></i></div><div class="lbl">Forno</div></div>
+      <div class="cell"><div class="tile" style="--ac:#5ea8ff"><i class="ph-duotone ph-lightning"></i></div><div class="lbl">Induzione</div></div>
+      <div class="cell"><div class="tile" style="--ac:#36d1b7"><i class="ph-duotone ph-fire"></i></div><div class="lbl">Fornello<br>a gas</div></div>
+      <div class="cell"><div class="tile" style="--ac:#b06cff"><i class="ph-duotone ph-wind"></i></div><div class="lbl">Vaporiera</div></div>
+      <div class="cell"><div class="tile" style="--ac:#ffd166"><i class="ph-duotone ph-cooking-pot"></i></div><div class="lbl">Pentola a<br>pressione</div></div>
+    </div>
+    <div class="barlbl">Navigazione & funzioni</div>
+    <div class="bar">
+      <i class="ph-duotone ph-bowl-food"></i><i class="ph-duotone ph-book-open"></i><i class="ph-duotone ph-calendar-blank"></i><i class="ph-duotone ph-shopping-cart-simple"></i>
+      <div class="fab"><i class="ph-duotone ph-plus"></i> Ricetta</div>
+    </div>
+  </div>
+
+  <!-- B: Lucide line -->
+  <div class="opt">
+    <h2>Opzione B — Lucide “a linea”</h2>
+    <div class="note">Tratto sottile, minimal e pulitissimo. Molto moderno.</div>
+    <div class="grid">
+      <div class="cell"><div class="tile" style="--ac:#ff5e7e"><i data-lucide="fan"></i></div><div class="lbl">Friggitrice<br>ad aria</div></div>
+      <div class="cell"><div class="tile" style="--ac:#ff9a3d"><i data-lucide="microwave"></i></div><div class="lbl">Forno</div></div>
+      <div class="cell"><div class="tile" style="--ac:#5ea8ff"><i data-lucide="zap"></i></div><div class="lbl">Induzione</div></div>
+      <div class="cell"><div class="tile" style="--ac:#36d1b7"><i data-lucide="flame"></i></div><div class="lbl">Fornello<br>a gas</div></div>
+      <div class="cell"><div class="tile" style="--ac:#b06cff"><i data-lucide="wind"></i></div><div class="lbl">Vaporiera</div></div>
+      <div class="cell"><div class="tile" style="--ac:#ffd166"><i data-lucide="cooking-pot"></i></div><div class="lbl">Pentola a<br>pressione</div></div>
+    </div>
+    <div class="barlbl">Navigazione & funzioni</div>
+    <div class="bar">
+      <i data-lucide="utensils"></i><i data-lucide="book-open"></i><i data-lucide="calendar"></i><i data-lucide="shopping-cart"></i>
+      <div class="fab"><i data-lucide="plus"></i> Ricetta</div>
+    </div>
+  </div>
+
+  <!-- C: Emoji + line -->
+  <div class="opt">
+    <h2>Opzione C — Emoji + icone miste</h2>
+    <div class="note">Emoji colorate per gli strumenti, icone a linea per i pulsanti. Più informale e vivace.</div>
+    <div class="grid">
+      <div class="cell"><div class="tile" style="--ac:#ff5e7e"><span class="em">🍟</span></div><div class="lbl">Friggitrice<br>ad aria</div></div>
+      <div class="cell"><div class="tile" style="--ac:#ff9a3d"><span class="em">🔥</span></div><div class="lbl">Forno</div></div>
+      <div class="cell"><div class="tile" style="--ac:#5ea8ff"><span class="em">⚡</span></div><div class="lbl">Induzione</div></div>
+      <div class="cell"><div class="tile" style="--ac:#36d1b7"><span class="em">🍳</span></div><div class="lbl">Fornello<br>a gas</div></div>
+      <div class="cell"><div class="tile" style="--ac:#b06cff"><span class="em">♨️</span></div><div class="lbl">Vaporiera</div></div>
+      <div class="cell"><div class="tile" style="--ac:#ffd166"><span class="em">⏲️</span></div><div class="lbl">Pentola a<br>pressione</div></div>
+    </div>
+    <div class="barlbl">Navigazione & funzioni</div>
+    <div class="bar">
+      <i data-lucide="utensils"></i><i data-lucide="book-open"></i><i data-lucide="calendar"></i><i data-lucide="shopping-cart"></i>
+      <div class="fab"><i data-lucide="plus"></i> Ricetta</div>
+    </div>
+  </div>
+
+  <div class="pick">👉 Dimmi quale preferisci (<b>A</b> Phosphor, <b>B</b> Lucide, <b>C</b> Emoji+linea) e applico lo stile a tutta l'app. Le icone dei singoli strumenti restano comunque personalizzabili una per una.</div>
+</div>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>lucide.createIcons();</script>
+</body></html>

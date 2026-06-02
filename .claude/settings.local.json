@@ -7,7 +7,8 @@
       "mcp__Claude_Preview__preview_start",
       "PowerShell(git init -b main)",
       "PowerShell(git add -A)",
-      "PowerShell(\"--- log ---\")"
+      "PowerShell(\"--- log ---\")",
+      "WebSearch"
     ]
   }
 }
