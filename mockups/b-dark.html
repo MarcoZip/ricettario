@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup B — Dark Gourmet</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+  body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;background:#15171c;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .device{width:390px;height:780px;border-radius:46px;background:#000;padding:12px;box-shadow:0 40px 90px rgba(0,0,0,.6);position:relative}
+  .screen{width:100%;height:100%;border-radius:36px;overflow:hidden;position:relative;background:radial-gradient(120% 80% at 50% -10%,#2a2018 0%,#16161b 45%,#0e0f13 100%)}
+
+  .content{position:relative;z-index:1;height:100%;display:flex;flex-direction:column;padding:54px 22px 0;color:#ece7df}
+  .glow{position:absolute;top:-60px;left:50%;transform:translateX(-50%);width:300px;height:200px;background:radial-gradient(closest-side,rgba(255,150,60,.35),transparent);filter:blur(20px);z-index:0}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px}
+  .name{font-size:26px;font-weight:800;letter-spacing:-.5px}
+  .name b{background:linear-gradient(135deg,#ffb86b,#ff7a3d);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{font-size:12px;color:#8b8478;margin-top:2px}
+  .avatar{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#ffb86b,#ff7a3d);display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 8px 24px rgba(255,122,61,.4)}
+
+  .hero{background:linear-gradient(135deg,rgba(255,140,60,.18),rgba(255,140,60,.04));border:1px solid rgba(255,160,90,.25);border-radius:22px;padding:18px;margin-bottom:26px;display:flex;justify-content:space-between;align-items:center}
+  .hero .big{font-size:30px;font-weight:800;color:#ffb86b}
+  .hero .lbl{font-size:12px;color:#b3a89a}
+  .hero .pill{background:rgba(255,184,107,.15);border:1px solid rgba(255,184,107,.3);color:#ffd9a8;font-size:12px;font-weight:700;padding:8px 14px;border-radius:999px}
+
+  .sec{font-size:15px;font-weight:800;margin-bottom:14px;color:#ece7df}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;overflow:auto;padding-bottom:10px}
+  .card{background:linear-gradient(160deg,#22232b,#191a20);border:1px solid #2c2d36;border-radius:22px;padding:18px;position:relative;overflow:hidden;transition:.3s}
+  .card::before{content:"";position:absolute;inset:0;border-radius:22px;padding:1px;background:linear-gradient(135deg,var(--ac),transparent 60%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.7}
+  .emoji{width:52px;height:52px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:27px;background:radial-gradient(closest-side,color-mix(in srgb,var(--ac) 35%,#22232b),#1a1b21);box-shadow:0 0 24px -6px var(--ac);margin-bottom:12px}
+  .cname{font-weight:700;font-size:14px;line-height:1.2}
+  .ccount{font-size:12px;color:#8b8478;margin-top:4px}
+
+  .fab{position:absolute;bottom:96px;right:24px;width:60px;height:60px;border-radius:18px;background:linear-gradient(135deg,#ffb86b,#ff7a3d);display:flex;align-items:center;justify-content:center;color:#241606;font-size:30px;font-weight:700;box-shadow:0 0 36px -4px rgba(255,140,60,.7);z-index:3}
+  .nav{position:absolute;bottom:0;left:0;right:0;height:80px;background:rgba(16,17,21,.85);backdrop-filter:blur(20px);border-top:1px solid #24252e;display:flex;justify-content:space-around;align-items:center;padding-bottom:16px;z-index:2}
+  .nav div{font-size:22px;opacity:.35;filter:grayscale(.4)}
+  .nav .on{opacity:1;filter:none}
+</style></head>
+<body>
+  <div class="device"><div class="screen">
+    <div class="glow"></div>
+    <div class="content">
+      <div class="topbar">
+        <div><div class="name">Ricett<b>ario</b></div><div class="sub">Le tue ricette, al caldo 🔥</div></div>
+        <div class="avatar">🍳</div>
+      </div>
+      <div class="hero">
+        <div><div class="big">17</div><div class="lbl">ricette salvate</div></div>
+        <div class="pill">＋ Nuova ricetta</div>
+      </div>
+      <div class="sec">Strumenti di cottura</div>
+      <div class="grid">
+        <div class="card" style="--ac:#ff5e7e"><div class="emoji">🍟</div><div class="cname">Friggitrice ad aria</div><div class="ccount">3 ricette</div></div>
+        <div class="card" style="--ac:#ff9a3d"><div class="emoji">🔥</div><div class="cname">Forno</div><div class="ccount">5 ricette</div></div>
+        <div class="card" style="--ac:#5ea8ff"><div class="emoji">⚡</div><div class="cname">Piano a induzione</div><div class="ccount">2 ricette</div></div>
+        <div class="card" style="--ac:#36d1b7"><div class="emoji">🍳</div><div class="cname">Fornello a gas</div><div class="ccount">4 ricette</div></div>
+        <div class="card" style="--ac:#b06cff"><div class="emoji">♨️</div><div class="cname">Vaporiera</div><div class="ccount">1 ricetta</div></div>
+        <div class="card" style="--ac:#ffd166"><div class="emoji">⏲️</div><div class="cname">Pentola a pressione</div><div class="ccount">2 ricette</div></div>
+      </div>
+    </div>
+    <div class="fab">＋</div>
+    <div class="nav"><div class="on">🍲</div><div>📖</div><div>⚙️</div></div>
+  </div></div>
+</body></html>

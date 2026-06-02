@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup C — Bento Pop</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased}
+  body{font-family:-apple-system,"Segoe UI",Roboto,sans-serif;background:#efe9e1;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .device{width:390px;height:780px;border-radius:46px;background:#1c1a17;padding:12px;box-shadow:0 40px 90px rgba(80,60,30,.3);position:relative}
+  .screen{width:100%;height:100%;border-radius:36px;overflow:hidden;position:relative;background:#fbf6ee}
+
+  .content{position:relative;z-index:1;height:100%;display:flex;flex-direction:column;padding:54px 20px 0}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+  .name{font-size:27px;font-weight:900;color:#2a211a;letter-spacing:-1px}
+  .hi{font-size:13px;color:#a08d77;font-weight:700}
+  .avatar{width:46px;height:46px;border-radius:16px;background:#ffce4a;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:3px 3px 0 #2a211a}
+
+  .sec{font-size:15px;font-weight:800;color:#2a211a;margin:8px 0 14px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:minmax(96px,auto);gap:13px;overflow:auto;padding-bottom:10px}
+  .card{border-radius:24px;padding:16px;position:relative;border:2.5px solid #2a211a;box-shadow:4px 4px 0 #2a211a;display:flex;flex-direction:column;justify-content:space-between;transition:.15s}
+  .wide{grid-column:span 2;flex-direction:row;align-items:center;gap:14px}
+  .emoji{font-size:30px;width:54px;height:54px;background:rgba(255,255,255,.55);border-radius:14px;display:flex;align-items:center;justify-content:center;border:2px solid #2a211a}
+  .cname{font-weight:800;font-size:15px;color:#2a211a;line-height:1.1;margin-top:10px}
+  .wide .cname{margin-top:0}
+  .ccount{font-size:12px;font-weight:700;color:#2a211a;opacity:.65;margin-top:3px}
+  .c1{background:#ffd6a0}.c2{background:#ffb3c1}.c3{background:#a8e6cf}.c4{background:#bcd6ff}.c5{background:#e4c1ff}.c6{background:#ffe39e}
+
+  .fab{position:absolute;bottom:98px;right:22px;height:54px;padding:0 20px;border-radius:18px;background:#ff6b4a;display:flex;align-items:center;gap:8px;color:#fff;font-size:16px;font-weight:800;border:2.5px solid #2a211a;box-shadow:4px 4px 0 #2a211a;z-index:3}
+  .nav{position:absolute;bottom:0;left:0;right:0;height:80px;background:#fff;border-top:2.5px solid #2a211a;display:flex;justify-content:space-around;align-items:center;padding-bottom:16px;z-index:2}
+  .nav div{font-size:22px;opacity:.4}
+  .nav .on{opacity:1;background:#ffce4a;width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;border:2px solid #2a211a}
+</style></head>
+<body>
+  <div class="device"><div class="screen">
+    <div class="content">
+      <div class="topbar">
+        <div><div class="hi">Bentornata 👩‍🍳</div><div class="name">Ricettario</div></div>
+        <div class="avatar">🍳</div>
+      </div>
+      <div class="sec">I tuoi strumenti</div>
+      <div class="grid">
+        <div class="card wide c1"><div class="emoji">🍟</div><div><div class="cname">Friggitrice ad aria</div><div class="ccount">3 ricette · la tua preferita</div></div></div>
+        <div class="card c2"><div class="emoji">🔥</div><div><div class="cname">Forno</div><div class="ccount">5 ricette</div></div></div>
+        <div class="card c3"><div class="emoji">⚡</div><div><div class="cname">Induzione</div><div class="ccount">2 ricette</div></div></div>
+        <div class="card c4"><div class="emoji">🍳</div><div><div class="cname">Fornello a gas</div><div class="ccount">4 ricette</div></div></div>
+        <div class="card c5"><div class="emoji">♨️</div><div><div class="cname">Vaporiera</div><div class="ccount">1 ricetta</div></div></div>
+        <div class="card wide c6"><div class="emoji">⏲️</div><div><div class="cname">Pentola a pressione</div><div class="ccount">2 ricette</div></div></div>
+      </div>
+    </div>
+    <div class="fab">＋ Ricetta</div>
+    <div class="nav"><div class="on">🍲</div><div>📖</div><div>⚙️</div></div>
+  </div></div>
+</body></html>
