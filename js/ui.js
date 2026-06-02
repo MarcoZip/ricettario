@@ -993,7 +993,7 @@ const GUIDE_SECTIONS = [
   { icon: "book-open", title: "Ricettario", text: "Cerca idee online o tra i siti italiani; tocca \"Salva\" per aggiungerle a uno dei tuoi strumenti." },
   { icon: "fork-knife", title: "Porzioni su misura", text: "Apri una ricetta e cambia il numero di persone con + e −: le quantità degli ingredienti si ricalcolano da sole." },
   { icon: "heart", title: "Preferiti, voti e ricerca", text: "Metti il cuore alle ricette migliori e dai un voto a stelle. Dalla schermata Strumenti cercale per nome o ingrediente e filtrale per categoria (Primi, Dolci, Veloce…)." },
-  { icon: "shopping-cart-simple", title: "Spesa & Dispensa", text: "Aggiungi gli ingredienti alla lista della spesa (uniti e divisi per reparto). In \"Dispensa\" metti ciò che hai già — con la scadenza — e non verrà rimesso nella spesa. Il pulsante \"Cosa posso cucinare\" ti suggerisce le ricette con quello che hai." },
+  { icon: "shopping-cart-simple", title: "Spesa & Dispensa", text: "Aggiungi gli ingredienti alla lista della spesa (uniti e divisi per reparto). Spunta ciò che prendi e con \"Spesa fatta\" passa tutto in dispensa. In \"Dispensa\" tieni ciò che hai già — con la scadenza — e non verrà rimesso nella spesa; \"Cosa posso cucinare\" suggerisce le ricette con quello che hai." },
   { icon: "fire", title: "Modalità cucina", text: "Nelle ricette con i passi, tocca \"Modalità cucina\": istruzioni passo-passo, timer, lettura vocale (🔊) e schermo sempre acceso mentre cucini." },
   { icon: "calendar-dots", title: "Pianificazione", text: "Nel calendario assegna le ricette ai giorni in pranzo o cena, e genera la lista della spesa dell'intero mese." },
   { icon: "arrow-square-out", title: "Condividi", text: "Da una ricetta tocca \"Condividi\" per inviarla a qualcuno (WhatsApp, email…) con ingredienti e preparazione." },
@@ -1082,7 +1082,8 @@ function renderShoppingList() {
       <button class="btn btn--primary" id="shopAddBtn">${iconHtml("plus")}</button>
     </div>
     <div id="shopBody">${body}</div>
-    ${items.length ? `<div style="display:flex;gap:8px;margin-top:18px">
+    ${done.length ? `<button class="btn btn--primary btn--block" id="toPantry" style="margin-top:18px">${iconHtml("basket")} Spesa fatta: presi in dispensa</button>` : ""}
+    ${items.length ? `<div style="display:flex;gap:8px;margin-top:${done.length ? "8px" : "18px"}">
       <button class="btn btn--ghost" id="clearDone">Svuota presi</button>
       <button class="btn btn--ghost" id="clearAll" style="color:var(--danger)">Svuota tutto</button>
     </div>` : ""}
@@ -1109,6 +1110,11 @@ function renderShoppingList() {
     rowEl.querySelector('[data-act="del"]').addEventListener("click", () => store.deleteShoppingItem(id));
   });
 
+  const tp = wrap.querySelector("#toPantry");
+  if (tp) tp.addEventListener("click", async () => {
+    const n = await store.moveCheckedToPantry();
+    toast(`${n} ${n === 1 ? "articolo messo" : "articoli messi"} in dispensa`, "success");
+  });
   const cd = wrap.querySelector("#clearDone");
   if (cd) cd.addEventListener("click", () => store.clearCheckedShopping());
   const ca = wrap.querySelector("#clearAll");

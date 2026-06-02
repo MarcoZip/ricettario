@@ -211,6 +211,14 @@ export async function clearAllShopping() {
   const ids = state.shopping.map((s) => s.id);
   if (ids.length) await adapter.clearShopping(ids);
 }
+// Sposta gli articoli "presi" (spuntati) nella dispensa e li toglie dalla lista.
+export async function moveCheckedToPantry() {
+  const checked = state.shopping.filter((s) => s.checked);
+  for (const s of checked) await addPantryItem(s.name);
+  const ids = checked.map((s) => s.id);
+  if (ids.length) await adapter.clearShopping(ids);
+  return checked.length;
+}
 
 // ---- Piano settimanale / calendario ----
 export function getPlan() {
