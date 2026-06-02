@@ -157,9 +157,9 @@ a { color: var(--primary-2); }
   font-weight: 700;
   padding: 6px 0;
 }
-.bottom-nav__icon { font-size: 1.35rem; filter: grayscale(0.5); opacity: 0.5; transition: 0.2s; }
+.bottom-nav__icon { font-size: 1.4rem; opacity: 0.75; transition: 0.2s; }
 .bottom-nav__btn.is-active { color: var(--primary-2); }
-.bottom-nav__btn.is-active .bottom-nav__icon { filter: none; opacity: 1; transform: translateY(-1px); }
+.bottom-nav__btn.is-active .bottom-nav__icon { opacity: 1; transform: translateY(-1px); }
 
 /* ---------- Tool grid ---------- */
 .tool-grid {
@@ -202,6 +202,7 @@ a { color: var(--primary-2); }
   align-items: center;
   justify-content: center;
   font-size: 1.7rem;
+  color: var(--ac, var(--primary-2));
   background: var(--surface-2);
   background: radial-gradient(closest-side, color-mix(in srgb, var(--ac, #ff8a4d) 32%, #22232b), #1a1b21);
   box-shadow: 0 0 24px -6px var(--ac, #ff8a4d);
@@ -507,6 +508,51 @@ a { color: var(--primary-2); }
   background: var(--primary-grad);
   box-shadow: var(--glow);
 }
+
+/* ---------- Icone ---------- */
+.ic { display: inline-flex; align-items: center; justify-content: center; vertical-align: -0.15em; line-height: 0; }
+.ic svg, .bottom-nav__icon svg, [data-ph] svg { width: 1em; height: 1em; display: block; }
+.btn .ic, .chip .ic, .home-hero__btn .ic, .tab-btn .ic, .recipe-item__link .ic { font-size: 1.1em; }
+.fab .ic { font-size: 1.25em; }
+.recipe-item__link .ic { color: var(--primary-2); }
+
+.toolbar__icon {
+  width: 42px; height: 42px; border-radius: 13px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 1.35rem; color: var(--ac, var(--primary-2));
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--ac, #ff8a4d) 30%, #22232b), #1a1b21);
+  box-shadow: 0 0 20px -8px var(--ac, #ff8a4d);
+}
+
+/* selettore icone strumento */
+.icon-picker { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.icon-picker button {
+  border: 1px solid var(--surface-3); background: #15161b; border-radius: 12px;
+  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  font-size: 1.45rem; color: var(--text-soft);
+}
+.icon-picker button.is-selected {
+  border-color: var(--primary); background: rgba(255, 122, 61, 0.14);
+  color: var(--primary-2); box-shadow: 0 0 18px -6px var(--primary);
+}
+
+/* ---------- Animazioni ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .stagger { animation: cardIn 0.42s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 45ms); }
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.3s; }
+}
+@keyframes cardIn { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
+.tool-card { transition: transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.2s; }
+.tool-card:active { transform: scale(0.96); }
+
+/* ---------- Skeleton caricamento ---------- */
+.meal-card--skeleton { pointer-events: none; }
+.sk { background: linear-gradient(90deg, #1f2027 25%, #2a2b34 37%, #1f2027 63%); background-size: 400% 100%; border-radius: 8px; }
+.sk--img { width: 94px; height: 94px; border-radius: 0; flex-shrink: 0; }
+.sk--line { height: 14px; margin: 7px 0; }
+.sk--short { width: 50%; }
+@media (prefers-reduced-motion: no-preference) { .sk { animation: shimmer 1.3s ease infinite; } }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }

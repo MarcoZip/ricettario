@@ -52,12 +52,12 @@ export async function initCloud(userId, { seedIfEmpty = false } = {}) {
 
 // ---- Strumenti di cottura predefiniti ----
 const DEFAULT_TOOLS = [
-  { name: "Friggitrice ad aria", icon: "🍟" },
-  { name: "Forno", icon: "🔥" },
-  { name: "Piano a induzione", icon: "⚡" },
-  { name: "Fornello a gas", icon: "🍳" },
-  { name: "Vaporiera", icon: "♨️" },
-  { name: "Pentola a pressione", icon: "⏲️" }
+  { name: "Friggitrice ad aria", icon: "fan" },
+  { name: "Forno", icon: "oven" },
+  { name: "Piano a induzione", icon: "lightning" },
+  { name: "Fornello a gas", icon: "fire" },
+  { name: "Vaporiera", icon: "wind" },
+  { name: "Pentola a pressione", icon: "cooking-pot" }
 ];
 
 export async function seedDefaults() {

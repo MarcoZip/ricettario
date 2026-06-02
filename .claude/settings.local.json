@@ -8,7 +8,8 @@
       "PowerShell(git init -b main)",
       "PowerShell(git add -A)",
       "PowerShell(\"--- log ---\")",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:unpkg.com)"
     ]
   }
 }

@@ -2,6 +2,31 @@
 import * as store from "./store.js";
 import * as mealdb from "./mealdb.js";
 import { ITALIAN_SITES } from "./sites.js";
+import { iconHtml, rawIcon, ICON_PICKER, resolveIcon } from "./icons.js";
+
+// Animazioni: rispetta la preferenza di sistema "riduci animazioni".
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// Esegue una transizione animata tra schermate (stile iOS) quando supportata.
+function withTransition(fn) {
+  if (reduceMotion || !document.startViewTransition) return fn();
+  document.startViewTransition(fn);
+}
+
+// Anima un numero da 0 al valore finale.
+function countUp(el, to) {
+  if (!el) return;
+  if (reduceMotion || to <= 0) { el.textContent = String(to); return; }
+  const dur = 600;
+  const start = performance.now();
+  const step = (now) => {
+    const p = Math.min(1, (now - start) / dur);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = String(Math.round(eased * to));
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
 
 let root = null;
 let currentRoute = "strumenti";
@@ -24,12 +49,6 @@ export const handlers = {
 
 // Colori di "bagliore" assegnati a rotazione agli strumenti.
 const ACCENTS = ["#ff5e7e", "#ff9a3d", "#5ea8ff", "#36d1b7", "#b06cff", "#ffd166", "#ff7a3d", "#4dd0a0"];
-
-const COOKING_EMOJIS = [
-  "🍟", "🔥", "⚡", "🍳", "♨️", "⏲️", "🥘", "🍲", "🫕", "🍞", "🥖", "🧁",
-  "🍰", "🥧", "🍕", "🍝", "🥩", "🍗", "🐟", "🥦", "🥕", "🧂", "☕", "🍵",
-  "🧆", "🥟", "🌮", "🥗", "🍮", "🫓", "🥞", "🍽️"
-];
 
 // ---------------- Utility ----------------
 function escapeHtml(str) {
@@ -91,6 +110,8 @@ export function confirmDialog({ title, message, confirmText = "Conferma", danger
 // ---------------- Navigazione ----------------
 export function mount(rootEl) {
   root = rootEl;
+  // Inietta le icone Phosphor dove indicato nell'HTML (es. barra di navigazione).
+  document.querySelectorAll("[data-ph]").forEach((el) => { el.innerHTML = rawIcon(el.dataset.ph); });
   store.subscribe(() => render());
   document.querySelectorAll(".bottom-nav__btn").forEach((btn) => {
     btn.addEventListener("click", () => navigate(btn.dataset.route));
@@ -103,13 +124,13 @@ export function navigate(route) {
   document.querySelectorAll(".bottom-nav__btn").forEach((b) => {
     b.classList.toggle("is-active", b.dataset.route === route);
   });
-  render();
+  withTransition(() => render());
   window.scrollTo(0, 0);
 }
 
 function openTool(toolId) {
   currentToolId = toolId;
-  render();
+  withTransition(() => render());
   window.scrollTo(0, 0);
 }
 
@@ -139,8 +160,8 @@ function renderStrumenti() {
     .map((t, i) => {
       const n = store.countRecipes(t.id);
       return `
-      <button class="tool-card" data-tool="${t.id}" style="--ac:${ACCENTS[i % ACCENTS.length]}">
-        <span class="tool-card__emoji">${escapeHtml(t.icon || "🍽️")}</span>
+      <button class="tool-card stagger" data-tool="${t.id}" style="--ac:${ACCENTS[i % ACCENTS.length]};--i:${i}">
+        <span class="tool-card__emoji">${iconHtml(t.icon)}</span>
         <span class="tool-card__name">${escapeHtml(t.name)}</span>
         <span class="tool-card__count">${n} ${n === 1 ? "ricetta" : "ricette"}</span>
       </button>`;
@@ -153,16 +174,16 @@ function renderStrumenti() {
     <h1 class="page-title">Strumenti di cottura</h1>
     <div class="home-hero">
       <div>
-        <div class="home-hero__num">${total}</div>
+        <div class="home-hero__num" id="heroNum">${total}</div>
         <div class="home-hero__lbl">${total === 1 ? "ricetta salvata" : "ricette salvate"}</div>
       </div>
-      <button class="home-hero__btn" id="heroAdd">＋ Nuova ricetta</button>
+      <button class="home-hero__btn" id="heroAdd">${iconHtml("plus")} Nuova ricetta</button>
     </div>
     ${banner}
     <div class="tool-grid">
       ${cards}
-      <button class="add-card" id="addTool">
-        <span class="add-card__plus">＋</span>
+      <button class="add-card stagger" id="addTool" style="--i:${tools.length}">
+        <span class="add-card__plus">${iconHtml("plus")}</span>
         <span>Aggiungi strumento</span>
       </button>
     </div>
@@ -173,6 +194,7 @@ function renderStrumenti() {
   );
   root.querySelector("#addTool").addEventListener("click", () => openToolForm());
   root.querySelector("#heroAdd").addEventListener("click", () => openRecipeForm({}));
+  countUp(root.querySelector("#heroNum"), total);
 }
 
 // ---------------- Schermata: dettaglio strumento ----------------
@@ -183,21 +205,21 @@ function renderToolDetail() {
 
   const list = recipes.length
     ? recipes
-        .map((r) => {
+        .map((r, i) => {
           const url = safeUrl(r.url);
           const link = url
-            ? `<a class="recipe-item__link" href="${escapeHtml(url)}" target="_blank" rel="noopener">🔗 ${escapeHtml(r.url)}</a>`
+            ? `<a class="recipe-item__link" href="${escapeHtml(url)}" target="_blank" rel="noopener">${iconHtml("link-simple")} ${escapeHtml(r.url)}</a>`
             : "";
           const notes = r.notes
             ? `<div class="recipe-item__notes">${escapeHtml(r.notes)}</div>`
             : "";
           return `
-          <div class="recipe-item" data-recipe="${r.id}">
+          <div class="recipe-item stagger" data-recipe="${r.id}" style="--i:${i}">
             <div class="recipe-item__top">
               <h3 class="recipe-item__title">${escapeHtml(r.title)}</h3>
               <div class="recipe-item__actions">
-                <button class="icon-btn" data-act="edit" title="Modifica">✏️</button>
-                <button class="icon-btn icon-btn--danger" data-act="del" title="Elimina">🗑️</button>
+                <button class="icon-btn" data-act="edit" title="Modifica">${iconHtml("pencil-simple")}</button>
+                <button class="icon-btn icon-btn--danger" data-act="del" title="Elimina">${iconHtml("trash")}</button>
               </div>
             </div>
             ${link}
@@ -205,22 +227,22 @@ function renderToolDetail() {
           </div>`;
         })
         .join("")
-    : `<div class="empty"><span class="empty__emoji">📝</span>Nessuna ricetta per ora.<br>Tocca <b>＋ Aggiungi ricetta</b> per inserirne una.</div>`;
+    : `<div class="empty"><span class="empty__emoji">${iconHtml("note-pencil")}</span>Nessuna ricetta per ora.<br>Tocca <b>Aggiungi ricetta</b> per inserirne una.</div>`;
 
   root.innerHTML = `
     <div class="toolbar">
-      <button class="back-btn" id="back">←</button>
-      <div class="toolbar__title">${escapeHtml(tool.icon || "🍽️")} ${escapeHtml(tool.name)}</div>
+      <button class="back-btn" id="back">${iconHtml("arrow-left")}</button>
+      <div class="toolbar__title"><span class="toolbar__icon" style="--ac:${ACCENTS[Math.max(0, store.getTools().findIndex((x) => x.id === tool.id)) % ACCENTS.length]}">${iconHtml(tool.icon)}</span> ${escapeHtml(tool.name)}</div>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:16px">
-      <button class="btn btn--ghost" id="editTool">✏️ Rinomina</button>
-      <button class="btn btn--ghost" id="delTool" style="color:var(--danger)">🗑️ Elimina strumento</button>
+      <button class="btn btn--ghost" id="editTool">${iconHtml("pencil-simple")} Rinomina</button>
+      <button class="btn btn--ghost" id="delTool" style="color:var(--danger)">${iconHtml("trash")} Elimina strumento</button>
     </div>
     <div>${list}</div>
-    <button class="fab" id="addRecipe">＋ Aggiungi ricetta</button>
+    <button class="fab" id="addRecipe">${iconHtml("plus")} Aggiungi ricetta</button>
   `;
 
-  root.querySelector("#back").addEventListener("click", () => { currentToolId = null; render(); });
+  root.querySelector("#back").addEventListener("click", () => { currentToolId = null; withTransition(() => render()); });
   root.querySelector("#addRecipe").addEventListener("click", () => openRecipeForm({ toolId: tool.id }));
   root.querySelector("#editTool").addEventListener("click", () => openToolForm(tool));
   root.querySelector("#delTool").addEventListener("click", async () => {
@@ -260,9 +282,9 @@ function renderToolDetail() {
 // ---------------- Form: strumento ----------------
 function openToolForm(tool = null) {
   const editing = Boolean(tool);
-  let selected = tool ? tool.icon : "🍽️";
-  const emojiBtns = COOKING_EMOJIS.map(
-    (e) => `<button type="button" data-emoji="${e}" class="${e === selected ? "is-selected" : ""}">${e}</button>`
+  let selected = (editing && resolveIcon(tool.icon)) || "cooking-pot";
+  const iconBtns = ICON_PICKER.map(
+    (name) => `<button type="button" data-icon="${name}" class="${name === selected ? "is-selected" : ""}">${iconHtml(name)}</button>`
   ).join("");
 
   const m = openModal(`
@@ -273,7 +295,7 @@ function openToolForm(tool = null) {
     </div>
     <div class="field">
       <label>Icona</label>
-      <div class="emoji-picker" id="emojiPicker">${emojiBtns}</div>
+      <div class="icon-picker" id="iconPicker">${iconBtns}</div>
     </div>
     <div class="modal__actions">
       <button class="btn" data-act="cancel">Annulla</button>
@@ -281,10 +303,10 @@ function openToolForm(tool = null) {
     </div>
   `);
 
-  const picker = m.el.querySelector("#emojiPicker");
+  const picker = m.el.querySelector("#iconPicker");
   picker.querySelectorAll("button").forEach((b) =>
     b.addEventListener("click", () => {
-      selected = b.dataset.emoji;
+      selected = b.dataset.icon;
       picker.querySelectorAll("button").forEach((x) => x.classList.remove("is-selected"));
       b.classList.add("is-selected");
     })
@@ -318,7 +340,7 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
   }
   const selectedTool = recipe ? recipe.toolId : toolId || tools[0].id;
   const opts = tools
-    .map((t) => `<option value="${t.id}" ${t.id === selectedTool ? "selected" : ""}>${escapeHtml(t.icon)} ${escapeHtml(t.name)}</option>`)
+    .map((t) => `<option value="${t.id}" ${t.id === selectedTool ? "selected" : ""}>${escapeHtml(t.name)}</option>`)
     .join("");
 
   const title = recipe ? recipe.title : prefill ? prefill.title : "";
@@ -378,8 +400,8 @@ function renderRicettario() {
     <h1 class="page-title">Ricettario</h1>
     <p class="page-sub">Trova ispirazione e salva le ricette nei tuoi strumenti.</p>
     <div class="tabs">
-      <button class="tab-btn ${mealTab === "online" ? "is-active" : ""}" data-tab="online">🔎 Cerca online</button>
-      <button class="tab-btn ${mealTab === "siti" ? "is-active" : ""}" data-tab="siti">🇮🇹 Siti italiani</button>
+      <button class="tab-btn ${mealTab === "online" ? "is-active" : ""}" data-tab="online">${iconHtml("magnifying-glass")} Cerca online</button>
+      <button class="tab-btn ${mealTab === "siti" ? "is-active" : ""}" data-tab="siti">${iconHtml("book-bookmark")} Siti italiani</button>
     </div>
     <div id="ricettarioBody"></div>
   `;
@@ -394,15 +416,17 @@ function renderOnlineTab() {
   const body = root.querySelector("#ricettarioBody");
   let resultsHtml = "";
   if (mealLoading) {
-    resultsHtml = `<div class="loader"><div class="spinner"></div>Ricerca in corso...</div>`;
+    resultsHtml = Array.from({ length: 4 }, () =>
+      `<div class="meal-card meal-card--skeleton"><div class="sk sk--img"></div><div class="meal-card__body"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div></div></div>`
+    ).join("");
   } else if (mealError) {
-    resultsHtml = `<div class="empty"><span class="empty__emoji">⚠️</span>${escapeHtml(mealError)}</div>`;
+    resultsHtml = `<div class="empty"><span class="empty__emoji">${iconHtml("cloud-check")}</span>${escapeHtml(mealError)}</div>`;
   } else if (mealResults && mealResults.length === 0) {
-    resultsHtml = `<div class="empty"><span class="empty__emoji">🍽️</span>Nessun risultato. Prova un altro termine (in inglese funziona meglio, es. "chicken").</div>`;
+    resultsHtml = `<div class="empty"><span class="empty__emoji">${iconHtml("magnifying-glass")}</span>Nessun risultato. Prova un altro termine (in inglese funziona meglio, es. "chicken").</div>`;
   } else if (mealResults) {
     resultsHtml = mealResults.map(mealCardHtml).join("");
   } else {
-    resultsHtml = `<div class="empty"><span class="empty__emoji">👩‍🍳</span>Cerca una ricetta oppure tocca <b>Ispirami</b>.<br><small>Fonte: TheMealDB (in inglese)</small></div>`;
+    resultsHtml = `<div class="empty"><span class="empty__emoji">${iconHtml("fork-knife")}</span>Cerca una ricetta oppure tocca <b>Ispirami</b>.<br><small>Fonte: TheMealDB (in inglese)</small></div>`;
   }
 
   body.innerHTML = `
@@ -410,7 +434,7 @@ function renderOnlineTab() {
       <input type="search" id="mealSearch" placeholder="Cerca (es. pasta, chicken...)" value="${escapeHtml(mealQuery)}" />
       <button class="btn btn--primary" id="mealSearchBtn">Cerca</button>
     </div>
-    <div style="margin-bottom:16px"><button class="btn btn--ghost" id="mealRandom">🎲 Ispirami</button></div>
+    <div style="margin-bottom:16px"><button class="btn btn--ghost" id="mealRandom">${iconHtml("shuffle")} Ispirami</button></div>
     <div id="mealResults">${resultsHtml}</div>
   `;
 
@@ -453,8 +477,8 @@ function mealCardHtml(m) {
         <h3 class="meal-card__title">${escapeHtml(m.title)}</h3>
         <div class="meal-card__meta">${escapeHtml(meta)}</div>
         <div class="meal-card__actions">
-          <a class="chip" href="${escapeHtml(safeUrl(m.link))}" target="_blank" rel="noopener">↗ Apri</a>
-          <button class="chip" data-act="save">＋ Salva</button>
+          <a class="chip" href="${escapeHtml(safeUrl(m.link))}" target="_blank" rel="noopener">${iconHtml("arrow-square-out")} Apri</a>
+          <button class="chip" data-act="save">${iconHtml("plus")} Salva</button>
         </div>
       </div>
     </div>`;
@@ -500,7 +524,7 @@ function renderImpostazioni() {
         </div>
         <div class="setting-row">
           <div>
-            <div class="setting-row__label">Backup nel cloud attivo ✅</div>
+            <div class="setting-row__label">Backup nel cloud attivo ${iconHtml("cloud-check")}</div>
             <div class="setting-row__desc">Le ricette si sincronizzano automaticamente.</div>
           </div>
         </div>
