@@ -1149,8 +1149,9 @@ function renderOnlineTab() {
     mealLoading = false; renderOnlineTab();
   });
 
-  body.querySelectorAll(".meal-card").forEach((card) => {
-    const data = JSON.parse(card.dataset.meal);
+  body.querySelectorAll(".meal-card[data-meal]").forEach((card) => {
+    let data;
+    try { data = JSON.parse(card.dataset.meal); } catch (e) { return; }
     card.querySelector('[data-act="save"]').addEventListener("click", () =>
       openRecipeForm({ prefill: { title: data.title, url: data.link, ingredients: data.ingredients || [], steps: data.steps || [] } })
     );
