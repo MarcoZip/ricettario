@@ -1159,7 +1159,7 @@ function renderOnlineTab() {
       const old = saveBtn.innerHTML;
       saveBtn.disabled = true;
       saveBtn.innerHTML = `${iconHtml("download-simple")} Traduco...`;
-      let prefill = { title: data.title, url: data.link, ingredients: data.ingredients || [], steps: data.steps || [] };
+      let prefill = { title: data.title, url: data.link, image: data.thumb || "", ingredients: data.ingredients || [], steps: data.steps || [] };
       try {
         const tr = await translateRecipe({ title: data.title, ingredients: prefill.ingredients, steps: prefill.steps });
         prefill = { ...prefill, title: tr.title, ingredients: tr.ingredients, steps: tr.steps };
