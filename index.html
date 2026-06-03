@@ -15,6 +15,55 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <!-- Splash di avvio: una delle 4 animazioni del cappello, scelta a caso -->
+  <div id="splash" aria-hidden="true">
+    <div class="splash__glow"></div>
+    <div class="splash__ring"></div>
+    <svg class="splash__hat hat-fill" viewBox="0 0 512 512" aria-hidden="true">
+      <g fill="#fff"><circle cx="256" cy="214" r="78"/><circle cx="176" cy="237" r="61"/><circle cx="336" cy="237" r="61"/><rect x="169" y="222" width="174" height="91"/><rect x="180" y="301" width="152" height="64" rx="19"/></g>
+      <g stroke="#df5117" stroke-width="8" stroke-linecap="round"><line x1="222" y1="317" x2="222" y2="351"/><line x1="256" y1="317" x2="256" y2="351"/><line x1="290" y1="317" x2="290" y2="351"/></g>
+    </svg>
+    <svg class="splash__hat hat-draw" viewBox="0 0 512 512" aria-hidden="true">
+      <g class="fillpart" fill="#fff"><circle cx="256" cy="214" r="78"/><circle cx="176" cy="237" r="61"/><circle cx="336" cy="237" r="61"/><rect x="169" y="222" width="174" height="91"/><rect x="180" y="301" width="152" height="64" rx="19"/></g>
+      <g class="outline" fill="none" stroke="#fff" stroke-width="9" stroke-linejoin="round" stroke-linecap="round">
+        <circle class="o" style="animation-delay:0ms" pathLength="1" cx="256" cy="214" r="78"/>
+        <circle class="o" style="animation-delay:160ms" pathLength="1" cx="176" cy="237" r="61"/>
+        <circle class="o" style="animation-delay:300ms" pathLength="1" cx="336" cy="237" r="61"/>
+        <rect class="o" style="animation-delay:440ms" pathLength="1" x="169" y="222" width="174" height="91"/>
+        <rect class="o" style="animation-delay:580ms" pathLength="1" x="180" y="301" width="152" height="64" rx="19"/>
+      </g>
+      <g><line class="pleat" pathLength="1" x1="222" y1="317" x2="222" y2="351"/><line class="pleat" pathLength="1" x1="256" y1="317" x2="256" y2="351"/><line class="pleat" pathLength="1" x1="290" y1="317" x2="290" y2="351"/></g>
+    </svg>
+    <span class="splash__steam s1"></span><span class="splash__steam s2"></span><span class="splash__steam s3"></span>
+    <div class="splash__sparks"></div>
+  </div>
+  <script>
+    (function () {
+      var s = document.getElementById("splash");
+      if (!s) return;
+      function dismiss() { s.classList.add("is-gone"); setTimeout(function () { if (s.parentNode) s.parentNode.removeChild(s); }, 500); }
+      var reduce = false;
+      try { reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
+      if (reduce) { s.classList.add("v0"); setTimeout(dismiss, 450); return; }
+      var v = 1 + Math.floor(Math.random() * 4);
+      s.classList.add("v" + v);
+      if (v === 3) {
+        var box = s.querySelector(".splash__sparks");
+        var cols = ["#fff", "#ffe08a", "#fff3d6", "#ffd166"];
+        for (var i = 0; i < 12; i++) {
+          var a = (i / 12) * Math.PI * 2, sp = document.createElement("span");
+          sp.className = "spark";
+          sp.style.setProperty("--x", Math.round(Math.cos(a) * 130) + "px");
+          sp.style.setProperty("--y", Math.round(Math.sin(a) * 130) + "px");
+          sp.style.background = cols[i % 4];
+          sp.style.animationDelay = (i % 4) * 30 + "ms";
+          box.appendChild(sp);
+        }
+      }
+      setTimeout(dismiss, v === 4 ? 2350 : 2100);
+    })();
+  </script>
+
   <!-- Header -->
   <header class="app-header">
     <div class="app-header__title">

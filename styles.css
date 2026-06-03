@@ -614,6 +614,76 @@ a { color: var(--primary-2); }
   100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.65); }
 }
 
+/* ---------- Splash di avvio (4 animazioni del cappello, a caso) ---------- */
+#splash { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, #ffa64d, #df5117); overflow: hidden; }
+#splash.is-gone { opacity: 0; transition: opacity 0.5s ease; pointer-events: none; }
+.splash__hat { width: min(210px, 48vw); overflow: visible; transform-origin: center; }
+#splash:not(.v4) .hat-draw { display: none; }
+#splash.v4 .hat-fill, #splash.v0 .hat-draw { display: none; }
+.splash__glow { position: absolute; width: 80vw; max-width: 380px; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, rgba(255, 255, 255, 0.45), transparent 62%); opacity: 0; pointer-events: none; }
+.splash__ring { position: absolute; width: 130px; aspect-ratio: 1; border-radius: 50%; border: 5px solid rgba(255, 255, 255, 0.9); opacity: 0; pointer-events: none; }
+.splash__steam { position: absolute; top: 26%; left: 50%; width: 11px; height: 80px; border-radius: 11px; background: linear-gradient(to top, rgba(255, 255, 255, 0.75), transparent); opacity: 0; pointer-events: none; }
+.splash__steam.s1 { margin-left: -38px; }
+.splash__steam.s2 { margin-left: -5px; }
+.splash__steam.s3 { margin-left: 28px; }
+.splash .spark { position: absolute; width: 12px; height: 12px; border-radius: 2px; opacity: 0; pointer-events: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* V1 — vola nell'header */
+  #splash.v1 { animation: spReveal1 1.7s ease forwards; }
+  #splash.v1 .hat-fill { animation: spHat1 1.7s cubic-bezier(0.6, 0.05, 0.2, 1) forwards; }
+  /* V2 — vapore caldo */
+  #splash.v2 { animation: spReveal 1.9s ease forwards; }
+  #splash.v2 .hat-fill { animation: spHat2 1.9s ease forwards; transform-origin: center bottom; }
+  #splash.v2 .splash__glow { animation: spGlow 1.9s ease forwards; }
+  #splash.v2 .splash__steam { animation: spSteam 1.5s ease-in-out infinite; }
+  #splash.v2 .s2 { animation-delay: 0.35s; }
+  #splash.v2 .s3 { animation-delay: 0.7s; }
+  /* V3 — pop + scintille */
+  #splash.v3 { animation: spReveal 1.9s ease forwards; }
+  #splash.v3 .hat-fill { animation: spHat3 1.7s cubic-bezier(0.2, 1.6, 0.3, 1) forwards; }
+  #splash.v3 .splash__ring { animation: spRing 1.5s ease forwards; }
+  #splash.v3 .spark { animation: spSpark 1.4s ease forwards; }
+  /* V4 — disegno a mano */
+  #splash.v4 { animation: spReveal4 2.2s ease forwards; }
+  #splash.v4 .fillpart { opacity: 0; animation: spFill 2.2s ease forwards; }
+  #splash.v4 .outline .o { stroke-dasharray: 1; stroke-dashoffset: 1; animation: spDraw 2.2s ease forwards; }
+  #splash.v4 .pleat { stroke-dasharray: 1; stroke-dashoffset: 1; animation: spPleat 2.2s ease forwards; }
+}
+
+@keyframes spReveal { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes spReveal1 { 0%, 52% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes spReveal4 { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes spHat1 {
+  0% { transform: translate(0, 0) scale(1); }
+  26% { transform: translate(0, 0) scale(1.06); }
+  100% { transform: translate(calc(32px - 50vw), calc(var(--safe-top, 0px) + 30px - 50vh)) scale(0.12); }
+}
+@keyframes spHat2 {
+  0% { transform: scale(0.4); opacity: 0; }
+  16% { transform: scale(1.14); opacity: 1; }
+  24% { transform: scale(0.97); }
+  32% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+  66% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.5) translateY(-7%); opacity: 0; }
+}
+@keyframes spGlow { 0%, 16% { opacity: 0; transform: scale(0.7); } 44% { opacity: 0.9; transform: scale(1); } 70% { opacity: 0.4; } 100% { opacity: 0; } }
+@keyframes spSteam { 0% { opacity: 0; transform: translateY(14px) scaleY(0.6); } 35% { opacity: 0.85; } 100% { opacity: 0; transform: translateY(-54px) scaleY(1.25); } }
+@keyframes spHat3 {
+  0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+  20% { transform: scale(1.16) rotate(9deg); opacity: 1; }
+  30% { transform: scale(0.94) rotate(-4deg); }
+  40% { transform: scale(1) rotate(0); }
+  66% { transform: scale(1) rotate(0); opacity: 1; }
+  100% { transform: scale(1.6) rotate(0); opacity: 0; }
+}
+@keyframes spRing { 0%, 16% { opacity: 0; transform: scale(0.3); } 28% { opacity: 0.9; } 52% { opacity: 0; transform: scale(2.6); } 100% { opacity: 0; } }
+@keyframes spSpark { 0%, 20% { opacity: 0; transform: translate(0, 0) scale(1); } 28% { opacity: 1; } 55% { opacity: 0; transform: translate(var(--x), var(--y)) scale(0.5); } 100% { opacity: 0; } }
+@keyframes spDraw { 0% { stroke-dashoffset: 1; } 42%, 100% { stroke-dashoffset: 0; } }
+@keyframes spFill { 0%, 46% { opacity: 0; } 64%, 100% { opacity: 1; } }
+@keyframes spPleat { 0%, 62% { stroke-dashoffset: 1; } 78%, 100% { stroke-dashoffset: 0; } }
+
 /* ---------- Ricetta: anteprima & dettaglio ---------- */
 .recipe-item--tap { cursor: pointer; }
 .recipe-item__meta { display: flex; align-items: center; gap: 8px; color: var(--text-soft); font-size: 0.82rem; margin-top: 8px; }
