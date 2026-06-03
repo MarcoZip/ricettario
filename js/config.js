@@ -52,7 +52,7 @@ export function isImportConfigured() {
 //  locali (che appaiono quando apri l'app).
 // ============================================================
 export const VAPID_PUBLIC_KEY = "BG6AgCm8Ca2HT0xDX_hdBct0cQXRn-Yj8Rbs-3dbgyYDLgPfrKaktoDMg8ho0PMV99rrg5McH1QeBe1EiYzQJq8";
-export const PUSH_WORKER_URL = "";
+export const PUSH_WORKER_URL = "https://fornelli-push.marcozeta73.workers.dev";
 
 export function isPushConfigured() {
   return Boolean(VAPID_PUBLIC_KEY && PUSH_WORKER_URL);

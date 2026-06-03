@@ -14,7 +14,8 @@
       "Bash(grep -oq ''\\\\''__TRACKED_VAR__'\\\\'':' js/icons-data.js)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"https://fornelli-push.marcozeta73.workers.dev/health\" -UseBasicParsing -TimeoutSec 20; \"STATUS: $\\($r.StatusCode\\)\"; \"BODY: $\\($r.Content\\)\" } catch { \"ERRORE: $\\($_.Exception.Message\\)\"; if \\($_.Exception.Response\\) { \"HTTP: $\\([int]$_.Exception.Response.StatusCode\\)\" } })"
     ]
   }
 }
