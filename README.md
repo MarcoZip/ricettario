@@ -100,6 +100,50 @@ sincronizzano su più dispositivi. È **gratis** per questo uso.
 
 ---
 
+## 4) (Opzionale) Notifiche push anche ad app chiusa
+
+Senza questo passaggio l'app mostra comunque i **promemoria locali** (scadenze e
+pasto di oggi) quando la apri. Per riceverli **anche a telefono in tasca, con
+l'app chiusa**, serve un piccolo servizio che li invia: un **Cloudflare Worker**
+con un *Cron Trigger*. È gratuito.
+
+> Su **iPhone** le notifiche funzionano solo se l'app è **installata sulla
+> schermata Home** (iOS 16.4 o successivo). Su Android funzionano sempre.
+
+**a. Crea il Worker**
+1. Vai su [dash.cloudflare.com](https://dash.cloudflare.com) → **Workers & Pages**
+   → **Create** → **Create Worker**. Dagli un nome (es. `fornelli-push`) e **Deploy**.
+2. Apri **Edit code**, cancella tutto e incolla il contenuto del file
+   `worker/push-sender.js` di questo progetto. **Deploy**.
+
+**b. Crea l'archivio (KV)**
+1. **Storage & Databases** → **KV** → **Create a namespace** (es. `fornelli-push`).
+2. Torna al Worker → **Settings** → **Bindings** → **Add** → **KV namespace**:
+   - *Variable name*: `PUSH_KV`
+   - *KV namespace*: quello appena creato. **Save**.
+
+**c. Aggiungi la chiave segreta**
+1. Worker → **Settings** → **Variables and Secrets** → **Add** → tipo **Secret**:
+   - *Name*: `VAPID_PRIVATE`
+   - *Value*: `4YkkNVt19V7DUn8fUqun8WvvS7vohlg2UWa1Z0GPv6E`
+   - **Save** (e poi **Deploy**).
+
+**d. Attiva il Cron (l'orario di invio)**
+1. Worker → **Settings** → **Triggers** (o **Cron Triggers**) → **Add Cron Trigger**:
+   imposta `0 * * * *` (controlla ogni ora). **Save**.
+
+**e. Collega l'app**
+1. Apri `js/config.js` e in `PUSH_WORKER_URL` incolla l'indirizzo del Worker
+   (lo trovi nella sua pagina, es. `https://fornelli-push.tuonome.workers.dev`).
+2. Ripubblica l'app. Sul telefono: **Impostazioni → Promemoria → Attiva**: vedrai
+   *"Attive: le notifiche arrivano anche con l'app chiusa"*.
+
+> La chiave pubblica VAPID è già impostata in `js/config.js` e nel Worker: le due
+> devono combaciare (lo sono già). La chiave segreta qui sopra va **solo** nel
+> Worker, mai pubblicata altrove.
+
+---
+
 ## Backup manuale (sempre disponibile)
 
 In **Impostazioni** puoi **Esportare** tutte le ricette in un file e
@@ -127,7 +171,13 @@ Ricette/
    ├─ auth.js              Login / registrazione
    ├─ ui.js                Interfaccia e schermate
    ├─ mealdb.js            Ricerca ricette online (TheMealDB)
+   ├─ nutrition.js         Stima valori nutrizionali (+ Open Food Facts)
+   ├─ notify.js            Promemoria locali (notifiche di sistema)
+   ├─ push.js              Notifiche push (iscrizione + promemoria al worker)
    └─ sites.js             Elenco siti italiani
+   worker/
+   ├─ recipe-extractor.js  Import ingredienti dai link (Cloudflare Worker)
+   └─ push-sender.js       Invio notifiche push (Cloudflare Worker + Cron)
 ```
 
 ## Note

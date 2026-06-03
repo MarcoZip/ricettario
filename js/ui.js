@@ -6,6 +6,7 @@ import { iconHtml, rawIcon, ICON_PICKER, resolveIcon } from "./icons.js";
 import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from "./ingredients.js";
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
+import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
 import { importFromUrl } from "./import-recipe.js";
 import { isImportConfigured } from "./config.js";
 import { fileToDataUrl } from "./image.js";
@@ -1736,6 +1737,12 @@ function notifyGroupHtml() {
       </div>
       <input type="checkbox" id="ntMeals" class="mini-check" ${prefs.meals ? "checked" : ""} />
     </div>
+    ${pushReady() ? `<div class="setting-row">
+      <div>
+        <div class="setting-row__label">Anche ad app chiusa</div>
+        <div class="setting-row__desc" id="pushStatus">Verifico…</div>
+      </div>
+    </div>` : ""}
     <div class="setting-row">
       <div>
         <div class="setting-row__label">Prova le notifiche</div>
@@ -1746,16 +1753,42 @@ function notifyGroupHtml() {
   return `<div class="setting-group">${main}${sub}</div>`;
 }
 
+// Aggiorna i promemoria sul worker quando cambiano le preferenze (se iscritti).
+async function pushRefreshSafe() {
+  try { if (await isPushSubscribed()) await refreshReminders(store); } catch (e) { /* ignora */ }
+}
+
+// Mostra lo stato delle push e tenta l'iscrizione se mancante.
+async function updatePushStatus(tryRegister) {
+  const el = root.querySelector("#pushStatus");
+  if (!el) return;
+  try {
+    let subscribed = await isPushSubscribed();
+    if (!subscribed && tryRegister) {
+      await registerPush(store);
+      subscribed = true;
+    }
+    el.textContent = subscribed
+      ? "Attive: le notifiche arrivano anche con l'app chiusa."
+      : "Non attive su questo dispositivo.";
+    el.style.color = subscribed ? "var(--primary-2)" : "";
+  } catch (e) {
+    el.textContent = "Non disponibili ora (riprovo alla prossima apertura).";
+  }
+}
+
 function wireNotify() {
   const toggle = root.querySelector("#notifyToggle");
   if (toggle) toggle.addEventListener("click", async () => {
     if (notifyEnabled()) {
       disableNotify();
+      await unregisterPush();
       toast("Promemoria disattivati");
     } else {
       try {
         await enableNotify();
         toast("Promemoria attivati", "success");
+        if (pushReady()) registerPush(store).catch(() => {});
       } catch (e) {
         toast(e.message || "Impossibile attivare le notifiche", "error");
       }
@@ -1763,16 +1796,17 @@ function wireNotify() {
     renderImpostazioni();
   });
   const exp = root.querySelector("#ntExpiry");
-  if (exp) exp.addEventListener("change", () => setNotifyPref("expiry", exp.checked));
+  if (exp) exp.addEventListener("change", () => { setNotifyPref("expiry", exp.checked); pushRefreshSafe(); });
   const meals = root.querySelector("#ntMeals");
-  if (meals) meals.addEventListener("change", () => setNotifyPref("meals", meals.checked));
+  if (meals) meals.addEventListener("change", () => { setNotifyPref("meals", meals.checked); pushRefreshSafe(); });
   const days = root.querySelector("#ntDays");
-  if (days) days.addEventListener("change", () => setNotifyPref("days", parseInt(days.value, 10)));
+  if (days) days.addEventListener("change", () => { setNotifyPref("days", parseInt(days.value, 10)); pushRefreshSafe(); });
   const test = root.querySelector("#ntTest");
   if (test) test.addEventListener("click", async () => {
     try { await sendTestNotification(); toast("Notifica inviata", "success"); }
     catch (e) { toast("Invio non riuscito", "error"); }
   });
+  if (pushReady() && notifyEnabled()) updatePushStatus(true);
 }
 
 function renderImpostazioni() {

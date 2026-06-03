@@ -40,3 +40,20 @@ export const WORKER_URL = "https://ricette-import.marcozeta73.workers.dev";
 export function isImportConfigured() {
   return Boolean(WORKER_URL);
 }
+
+// ============================================================
+//  NOTIFICHE PUSH (anche ad app chiusa) — opzionale
+// ------------------------------------------------------------
+//  Per ricevere le notifiche quando l'app è chiusa serve un piccolo
+//  servizio che le invia a un orario fisso: un Cloudflare Worker con
+//  "Cron Trigger". La chiave pubblica qui sotto è già pronta; dopo aver
+//  pubblicato il worker, incolla il suo indirizzo in PUSH_WORKER_URL.
+//  Guida completa in README.md. Lasciato vuoto, restano i promemoria
+//  locali (che appaiono quando apri l'app).
+// ============================================================
+export const VAPID_PUBLIC_KEY = "BG6AgCm8Ca2HT0xDX_hdBct0cQXRn-Yj8Rbs-3dbgyYDLgPfrKaktoDMg8ho0PMV99rrg5McH1QeBe1EiYzQJq8";
+export const PUSH_WORKER_URL = "";
+
+export function isPushConfigured() {
+  return Boolean(VAPID_PUBLIC_KEY && PUSH_WORKER_URL);
+}

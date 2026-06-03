@@ -5,11 +5,19 @@ import * as ui from "./ui.js";
 import { isCloudConfigured } from "./config.js";
 import { applyTheme } from "./theme.js";
 import { runDailyReminders } from "./notify.js";
+import { isPushSubscribed, refreshReminders } from "./push.js";
 
-// Mostra i promemoria (scadenze / pasto di oggi) lasciando il tempo ai dati
-// cloud di arrivare. È idempotente: al massimo una notifica al giorno per tipo.
+// Gestisce i promemoria lasciando il tempo ai dati (cloud) di arrivare. Se le
+// push "vere" sono attive, aggiorna i promemoria sul worker (le manda lui, anche
+// ad app chiusa); altrimenti usa il fallback locale (notifica all'apertura).
+async function doReminders() {
+  try {
+    if (await isPushSubscribed()) await refreshReminders(store);
+    else await runDailyReminders(store);
+  } catch (e) { /* offline o non supportato */ }
+}
 function scheduleReminders() {
-  setTimeout(() => runDailyReminders(store).catch(() => {}), 3000);
+  setTimeout(doReminders, 3000);
 }
 
 applyTheme();
@@ -117,7 +125,7 @@ window.addEventListener("offline", updateBadge);
 
 // Ricontrolla i promemoria quando l'app torna in primo piano.
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") runDailyReminders(store).catch(() => {});
+  if (document.visibilityState === "visible") doReminders();
 });
 
 // Registrazione del service worker (per il funzionamento offline / installazione).
