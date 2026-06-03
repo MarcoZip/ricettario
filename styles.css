@@ -589,6 +589,31 @@ a { color: var(--primary-2); }
 @media (prefers-reduced-motion: no-preference) { .sk { animation: shimmer 1.3s ease infinite; } }
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
 
+/* ---------- Effetti speciali (wow) ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .home-hero {
+    background: linear-gradient(120deg, rgba(255, 140, 60, 0.22), rgba(255, 90, 120, 0.10), rgba(120, 150, 255, 0.13), rgba(255, 140, 60, 0.22));
+    background-size: 300% 300%;
+    animation: heroGlow 13s ease-in-out infinite;
+  }
+  .pick-row, .recipe-item--tap, .shop-row, .filter-chip, .btn { transition: transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .pick-row:active, .recipe-item--tap:active { transform: scale(0.985); }
+  .filter-chip:active, .btn:active { transform: scale(0.95); }
+  .fav-btn.is-fav .ic { animation: heartPop 0.45s ease; }
+  .home-hero__num { animation: cardIn 0.5s ease backwards; }
+}
+@keyframes heroGlow { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes heartPop { 0% { transform: scale(1); } 40% { transform: scale(1.4); } 70% { transform: scale(0.88); } 100% { transform: scale(1); } }
+
+/* Esplosione di particelle (confetti / emoji) */
+.fx-layer { position: fixed; inset: 0; pointer-events: none; z-index: 500; overflow: hidden; }
+.fx-bit { position: absolute; width: 10px; height: 10px; border-radius: 2px; will-change: transform, opacity; animation: fxFly 1s cubic-bezier(0.15, 0.6, 0.25, 1) forwards; }
+.fx-bit.is-emoji { width: auto; height: auto; font-size: 22px; border-radius: 0; }
+@keyframes fxFly {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.65); }
+}
+
 /* ---------- Ricetta: anteprima & dettaglio ---------- */
 .recipe-item--tap { cursor: pointer; }
 .recipe-item__meta { display: flex; align-items: center; gap: 8px; color: var(--text-soft); font-size: 0.82rem; margin-top: 8px; }

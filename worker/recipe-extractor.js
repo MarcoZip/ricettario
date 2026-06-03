@@ -165,7 +165,26 @@ function normalize(n) {
 
   const steps = flattenInstructions(n.recipeInstructions);
 
-  return { title: clean(n.name) || "", image: image || "", servings, ingredients, steps };
+  // Tempo: totalTime, oppure prep + cook. Formato ISO 8601 ("PT1H30M").
+  let time = isoDurationToMinutes(n.totalTime);
+  if (!time) {
+    const p = isoDurationToMinutes(n.prepTime);
+    const c = isoDurationToMinutes(n.cookTime);
+    if (p || c) time = (p || 0) + (c || 0);
+  }
+
+  return { title: clean(n.name) || "", image: image || "", servings, time: time || null, ingredients, steps };
+}
+
+// Converte una durata ISO 8601 (es. "PT1H30M", "PT45M") in minuti.
+export function isoDurationToMinutes(v) {
+  if (!v) return null;
+  const s = Array.isArray(v) ? v[0] : v;
+  const m = String(s).match(/^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/i);
+  if (!m) return null;
+  const days = parseInt(m[1] || 0, 10), h = parseInt(m[2] || 0, 10), min = parseInt(m[3] || 0, 10), sec = parseInt(m[4] || 0, 10);
+  const total = days * 1440 + h * 60 + min + Math.round(sec / 60);
+  return total > 0 ? total : null;
 }
 
 // ---------- fallback microdata (siti senza JSON-LD) ----------

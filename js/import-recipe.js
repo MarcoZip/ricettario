@@ -25,6 +25,7 @@ export async function importFromUrl(url) {
     title: data.title || "",
     image: data.image || "",
     servings: typeof data.servings === "number" ? data.servings : (parseInt(data.servings, 10) || null),
+    time: typeof data.time === "number" ? data.time : (parseInt(data.time, 10) || null),
     ingredients: Array.isArray(data.ingredients) ? data.ingredients : [],
     steps: Array.isArray(data.steps) ? data.steps : []
   };

@@ -8,7 +8,7 @@ import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
 import { importFromUrl } from "./import-recipe.js";
-import { isImportConfigured } from "./config.js";
+import { isImportConfigured, APP_VERSION } from "./config.js";
 import { fileToDataUrl } from "./image.js";
 import { getTheme, setTheme } from "./theme.js";
 
@@ -22,6 +22,38 @@ const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").match
 function withTransition(fn) {
   if (reduceMotion || !document.startViewTransition) return fn();
   document.startViewTransition(fn);
+}
+
+// Esplosione di particelle (confetti o emoji) per i momenti "wow".
+function fxBurst(x, y, opts = {}) {
+  if (reduceMotion) return;
+  const emojis = opts.emojis || null;
+  const count = opts.count || (emojis ? 14 : 28);
+  const colors = ["#ff7a3d", "#ffd166", "#06d6a0", "#ef476f", "#5aa9ff", "#c77dff"];
+  const layer = document.createElement("div");
+  layer.className = "fx-layer";
+  for (let i = 0; i < count; i++) {
+    const b = document.createElement("span");
+    b.className = "fx-bit" + (emojis ? " is-emoji" : "");
+    const ang = Math.random() * Math.PI * 2;
+    const dist = 70 + Math.random() * 130;
+    b.style.left = x + "px";
+    b.style.top = y + "px";
+    b.style.setProperty("--dx", Math.cos(ang) * dist + "px");
+    b.style.setProperty("--dy", Math.sin(ang) * dist + 30 + "px"); // leggera gravità
+    b.style.setProperty("--rot", Math.random() * 720 - 360 + "deg");
+    b.style.animationDelay = Math.floor(Math.random() * 80) + "ms";
+    if (emojis) b.textContent = emojis[i % emojis.length];
+    else b.style.background = colors[i % colors.length];
+    layer.appendChild(b);
+  }
+  document.body.appendChild(layer);
+  setTimeout(() => layer.remove(), 1300);
+}
+function fxBurstFrom(el, opts) {
+  if (!el || reduceMotion) return;
+  const r = el.getBoundingClientRect();
+  fxBurst(r.left + r.width / 2, r.top + r.height / 2, opts);
 }
 
 // Anima un numero da 0 al valore finale.
@@ -201,13 +233,13 @@ export function render() {
 }
 
 // ---------------- Schermata: Strumenti ----------------
-function recipeResultRow(r) {
+function recipeResultRow(r, i = 0) {
   const tool = store.getTool(r.toolId);
   const fav = r.favorite ? ` <span class="meta-fav">${iconHtml("heart")}</span>` : "";
   const rate = r.rating ? ` <span class="meta-star">${iconHtml("star")} ${r.rating}</span>` : "";
   const cooked = r.cookCount ? ` <span class="meta-cooked">${iconHtml("fire")} ${r.cookCount}</span>` : "";
   const thumb = r.photo ? `<img class="pick-thumb" src="${escapeHtml(r.photo)}" alt="" />` : `<span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span>`;
-  return `<button class="pick-row" data-id="${r.id}">${thumb}<span class="day-row__name">${escapeHtml(r.title)}${fav}${rate}${cooked}</span></button>`;
+  return `<button class="pick-row stagger" data-id="${r.id}" style="--i:${i}">${thumb}<span class="day-row__name">${escapeHtml(r.title)}${fav}${rate}${cooked}</span></button>`;
 }
 
 function renderHomeBody() {
@@ -227,7 +259,7 @@ function renderHomeBody() {
     else if (homeFilter === "t30") { results = store.getAllRecipes().filter((r) => r.time && r.time <= 30); emptyIcon = "timer"; emptyMsg = "Nessuna ricetta entro 30 minuti. Aggiungi il tempo nelle ricette (modifica)."; }
     else results = store.getByTag(homeFilter);
     body.innerHTML = results.length
-      ? results.map(recipeResultRow).join("")
+      ? results.map((r, i) => recipeResultRow(r, i)).join("")
       : `<div class="empty"><span class="empty__emoji">${iconHtml(emptyIcon)}</span>${emptyMsg}</div>`;
     body.querySelectorAll(".pick-row").forEach((b) => b.addEventListener("click", () => openRecipe(b.dataset.id)));
     return;
@@ -503,7 +535,10 @@ function renderRecipeDetail() {
   if (pMinus) pMinus.addEventListener("click", () => { detailServings = Math.max(1, (detailServings || base || 1) - 1); render(); });
   if (pPlus) pPlus.addEventListener("click", () => { detailServings = (detailServings || base || 1) + 1; render(); });
 
-  root.querySelector("#favBtn").addEventListener("click", () => store.updateRecipe(r.id, { favorite: !r.favorite }));
+  root.querySelector("#favBtn").addEventListener("click", (e) => {
+    if (!r.favorite) fxBurstFrom(e.currentTarget, { emojis: ["❤️", "💛", "✨"] });
+    store.updateRecipe(r.id, { favorite: !r.favorite });
+  });
   root.querySelectorAll("#rating .star").forEach((st) => st.addEventListener("click", () => {
     const v = parseInt(st.dataset.v, 10);
     store.updateRecipe(r.id, { rating: v === r.rating ? 0 : v });
@@ -524,7 +559,7 @@ function renderRecipeDetail() {
   const cookBtn = root.querySelector("#cookBtn");
   if (cookBtn) cookBtn.addEventListener("click", () => openCookingMode(r));
 
-  root.querySelector("#cookedBtn").addEventListener("click", async () => { await store.markCooked(r.id); toast("Segnata come cucinata 🔥", "success"); });
+  root.querySelector("#cookedBtn").addEventListener("click", async (e) => { fxBurstFrom(e.currentTarget); await store.markCooked(r.id); toast("Segnata come cucinata 🔥", "success"); });
 
   root.querySelector("#editRecipe").addEventListener("click", () => openRecipeForm({ recipe: r }));
   root.querySelector("#shareRecipe").addEventListener("click", async () => {
@@ -608,6 +643,7 @@ async function wireNutrition(r, base, detailServings) {
     const nutrition = { ...result.total, used: result.used, skipped: result.skippedNames.length, skippedNames: result.skippedNames };
     await store.updateRecipe(r.id, { nutrition });
     r.nutrition = nutrition;
+    fxBurstFrom(btn, { emojis: ["✨", "🥕"] });
     card.innerHTML = nutritionCardHtml(r, base, detailServings);
     wireNutrition(r, base, detailServings);
     toast("Valori nutrizionali stimati", "success");
@@ -1002,6 +1038,7 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       const data = await importFromUrl(u);
       if (data.title && !titleInput.value.trim()) titleInput.value = data.title;
       if (data.servings) m.el.querySelector("#rServings").value = data.servings;
+      if (data.time) m.el.querySelector("#rTime").value = data.time;
       if (data.ingredients && data.ingredients.length) m.el.querySelector("#rIngredients").value = data.ingredients.join("\n");
       if (data.steps && data.steps.length) m.el.querySelector("#rSteps").value = data.steps.join("\n");
       toast("Ricetta importata", "success");
@@ -1977,7 +2014,7 @@ function renderImpostazioni() {
       </div>
     </div>
     <p style="text-align:center;color:var(--text-soft);font-size:0.78rem;margin-top:24px">
-      Fornelli · Ricette online da TheMealDB
+      Fornelli · versione ${escapeHtml(APP_VERSION)}<br>Ricette online da TheMealDB
     </p>
     <input type="file" id="importFile" accept="application/json,.json" style="display:none" />
   `;

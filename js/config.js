@@ -13,6 +13,9 @@
 //  Trovi la guida passo-passo completa nel file  README.md
 // ============================================================
 
+// Versione dell'app (mostrata in Impostazioni). Da alzare a ogni release.
+export const APP_VERSION = "1.0";
+
 export const firebaseConfig = {
   apiKey: "AIzaSyDOpr2Q0KXamaMdyAXzLvP9dA_U3kQj14E",
   authDomain: "ricettario-48e86.firebaseapp.com",
