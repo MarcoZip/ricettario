@@ -615,6 +615,14 @@ a { color: var(--primary-2); }
 
 .hint { color: var(--text-soft); font-size: 0.84rem; padding: 6px 0; }
 
+/* ---------- Valori nutrizionali ---------- */
+.nutri-box { display: flex; flex-direction: column; gap: 8px; }
+.nutri-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
+.nutri-row:last-child { border-bottom: none; }
+.nutri-lbl { color: var(--text-soft); font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; flex-shrink: 0; }
+.nutri-val { font-size: 0.94rem; text-align: right; }
+.nutri-val b { color: var(--primary-2); font-size: 1.05rem; }
+
 /* ---------- Lista della spesa ---------- */
 .shop-group { margin-bottom: 18px; }
 .shop-group__title { font-size: 0.74rem; letter-spacing: 0.5px; text-transform: uppercase; color: var(--primary-2); font-weight: 800; margin-bottom: 9px; }

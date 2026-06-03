@@ -9,7 +9,12 @@
       "PowerShell(git add -A)",
       "PowerShell(\"--- log ---\")",
       "WebSearch",
-      "WebFetch(domain:unpkg.com)"
+      "WebFetch(domain:unpkg.com)",
+      "Bash(grep -oq '\"__TRACKED_VAR__\":' js/icons-data.js)",
+      "Bash(grep -oq ''\\\\''__TRACKED_VAR__'\\\\'':' js/icons-data.js)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
     ]
   }
 }

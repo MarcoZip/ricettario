@@ -4,6 +4,7 @@ import * as mealdb from "./mealdb.js";
 import { ITALIAN_SITES } from "./sites.js";
 import { iconHtml, rawIcon, ICON_PICKER, resolveIcon } from "./icons.js";
 import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from "./ingredients.js";
+import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { importFromUrl } from "./import-recipe.js";
 import { isImportConfigured } from "./config.js";
 import { fileToDataUrl } from "./image.js";
@@ -137,8 +138,8 @@ export function mount(rootEl) {
   if (help) help.addEventListener("click", () => openGuide());
   // Guida al primo avvio.
   try {
-    if (!localStorage.getItem("ricettario.guide.v3")) {
-      localStorage.setItem("ricettario.guide.v3", "1");
+    if (!localStorage.getItem("ricettario.guide.v4")) {
+      localStorage.setItem("ricettario.guide.v4", "1");
       setTimeout(() => openGuide(true), 500);
     }
   } catch {}
@@ -471,6 +472,8 @@ function renderRecipeDetail() {
       ${ingList}
     </div>
 
+    ${ingredients.length ? `<div class="section-card" id="nutriCard">${nutritionCardHtml(r, base, detailServings)}</div>` : ""}
+
     ${steps.length ? `<div class="section-card">
       <h3 class="section-title">${iconHtml("fork-knife")} Preparazione</h3>
       <ol class="steps-list">${steps.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ol>
@@ -527,6 +530,75 @@ function renderRecipeDetail() {
   root.querySelector("#delRecipe").addEventListener("click", async () => {
     const ok = await confirmDialog({ title: "Eliminare la ricetta?", message: `"${r.title}" verrà eliminata.`, confirmText: "Elimina", danger: true });
     if (ok) { await store.deleteRecipe(r.id); currentRecipeId = null; toast("Ricetta eliminata"); withTransition(() => render()); }
+  });
+
+  wireNutrition(r, base, detailServings);
+}
+
+// ---- Valori nutrizionali (stima dagli ingredienti) ----
+// I valori salvati in r.nutrition sono i TOTALI della ricetta così com'è scritta
+// (cioè per le porzioni base). Per porzione = totale / porzioni base; il totale
+// mostrato si scala con lo stepper delle porzioni.
+function macroLine(n) {
+  return `<b>${n.kcal}</b> kcal · P ${n.p} g · C ${n.c} g · G ${n.f} g`;
+}
+
+function nutritionCardHtml(r, base, detailServings) {
+  const title = `<h3 class="section-title">${iconHtml("carrot")} Valori nutrizionali</h3>`;
+  const nut = r.nutrition;
+  if (!nut) {
+    return `${title}
+      <div class="hint" style="margin-top:0">Stima calorie e macronutrienti dagli ingredienti.</div>
+      <button class="btn btn--primary btn--block" id="nutriCalc" style="margin-top:10px">${iconHtml("sparkle")} Calcola (stima)</button>`;
+  }
+  const factor = base && detailServings ? detailServings / base : 1;
+  const totalScaled = { kcal: Math.round(nut.kcal * factor), p: Math.round(nut.p * factor), c: Math.round(nut.c * factor), f: Math.round(nut.f * factor) };
+  const perPortion = base ? { kcal: Math.round(nut.kcal / base), p: Math.round(nut.p / base), c: Math.round(nut.c / base), f: Math.round(nut.f / base) } : null;
+  const rows = [];
+  if (perPortion) rows.push(`<div class="nutri-row"><span class="nutri-lbl">Per porzione</span><span class="nutri-val">${macroLine(perPortion)}</span></div>`);
+  rows.push(`<div class="nutri-row"><span class="nutri-lbl">Totale${detailServings ? ` (${detailServings} porz.)` : ""}</span><span class="nutri-val">${macroLine(totalScaled)}</span></div>`);
+  const note = nut.skipped ? `<div class="hint" style="margin-top:8px">Stima da ${nut.used} ingredienti${nut.skipped > 0 ? ` · ${nut.skipped} non conteggiati` : ""}.</div>` : "";
+  return `${title}
+    <div class="nutri-box">${rows.join("")}</div>
+    ${note}
+    <button class="btn btn--ghost btn--block" id="nutriCalc" style="margin-top:10px">${iconHtml("sparkle")} Ricalcola</button>`;
+}
+
+async function wireNutrition(r, base, detailServings) {
+  const card = root.querySelector("#nutriCard");
+  if (!card) return;
+  const btn = card.querySelector("#nutriCalc");
+  if (!btn) return;
+  btn.addEventListener("click", async () => {
+    const est = estimateNutrition(r.ingredients || []);
+    if (est.used === 0 && est.offCandidates.length === 0) {
+      toast("Nessun ingrediente riconosciuto per la stima", "error");
+      return;
+    }
+    // Salva subito la stima offline.
+    let result = est;
+    // Se ci sono ingredienti non in tabella ma con peso noto, prova Open Food Facts.
+    if (est.offCandidates.length && navigator.onLine !== false) {
+      btn.disabled = true;
+      btn.innerHTML = `${iconHtml("download-simple")} Cerco ${est.offCandidates.length} ingredienti online…`;
+      try {
+        const enriched = await enrichWithOFF(est, (done, tot) => {
+          btn.innerHTML = `${iconHtml("download-simple")} Online ${done}/${tot}…`;
+        });
+        result = { total: enriched.total, used: enriched.used, skipped: enriched.stillMissing.length };
+      } catch (e) {
+        result = { total: est.total, used: est.used, skipped: est.skipped.length };
+      }
+      btn.disabled = false;
+    } else {
+      result = { total: est.total, used: est.used, skipped: est.skipped.length };
+    }
+    const nutrition = { ...result.total, used: result.used, skipped: result.skipped };
+    await store.updateRecipe(r.id, { nutrition });
+    r.nutrition = nutrition;
+    card.innerHTML = nutritionCardHtml(r, base, detailServings);
+    wireNutrition(r, base, detailServings);
+    toast("Valori nutrizionali stimati", "success");
   });
 }
 
@@ -934,6 +1006,13 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       tags: tags
     };
     if (!data.title) { toast("Inserisci un titolo", "error"); return; }
+    // Se cambiano gli ingredienti o le porzioni, la stima nutrizionale salvata
+    // non è più valida: la azzero così l'utente può ricalcolarla.
+    if (editing && recipe.nutrition) {
+      const oldIng = (recipe.ingredients || []).map((i) => i.raw || ingredientText(i)).join("\n");
+      const newIng = data.ingredients.map((i) => i.raw || ingredientText(i)).join("\n");
+      if (oldIng !== newIng || (recipe.servings || null) !== data.servings) data.nutrition = null;
+    }
     try {
       if (editing) await store.updateRecipe(recipe.id, data);
       else await store.addRecipe(data);
@@ -1057,6 +1136,7 @@ const GUIDE_SECTIONS = [
   { icon: "image", title: "Aggiungi senza fatica", text: "Tre scorciatoie nel form ricetta: incolla un link e tocca \"Importa\" (ingredienti e passi si compilano da soli), oppure \"Scansiona da una foto\" per leggere una ricetta da un libro o quaderno, o salva dal Ricettario online." },
   { icon: "book-open", title: "Ricettario", text: "Cerca idee online o tra i siti italiani; tocca \"Salva\" per aggiungerle a uno dei tuoi strumenti." },
   { icon: "fork-knife", title: "Porzioni su misura", text: "Apri una ricetta e cambia il numero di persone con + e −: le quantità degli ingredienti si ricalcolano da sole." },
+  { icon: "carrot", title: "Valori nutrizionali", text: "In una ricetta tocca \"Calcola\" sotto gli ingredienti: l'app stima calorie e macronutrienti (proteine, carboidrati, grassi) per porzione e totali. Per ciò che non conosce cerca online su Open Food Facts. È una stima: cambia con il numero di porzioni." },
   { icon: "heart", title: "Trova al volo", text: "Dalla schermata Strumenti cerca per nome o ingrediente e usa i filtri: Preferiti (cuore), Più cucinate, Di recente e le categorie. Dai un voto a stelle e tocca \"Segna come cucinata\" per tenere il conto." },
   { icon: "shopping-cart-simple", title: "Spesa & Dispensa", text: "Aggiungi gli ingredienti alla lista della spesa (uniti e per reparto). Spunta ciò che prendi e con \"Spesa fatta\" passa tutto in dispensa. In Dispensa tieni ciò che hai già — con la scadenza, e l'app ti avvisa quando qualcosa sta per scadere — e \"Cosa posso cucinare\" suggerisce le ricette con quello che hai." },
   { icon: "fire", title: "Modalità cucina", text: "Nelle ricette con i passi, tocca \"Modalità cucina\": istruzioni passo-passo, più timer con nome (pasta, forno…), lettura vocale (🔊) e schermo sempre acceso mentre cucini." },
