@@ -2,7 +2,7 @@
 //  Worker Cloudflare — Estrattore ingredienti da ricette
 // ------------------------------------------------------------
 //  Legge i dati strutturati schema.org/Recipe di una pagina web e
-//  restituisce JSON pulito: { title, image, servings, ingredients[] }.
+//  restituisce JSON pulito: { title, image, servings, ingredients[], steps[] }.
 //  Aggiunge gli header CORS così l'app (PWA) può chiamarlo dal browser.
 //
 //  COME PUBBLICARLO (gratis, senza installare nulla):
@@ -13,22 +13,23 @@
 //   5. Incollalo in js/config.js alla voce WORKER_URL e ripubblica l'app
 // ============================================================
 
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "*"
+};
+
 export default {
   async fetch(request) {
-    const cors = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "*"
-    };
-    if (request.method === "OPTIONS") return new Response(null, { headers: cors });
+    if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
 
     const target = new URL(request.url).searchParams.get("url");
-    if (!target) return json({ error: "Parametro 'url' mancante" }, 400, cors);
+    if (!target) return json({ error: "missing", message: "Parametro 'url' mancante" }, 400);
 
-    let html;
+    let res, html;
     try {
       const origin = new URL(target).origin + "/";
-      const res = await fetch(target, {
+      res = await fetch(target, {
         redirect: "follow",
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -39,26 +40,62 @@ export default {
         },
         cf: { cacheTtl: 3600, cacheEverything: true }
       });
-      if (!res.ok) return json({ error: "Pagina non raggiungibile" }, 502, cors);
-      html = await res.text();
     } catch (e) {
-      return json({ error: "Lettura pagina fallita" }, 502, cors);
+      return json({ error: "unreachable", message: "Lettura pagina fallita" }, 502);
     }
 
-    const recipe = extractRecipe(html);
-    if (!recipe) return json({ error: "Nessuna ricetta strutturata trovata" }, 404, cors);
-    return json(recipe, 200, cors);
+    // Siti dietro una "sfida" anti-bot (Cloudflare, ecc.): non leggibili automaticamente.
+    if (res.status === 403 || res.status === 503 || res.status === 429) {
+      return json({ error: "blocked", message: "Questo sito blocca la lettura automatica." }, 200);
+    }
+    if (!res.ok) return json({ error: "unreachable", message: "Pagina non raggiungibile" }, 502);
+
+    html = await res.text();
+    if (/Just a moment\.\.\.|cf-browser-verification|Checking your browser|challenge-platform|Attention Required/i.test(html)) {
+      return json({ error: "blocked", message: "Questo sito blocca la lettura automatica." }, 200);
+    }
+
+    const recipe = extractRecipe(html) || extractMicrodata(html);
+    if (!recipe) return json({ error: "notfound", message: "Nessuna ricetta strutturata trovata" }, 404);
+    return json(recipe, 200);
   }
 };
 
-function json(obj, status, cors) {
+function json(obj, status) {
   return new Response(JSON.stringify(obj), {
     status,
-    headers: { "Content-Type": "application/json; charset=utf-8", ...cors }
+    headers: { "Content-Type": "application/json; charset=utf-8", ...CORS }
   });
 }
 
-function extractRecipe(html) {
+// ---------- pulizia testo ----------
+const NAMED_ENTITIES = {
+  nbsp: " ", apos: "'", quot: '"', lt: "<", gt: ">", amp: "&",
+  agrave: "à", egrave: "è", eacute: "é", igrave: "ì", ograve: "ò", ugrave: "ù",
+  Agrave: "À", Egrave: "È", Eacute: "É", Igrave: "Ì", Ograve: "Ò", Ugrave: "Ù",
+  ndash: "–", mdash: "—", hellip: "…", deg: "°",
+  rsquo: "’", lsquo: "‘", ldquo: "“", rdquo: "”", laquo: "«", raquo: "»",
+  frac12: "½", frac14: "¼", frac34: "¾"
+};
+export function decodeEntities(s) {
+  return String(s)
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => safeCp(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => safeCp(parseInt(d, 10)))
+    .replace(/&([a-zA-Z][a-zA-Z0-9]+);/g, (m, name) => (name in NAMED_ENTITIES ? NAMED_ENTITIES[name] : m))
+    .replace(/&amp;/g, "&");
+}
+function safeCp(n) {
+  try { return String.fromCodePoint(n); } catch { return ""; }
+}
+export function clean(s) {
+  return decodeEntities(String(s == null ? "" : s).replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .trim();
+}
+
+// ---------- estrazione da JSON-LD ----------
+export function extractRecipe(html) {
   const blocks = [...html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]);
   for (const raw of blocks) {
     let data;
@@ -79,10 +116,31 @@ function findRecipe(data) {
   return null;
 }
 
+// Appiattisce recipeInstructions: stringhe, HowToStep, HowToSection (con
+// itemListElement), array annidati. Ignora i titoli di sezione, tiene i passi.
+export function flattenInstructions(ri) {
+  const out = [];
+  const walk = (x) => {
+    if (!x) return;
+    if (typeof x === "string") {
+      x.split(/\r?\n+/).forEach((line) => { const t = clean(line); if (t) out.push(t); });
+      return;
+    }
+    if (Array.isArray(x)) { x.forEach(walk); return; }
+    if (typeof x === "object") {
+      if (x.itemListElement) { walk(x.itemListElement); return; } // HowToSection
+      const t = clean(x.text || x.name || "");
+      if (t) out.push(t);
+    }
+  };
+  walk(ri);
+  return out;
+}
+
 function normalize(n) {
   const ingredients = []
     .concat(n.recipeIngredient || n.ingredients || [])
-    .map((x) => String(x).replace(/\s+/g, " ").trim())
+    .map((x) => clean(x))
     .filter(Boolean);
 
   let servings = null;
@@ -99,14 +157,18 @@ function normalize(n) {
     image = (img && (img.url || img)) || "";
   }
 
-  // Passi di preparazione da recipeInstructions (testo, lista o HowToStep).
-  let steps = [];
-  const ri = n.recipeInstructions;
-  if (typeof ri === "string") {
-    steps = ri.split(/\r?\n+/).map((s) => s.trim()).filter(Boolean);
-  } else if (Array.isArray(ri)) {
-    steps = ri.map((s) => (typeof s === "string" ? s : (s && (s.text || s.name)) || "")).map((s) => String(s).trim()).filter(Boolean);
-  }
+  const steps = flattenInstructions(n.recipeInstructions);
 
-  return { title: n.name || "", image: image || "", servings, ingredients, steps };
+  return { title: clean(n.name) || "", image: image || "", servings, ingredients, steps };
+}
+
+// ---------- fallback microdata (siti senza JSON-LD) ----------
+export function extractMicrodata(html) {
+  const grab = (prop) => [...html.matchAll(new RegExp('itemprop=["\']' + prop + '["\'][^>]*>([\\s\\S]*?)<', "gi"))]
+    .map((m) => clean(m[1])).filter(Boolean);
+  const ingredients = grab("recipeIngredient").concat(grab("ingredients")).filter(Boolean);
+  if (!ingredients.length) return null;
+  const names = grab("name");
+  const steps = grab("recipeInstructions");
+  return { title: names[0] || "", image: "", servings: null, ingredients, steps };
 }
