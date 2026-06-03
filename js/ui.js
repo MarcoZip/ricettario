@@ -7,6 +7,7 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { importFromUrl } from "./import-recipe.js";
 import { isImportConfigured } from "./config.js";
 import { fileToDataUrl } from "./image.js";
+import { getTheme, setTheme } from "./theme.js";
 
 // Tag suggeriti nel form ricetta.
 const TAG_SUGGESTIONS = ["Primi", "Secondi", "Contorni", "Antipasti", "Dolci", "Veloce", "Vegetariano", "Pesce", "Per ospiti"];
@@ -43,9 +44,10 @@ let detailServings = null; // porzioni scelte nella schermata ricetta
 let planYear = null; // anno mostrato nel calendario
 let planMonth = null; // mese (0-11) mostrato nel calendario
 let homeQuery = ""; // ricerca nella home
-let homeFav = false; // filtro preferiti nella home
-let homeTag = ""; // filtro per categoria nella home
+let homeFilter = ""; // "" | "fav" | "cooked" | "recent" | "menu" | <nome tag>
 let shopTab = "lista"; // scheda Spesa: "lista" | "dispensa"
+let planView = "month"; // "month" | "week"
+let weekAnchor = null; // data di riferimento per la vista settimana
 
 // Stato locale della sezione Ricettario (per non perdere i risultati ad ogni render).
 let mealTab = "online";
@@ -147,8 +149,7 @@ export function navigate(route) {
   currentToolId = null;
   currentRecipeId = null;
   homeQuery = "";
-  homeFav = false;
-  homeTag = "";
+  homeFilter = "";
   document.querySelectorAll(".bottom-nav__btn").forEach((b) => {
     b.classList.toggle("is-active", b.dataset.route === route);
   });
@@ -201,40 +202,51 @@ function recipeResultRow(r) {
   const tool = store.getTool(r.toolId);
   const fav = r.favorite ? ` <span class="meta-fav">${iconHtml("heart")}</span>` : "";
   const rate = r.rating ? ` <span class="meta-star">${iconHtml("star")} ${r.rating}</span>` : "";
-  return `<button class="pick-row" data-id="${r.id}"><span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span><span class="day-row__name">${escapeHtml(r.title)}${fav}${rate}</span></button>`;
+  const cooked = r.cookCount ? ` <span class="meta-cooked">${iconHtml("fire")} ${r.cookCount}</span>` : "";
+  const thumb = r.photo ? `<img class="pick-thumb" src="${escapeHtml(r.photo)}" alt="" />` : `<span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span>`;
+  return `<button class="pick-row" data-id="${r.id}">${thumb}<span class="day-row__name">${escapeHtml(r.title)}${fav}${rate}${cooked}</span></button>`;
 }
 
 function renderHomeBody() {
   const body = root.querySelector("#homeBody");
   if (!body) return;
-  const searching = homeQuery.trim() || homeFav || homeTag;
+
+  if (homeFilter === "menu") { renderMenusBody(body); return; }
+
+  const searching = homeQuery.trim() || homeFilter;
   if (searching) {
-    const results = homeTag ? store.getByTag(homeTag) : (homeFav ? store.getFavorites() : store.searchRecipes(homeQuery));
+    let results, emptyIcon = "magnifying-glass", emptyMsg = "Nessuna ricetta trovata.";
+    if (homeQuery.trim()) results = store.searchRecipes(homeQuery);
+    else if (homeFilter === "fav") { results = store.getFavorites(); emptyIcon = "heart"; emptyMsg = "Nessun preferito: tocca il cuore in una ricetta."; }
+    else if (homeFilter === "cooked") { results = store.getMostCooked(); emptyIcon = "fire"; emptyMsg = "Nessuna ricetta ancora segnata come cucinata."; }
+    else if (homeFilter === "recent") { results = store.getRecentCooked(); emptyIcon = "timer"; emptyMsg = "Niente cucinato di recente."; }
+    else results = store.getByTag(homeFilter);
     body.innerHTML = results.length
       ? results.map(recipeResultRow).join("")
-      : `<div class="empty"><span class="empty__emoji">${iconHtml(homeFav ? "heart" : "magnifying-glass")}</span>${homeFav ? "Nessun preferito. Tocca il cuore in una ricetta per aggiungerla." : "Nessuna ricetta trovata."}</div>`;
+      : `<div class="empty"><span class="empty__emoji">${iconHtml(emptyIcon)}</span>${emptyMsg}</div>`;
     body.querySelectorAll(".pick-row").forEach((b) => b.addEventListener("click", () => openRecipe(b.dataset.id)));
-  } else {
-    const tools = store.getTools();
-    const cards = tools
-      .map((t, i) => {
-        const n = store.countRecipes(t.id);
-        return `
-        <button class="tool-card stagger" data-tool="${t.id}" style="--ac:${ACCENTS[i % ACCENTS.length]};--i:${i}">
-          <span class="tool-card__emoji">${iconHtml(t.icon)}</span>
-          <span class="tool-card__name">${escapeHtml(t.name)}</span>
-          <span class="tool-card__count">${n} ${n === 1 ? "ricetta" : "ricette"}</span>
-        </button>`;
-      })
-      .join("");
-    body.innerHTML = `<div class="tool-grid">${cards}
-      <button class="add-card stagger" id="addTool" style="--i:${tools.length}">
-        <span class="add-card__plus">${iconHtml("plus")}</span>
-        <span>Aggiungi strumento</span>
-      </button></div>`;
-    body.querySelectorAll(".tool-card").forEach((c) => c.addEventListener("click", () => openTool(c.dataset.tool)));
-    body.querySelector("#addTool").addEventListener("click", () => openToolForm());
+    return;
   }
+
+  const tools = store.getTools();
+  const cards = tools
+    .map((t, i) => {
+      const n = store.countRecipes(t.id);
+      return `
+      <button class="tool-card stagger" data-tool="${t.id}" style="--ac:${ACCENTS[i % ACCENTS.length]};--i:${i}">
+        <span class="tool-card__emoji">${iconHtml(t.icon)}</span>
+        <span class="tool-card__name">${escapeHtml(t.name)}</span>
+        <span class="tool-card__count">${n} ${n === 1 ? "ricetta" : "ricette"}</span>
+      </button>`;
+    })
+    .join("");
+  body.innerHTML = `<div class="tool-grid">${cards}
+    <button class="add-card stagger" id="addTool" style="--i:${tools.length}">
+      <span class="add-card__plus">${iconHtml("plus")}</span>
+      <span>Aggiungi strumento</span>
+    </button></div>`;
+  body.querySelectorAll(".tool-card").forEach((c) => c.addEventListener("click", () => openTool(c.dataset.tool)));
+  body.querySelector("#addTool").addEventListener("click", () => openToolForm());
 }
 
 function renderStrumenti() {
@@ -248,6 +260,34 @@ function renderStrumenti() {
   const total = tools.reduce((s, t) => s + store.countRecipes(t.id), 0);
   const allTags = store.getAllTags();
 
+  // Oggi si mangia
+  const today = store.getPlanByDate(todayStr()).filter((e) => store.getRecipe(e.recipeId));
+  const todayCard = today.length
+    ? `<div class="today-card">
+        <div class="today__h">${iconHtml("calendar-dots")} Oggi si mangia</div>
+        ${today.map((e) => {
+          const r = store.getRecipe(e.recipeId);
+          const slot = e.slot ? `<span class="today__slot">${e.slot === "pranzo" ? "Pranzo" : "Cena"}</span>` : "";
+          return `<button class="today__item" data-recipe="${r.id}">${slot}<span class="today__name">${escapeHtml(r.title)}</span>${iconHtml("caret-right")}</button>`;
+        }).join("")}
+      </div>`
+    : "";
+
+  // Avviso scadenze
+  const exp = store.getExpiringPantry(3);
+  const expBanner = exp.length
+    ? `<button class="alert-banner" id="expAlert">${iconHtml("basket")} <span>${exp.length} ${exp.length === 1 ? "alimento in scadenza" : "alimenti in scadenza"} — controlla la dispensa</span></button>`
+    : "";
+
+  const specials = [
+    { k: "fav", label: "Preferiti", icon: "heart" },
+    { k: "cooked", label: "Più cucinate", icon: "fire" },
+    { k: "recent", label: "Di recente", icon: "timer" },
+    { k: "menu", label: "Menu", icon: "book-bookmark" }
+  ];
+  const chips = specials.map((s) => `<button class="filter-chip ${homeFilter === s.k ? "is-on" : ""}" data-filter="${s.k}">${iconHtml(s.icon)} ${s.label}</button>`).join("") +
+    allTags.map((t) => `<button class="filter-chip ${homeFilter === t ? "is-on" : ""}" data-filter="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("");
+
   root.innerHTML = `
     <h1 class="page-title">Strumenti di cottura</h1>
     <div class="home-hero">
@@ -257,26 +297,29 @@ function renderStrumenti() {
       </div>
       <button class="home-hero__btn" id="heroAdd">${iconHtml("plus")} Nuova ricetta</button>
     </div>
+    ${expBanner}
+    ${todayCard}
     ${banner}
     <div class="search-bar">
       <input type="search" id="homeSearch" placeholder="Cerca tra le tue ricette..." value="${escapeHtml(homeQuery)}" />
-      <button class="btn ${homeFav ? "btn--primary" : ""}" id="favToggle" title="Preferiti">${iconHtml("heart")}</button>
     </div>
-    ${allTags.length ? `<div class="home-tags">${allTags.map((t) => `<button class="filter-chip ${homeTag === t ? "is-on" : ""}" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}</div>` : ""}
+    <div class="home-tags">${chips}</div>
     <div id="homeBody"></div>
   `;
 
   root.querySelector("#heroAdd").addEventListener("click", () => openRecipeForm({}));
+  const ea = root.querySelector("#expAlert");
+  if (ea) ea.addEventListener("click", () => { shopTab = "dispensa"; navigate("spesa"); });
+  root.querySelectorAll(".today__item").forEach((b) => b.addEventListener("click", () => openRecipe(b.dataset.recipe)));
+
   const search = root.querySelector("#homeSearch");
   search.addEventListener("input", () => {
-    homeQuery = search.value; homeFav = false; homeTag = "";
-    root.querySelector("#favToggle").classList.remove("btn--primary");
+    homeQuery = search.value; homeFilter = "";
     root.querySelectorAll(".filter-chip").forEach((c) => c.classList.remove("is-on"));
     renderHomeBody();
   });
-  root.querySelector("#favToggle").addEventListener("click", () => { homeFav = !homeFav; homeQuery = ""; homeTag = ""; renderStrumenti(); });
   root.querySelectorAll(".filter-chip").forEach((c) => c.addEventListener("click", () => {
-    homeTag = homeTag === c.dataset.tag ? "" : c.dataset.tag; homeFav = false; homeQuery = "";
+    homeFilter = homeFilter === c.dataset.filter ? "" : c.dataset.filter; homeQuery = "";
     renderStrumenti();
   }));
   renderHomeBody();
@@ -436,6 +479,7 @@ function renderRecipeDetail() {
 
     ${r.notes ? `<div class="section-card"><h3 class="section-title">${iconHtml("note-pencil")} Note</h3><div class="recipe-item__notes" style="margin-top:0">${escapeHtml(r.notes)}</div></div>` : ""}
 
+    <button class="btn btn--block" id="cookedBtn" style="margin-bottom:10px">${iconHtml("fire")} Segna come cucinata${r.cookCount ? ` · ${r.cookCount} ${r.cookCount === 1 ? "volta" : "volte"}` : ""}</button>
     <div style="display:flex;gap:8px;margin-top:4px">
       <button class="btn btn--ghost" id="editRecipe">${iconHtml("pencil-simple")} Modifica</button>
       <button class="btn btn--ghost" id="shareRecipe">${iconHtml("arrow-square-out")} Condividi</button>
@@ -469,6 +513,8 @@ function renderRecipeDetail() {
 
   const cookBtn = root.querySelector("#cookBtn");
   if (cookBtn) cookBtn.addEventListener("click", () => openCookingMode(r));
+
+  root.querySelector("#cookedBtn").addEventListener("click", async () => { await store.markCooked(r.id); toast("Segnata come cucinata 🔥", "success"); });
 
   root.querySelector("#editRecipe").addEventListener("click", () => openRecipeForm({ recipe: r }));
   root.querySelector("#shareRecipe").addEventListener("click", async () => {
@@ -617,7 +663,7 @@ function openCookingMode(recipe) {
     el.querySelector("#ckClose").onclick = close;
     el.querySelector("#ckSpeak").onclick = () => { speak = !speak; if (speak) speakStep(); else stopSpeak(); el.querySelector("#ckSpeak").classList.toggle("is-on", speak); };
     el.querySelector("#ckPrev").onclick = () => { if (idx > 0) { idx--; draw(); speakStep(); } };
-    el.querySelector("#ckNext").onclick = () => { if (idx < steps.length - 1) { idx++; draw(); speakStep(); } else close(); };
+    el.querySelector("#ckNext").onclick = () => { if (idx < steps.length - 1) { idx++; draw(); speakStep(); } else { store.markCooked(recipe.id); close(); } };
     el.querySelector("#ckMinus").onclick = () => { remaining = Math.max(0, remaining - 60); paintTimer(); };
     el.querySelector("#ckPlus").onclick = () => { remaining += 60; paintTimer(); };
     el.querySelector("#ckToggle").onclick = () => {
@@ -1236,7 +1282,20 @@ function todayStr() { const n = new Date(); return ymd(n.getFullYear(), n.getMon
 function formatDateLong(ds) { const [y, m, d] = ds.split("-").map(Number); return `${d} ${MONTHS_IT[m - 1]} ${y}`; }
 function allRecipes() { return store.getTools().flatMap((t) => store.getRecipesByTool(t.id)); }
 
+function planToggle() {
+  return `<div class="tabs" style="margin-bottom:14px">
+    <button class="tab-btn ${planView === "month" ? "is-active" : ""}" data-pv="month">${iconHtml("calendar-dots")} Mese</button>
+    <button class="tab-btn ${planView === "week" ? "is-active" : ""}" data-pv="week">${iconHtml("calendar-blank")} Settimana</button>
+  </div>`;
+}
+function startOfWeek(d) {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+
 function renderPlan() {
+  if (planView === "week") return renderPlanWeek();
   const today = new Date();
   if (planYear == null) { planYear = today.getFullYear(); planMonth = today.getMonth(); }
   const first = new Date(planYear, planMonth, 1);
@@ -1258,6 +1317,7 @@ function renderPlan() {
 
   root.innerHTML = `
     <h1 class="page-title">Pianificazione</h1>
+    ${planToggle()}
     <div class="cal-head">
       <button class="back-btn" id="prevM">${iconHtml("caret-left")}</button>
       <div class="cal-title">${MONTHS_IT[planMonth]} ${planYear}</div>
@@ -1271,6 +1331,7 @@ function renderPlan() {
     </div>
   `;
 
+  root.querySelectorAll("[data-pv]").forEach((b) => b.addEventListener("click", () => { planView = b.dataset.pv; render(); }));
   root.querySelector("#prevM").addEventListener("click", () => { planMonth--; if (planMonth < 0) { planMonth = 11; planYear--; } render(); });
   root.querySelector("#nextM").addEventListener("click", () => { planMonth++; if (planMonth > 11) { planMonth = 0; planYear++; } render(); });
   root.querySelector("#todayBtn").addEventListener("click", () => { planYear = today.getFullYear(); planMonth = today.getMonth(); render(); });
@@ -1281,6 +1342,79 @@ function renderPlan() {
     if (!entries.length) { toast("Nessuna ricetta pianificata questo mese", "error"); return; }
     const items = collectIngredients(entries);
     const res = await store.addShoppingItems(items);
+    toast(shoppingToast(res), "success");
+  });
+}
+
+function renderPlanWeek() {
+  const today = new Date();
+  if (!weekAnchor) weekAnchor = startOfWeek(today);
+  const start = startOfWeek(weekAnchor);
+  const days = [];
+  for (let i = 0; i < 7; i++) { const d = new Date(start); d.setDate(start.getDate() + i); days.push(d); }
+  const tStr = todayStr();
+  const range = `${days[0].getDate()} ${MONTHS_IT[days[0].getMonth()].slice(0, 3).toLowerCase()} – ${days[6].getDate()} ${MONTHS_IT[days[6].getMonth()].slice(0, 3).toLowerCase()}`;
+
+  const cards = days.map((d, i) => {
+    const ds = ymd(d.getFullYear(), d.getMonth(), d.getDate());
+    const entries = store.getPlanByDate(ds);
+    const meals = entries.length
+      ? entries.map((e) => {
+          const r = store.getRecipe(e.recipeId);
+          const slot = e.slot ? `<b>${e.slot === "pranzo" ? "P" : "C"}</b> ` : "";
+          return `<button class="week-meal" data-recipe="${r ? r.id : ""}">${slot}${escapeHtml(r ? r.title : "(eliminata)")}</button>`;
+        }).join("")
+      : `<span class="week-empty">Niente in programma</span>`;
+    return `<div class="week-day ${ds === tStr ? "is-today" : ""}">
+      <button class="week-day__h" data-date="${ds}"><span>${WEEKDAYS_IT[i]} ${d.getDate()}</span>${iconHtml("plus")}</button>
+      <div class="week-day__meals">${meals}</div>
+    </div>`;
+  }).join("");
+
+  root.innerHTML = `
+    <h1 class="page-title">Pianificazione</h1>
+    ${planToggle()}
+    <div class="cal-head">
+      <button class="back-btn" id="prevW">${iconHtml("caret-left")}</button>
+      <div class="cal-title">${range}</div>
+      <button class="back-btn" id="nextW">${iconHtml("caret-right")}</button>
+    </div>
+    <div class="week-list">${cards}</div>
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+      <button class="btn btn--ghost" id="weekToday">Oggi</button>
+      <button class="btn btn--ghost" id="fillWeek">${iconHtml("sparkle")} Riempi le cene</button>
+      <button class="btn btn--ghost" id="weekShop">${iconHtml("shopping-cart-simple")} Spesa settimana</button>
+    </div>
+  `;
+
+  root.querySelectorAll("[data-pv]").forEach((b) => b.addEventListener("click", () => { planView = b.dataset.pv; render(); }));
+  root.querySelector("#prevW").addEventListener("click", () => { const a = new Date(start); a.setDate(a.getDate() - 7); weekAnchor = a; render(); });
+  root.querySelector("#nextW").addEventListener("click", () => { const a = new Date(start); a.setDate(a.getDate() + 7); weekAnchor = a; render(); });
+  root.querySelector("#weekToday").addEventListener("click", () => { weekAnchor = startOfWeek(new Date()); render(); });
+  root.querySelectorAll(".week-day__h").forEach((b) => b.addEventListener("click", () => openDaySheet(b.dataset.date)));
+  root.querySelectorAll(".week-meal").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); if (b.dataset.recipe) openRecipe(b.dataset.recipe); }));
+
+  root.querySelector("#fillWeek").addEventListener("click", async () => {
+    const recipes = allRecipes();
+    if (!recipes.length) { toast("Aggiungi prima qualche ricetta", "error"); return; }
+    let pool = [];
+    let added = 0;
+    for (const d of days) {
+      const ds = ymd(d.getFullYear(), d.getMonth(), d.getDate());
+      if (store.getPlanByDate(ds).some((e) => e.slot === "cena")) continue;
+      if (!pool.length) pool = [...recipes];
+      const idx = Math.floor(Math.random() * pool.length);
+      const r = pool.splice(idx, 1)[0];
+      await store.addPlan(ds, r.id, "cena");
+      added++;
+    }
+    toast(added ? `${added} cene pianificate` : "Cene già pianificate", added ? "success" : "");
+  });
+  root.querySelector("#weekShop").addEventListener("click", async () => {
+    const set = new Set(days.map((d) => ymd(d.getFullYear(), d.getMonth(), d.getDate())));
+    const entries = store.getPlan().filter((p) => set.has(p.date));
+    if (!entries.length) { toast("Nessuna ricetta pianificata questa settimana", "error"); return; }
+    const res = await store.addShoppingItems(collectIngredients(entries));
     toast(shoppingToast(res), "success");
   });
 }
@@ -1380,6 +1514,77 @@ function openRecipePicker(onPick) {
   search.addEventListener("input", () => { listEl.innerHTML = build(search.value); attach(); });
 }
 
+// ---------------- Menu / collezioni ----------------
+function openPrompt(title, placeholder, onOk, value = "") {
+  const m = openModal(`
+    <h3 class="modal__title">${escapeHtml(title)}</h3>
+    <div class="field"><input type="text" id="pmInput" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(value)}" /></div>
+    <div class="modal__actions">
+      <button class="btn" data-act="c">Annulla</button>
+      <button class="btn btn--primary" data-act="ok">Salva</button>
+    </div>
+  `);
+  const inp = m.el.querySelector("#pmInput");
+  setTimeout(() => inp.focus(), 50);
+  const ok = () => { const v = inp.value.trim(); if (!v) { toast("Inserisci un nome", "error"); return; } m.close(); onOk(v); };
+  m.el.querySelector('[data-act="c"]').onclick = m.close;
+  m.el.querySelector('[data-act="ok"]').onclick = ok;
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") ok(); });
+}
+
+function renderMenusBody(body) {
+  const menus = store.getMenus();
+  const list = menus.length
+    ? menus.map((mn) => `<button class="pick-row" data-menu="${mn.id}"><span class="day-row__icon">${iconHtml("book-bookmark")}</span><span class="day-row__name">${escapeHtml(mn.name)}<span class="have-badge">${(mn.recipeIds || []).length} ricette</span></span></button>`).join("")
+    : `<div class="hint">Nessun menu. Crea un menu per raggruppare più ricette (es. "Cena con amici") e generare un'unica lista della spesa.</div>`;
+  body.innerHTML = `${list}<button class="btn btn--primary btn--block" id="newMenu" style="margin-top:12px">${iconHtml("plus")} Nuovo menu</button>`;
+  body.querySelectorAll(".pick-row").forEach((b) => b.addEventListener("click", () => openMenuSheet(b.dataset.menu)));
+  body.querySelector("#newMenu").addEventListener("click", () => openPrompt("Nuovo menu", "Es. Cena con amici", async (name) => { await store.addMenu(name); renderHomeBody(); }));
+}
+
+function openMenuSheet(menuId) {
+  const mn = store.getMenu(menuId);
+  if (!mn) return;
+  const recipes = store.getMenuRecipes(menuId);
+  const rows = recipes.length
+    ? recipes.map((r) => {
+        const tool = store.getTool(r.toolId);
+        return `<div class="day-row" data-recipe="${r.id}"><span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span><span class="day-row__name">${escapeHtml(r.title)}</span><button class="icon-btn icon-btn--danger" data-act="rem">${iconHtml("trash")}</button></div>`;
+      }).join("")
+    : `<div class="hint">Menu vuoto. Aggiungi qualche ricetta.</div>`;
+  const m = openModal(`
+    <h3 class="modal__title">${escapeHtml(mn.name)}</h3>
+    <div>${rows}</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+      <button class="btn btn--primary btn--block" data-act="add">${iconHtml("plus")} Aggiungi ricetta</button>
+      ${recipes.length ? `<button class="btn btn--block" data-act="shop">${iconHtml("shopping-cart-simple")} Genera lista della spesa</button>` : ""}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn btn--ghost" data-act="rename">${iconHtml("pencil-simple")} Rinomina</button>
+      <button class="btn btn--ghost" data-act="del" style="color:var(--danger)">${iconHtml("trash")} Elimina</button>
+    </div>
+  `);
+  m.el.querySelectorAll(".day-row").forEach((row) => {
+    const rid = row.dataset.recipe;
+    row.querySelector('[data-act="rem"]').addEventListener("click", async (e) => { e.stopPropagation(); await store.toggleRecipeInMenu(menuId, rid); m.close(); openMenuSheet(menuId); });
+    row.addEventListener("click", () => { m.close(); openRecipe(rid); });
+  });
+  m.el.querySelector('[data-act="add"]').addEventListener("click", () => { m.close(); openRecipePicker(async (rid) => { await store.toggleRecipeInMenu(menuId, rid); openMenuSheet(menuId); }); });
+  const shopBtn = m.el.querySelector('[data-act="shop"]');
+  if (shopBtn) shopBtn.addEventListener("click", async () => {
+    const items = [];
+    for (const r of store.getMenuRecipes(menuId)) for (const it of (r.ingredients || [])) items.push({ name: it.name, unit: it.unit || "", qty: it.qty != null ? it.qty : null, category: categorize(it.name) });
+    const res = await store.addShoppingItems(items);
+    m.close();
+    toast(shoppingToast(res), "success");
+  });
+  m.el.querySelector('[data-act="rename"]').addEventListener("click", () => { m.close(); openPrompt("Rinomina menu", "Nome", async (name) => { await store.renameMenu(menuId, name); openMenuSheet(menuId); }, mn.name); });
+  m.el.querySelector('[data-act="del"]').addEventListener("click", async () => {
+    const ok = await confirmDialog({ title: "Eliminare il menu?", message: `"${mn.name}" verrà eliminato (le ricette restano).`, confirmText: "Elimina", danger: true });
+    if (ok) { await store.deleteMenu(menuId); m.close(); renderHomeBody(); }
+  });
+}
+
 // ---------------- Schermata: Impostazioni ----------------
 function renderImpostazioni() {
   const info = handlers.getAccountInfo();
@@ -1425,6 +1630,16 @@ function renderImpostazioni() {
         </div>
         <button class="btn" id="guideBtn">Apri</button>
       </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-row__label">Tema</div>
+          <div class="setting-row__desc">Aspetto chiaro o scuro.</div>
+        </div>
+        <select id="themeSel" class="mini-select">
+          <option value="dark">🌙 Scuro</option>
+          <option value="light">☀️ Chiaro</option>
+        </select>
+      </div>
     </div>
     <div class="setting-group">
       <div class="setting-row">
@@ -1464,6 +1679,10 @@ function renderImpostazioni() {
   });
 
   root.querySelector("#guideBtn").addEventListener("click", () => openGuide());
+
+  const themeSel = root.querySelector("#themeSel");
+  themeSel.value = getTheme();
+  themeSel.addEventListener("change", () => setTheme(themeSel.value));
 
   root.querySelector("#exportBtn").addEventListener("click", () => {
     const data = store.exportData();

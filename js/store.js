@@ -5,7 +5,7 @@ import { createLocalAdapter } from "./store-local.js";
 import { combine, categorize } from "./ingredients.js";
 
 let adapter = null;
-let state = { tools: [], recipes: [], shopping: [], plan: [], pantry: [] };
+let state = { tools: [], recipes: [], shopping: [], plan: [], pantry: [], menus: [] };
 const subscribers = new Set();
 
 function notify() {
@@ -152,6 +152,19 @@ export function getByTag(tag) {
   return state.recipes.filter((r) => (r.tags || []).some((x) => (x || "").toLowerCase() === t));
 }
 
+// Statistiche cucina.
+export async function markCooked(id) {
+  const r = getRecipe(id);
+  if (!r) return;
+  await adapter.updateRecipe(id, { cookCount: (r.cookCount || 0) + 1, lastCooked: now() });
+}
+export function getMostCooked() {
+  return state.recipes.filter((r) => (r.cookCount || 0) > 0).sort((a, b) => (b.cookCount || 0) - (a.cookCount || 0));
+}
+export function getRecentCooked() {
+  return state.recipes.filter((r) => r.lastCooked).sort((a, b) => (b.lastCooked || "").localeCompare(a.lastCooked || ""));
+}
+
 export async function updateRecipe(id, patch) {
   await adapter.updateRecipe(id, { ...patch, updatedAt: now() });
 }
@@ -220,6 +233,52 @@ export async function moveCheckedToPantry() {
   return checked.length;
 }
 
+// Alimenti in dispensa in scadenza entro N giorni (inclusi gli scaduti).
+export function getExpiringPantry(days = 3) {
+  const t = new Date();
+  const today = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  const res = [];
+  for (const p of state.pantry) {
+    if (!p.expiry) continue;
+    const [y, m, d] = p.expiry.split("-").map(Number);
+    const diff = Math.round((new Date(y, m - 1, d) - today) / 86400000);
+    if (diff <= days) res.push({ ...p, days: diff });
+  }
+  return res.sort((a, b) => a.days - b.days);
+}
+
+// ---- Menu / collezioni ----
+export function getMenus() {
+  return [...state.menus].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+}
+export function getMenu(id) {
+  return state.menus.find((m) => m.id === id) || null;
+}
+export async function addMenu(name) {
+  const clean = (name || "").trim();
+  if (!clean) return;
+  await adapter.addMenu({ id: newId(), name: clean, recipeIds: [], createdAt: now() });
+}
+export async function renameMenu(id, name) {
+  await adapter.updateMenu(id, { name: (name || "").trim() });
+}
+export async function deleteMenu(id) {
+  await adapter.deleteMenu(id);
+}
+export async function toggleRecipeInMenu(menuId, recipeId) {
+  const m = getMenu(menuId);
+  if (!m) return;
+  const ids = Array.isArray(m.recipeIds) ? [...m.recipeIds] : [];
+  const i = ids.indexOf(recipeId);
+  if (i >= 0) ids.splice(i, 1); else ids.push(recipeId);
+  await adapter.updateMenu(menuId, { recipeIds: ids });
+}
+export function getMenuRecipes(id) {
+  const m = getMenu(id);
+  if (!m) return [];
+  return (m.recipeIds || []).map((rid) => getRecipe(rid)).filter(Boolean);
+}
+
 // ---- Piano settimanale / calendario ----
 export function getPlan() {
   return [...state.plan];
@@ -283,7 +342,7 @@ export function suggestFromPantry() {
 
 // ---- Esporta / Importa (backup manuale) ----
 export function exportData() {
-  return { version: 4, exportedAt: now(), tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan, pantry: state.pantry };
+  return { version: 5, exportedAt: now(), tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan, pantry: state.pantry, menus: state.menus };
 }
 
 export async function importData(data, { merge = false } = {}) {
@@ -296,6 +355,6 @@ export async function importData(data, { merge = false } = {}) {
     for (const t of data.tools) if (!existingTools.has(t.id)) await adapter.addTool(t);
     for (const r of data.recipes) if (!existingRecipes.has(r.id)) await adapter.addRecipe(r);
   } else {
-    await adapter.replaceAll({ tools: data.tools, recipes: data.recipes, shopping: data.shopping || [], plan: data.plan || [], pantry: data.pantry || [] });
+    await adapter.replaceAll({ tools: data.tools, recipes: data.recipes, shopping: data.shopping || [], plan: data.plan || [], pantry: data.pantry || [], menus: data.menus || [] });
   }
 }

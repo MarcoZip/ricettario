@@ -19,16 +19,18 @@ export async function createFirebaseAdapter(uid) {
   const shoppingCol = collection(db, "users", uid, "shopping");
   const planCol = collection(db, "users", uid, "plan");
   const pantryCol = collection(db, "users", uid, "pantry");
+  const menusCol = collection(db, "users", uid, "menus");
 
   let tools = [];
   let recipes = [];
   let shopping = [];
   let plan = [];
   let pantry = [];
+  let menus = [];
   let onChange = () => {};
 
   function emit() {
-    onChange({ tools: [...tools], recipes: [...recipes], shopping: [...shopping], plan: [...plan], pantry: [...pantry] });
+    onChange({ tools: [...tools], recipes: [...recipes], shopping: [...shopping], plan: [...plan], pantry: [...pantry], menus: [...menus] });
   }
 
   return {
@@ -56,6 +58,10 @@ export async function createFirebaseAdapter(uid) {
       });
       onSnapshot(pantryCol, (snap) => {
         pantry = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        emit();
+      });
+      onSnapshot(menusCol, (snap) => {
+        menus = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         emit();
       });
     },
@@ -123,6 +129,17 @@ export async function createFirebaseAdapter(uid) {
       await deleteDoc(doc(pantryCol, id));
     },
 
+    async addMenu(menu) {
+      const { id, ...data } = menu;
+      await setDoc(doc(menusCol, id), data);
+    },
+    async updateMenu(id, patch) {
+      await setDoc(doc(menusCol, id), patch, { merge: true });
+    },
+    async deleteMenu(id) {
+      await deleteDoc(doc(menusCol, id));
+    },
+
     async replaceAll(data) {
       const batch = writeBatch(db);
       (data.tools || []).forEach((t) => {
@@ -144,6 +161,10 @@ export async function createFirebaseAdapter(uid) {
       (data.pantry || []).forEach((p) => {
         const { id, ...rest } = p;
         batch.set(doc(pantryCol, id), rest);
+      });
+      (data.menus || []).forEach((mn) => {
+        const { id, ...rest } = mn;
+        batch.set(doc(menusCol, id), rest);
       });
       await batch.commit();
     }

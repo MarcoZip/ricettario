@@ -6,16 +6,16 @@ const KEY = "ricettario.data.v1";
 function read() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { tools: [], recipes: [], shopping: [], plan: [], pantry: [] };
+    if (!raw) return { tools: [], recipes: [], shopping: [], plan: [], pantry: [], menus: [] };
     const data = JSON.parse(raw);
-    return { tools: data.tools || [], recipes: data.recipes || [], shopping: data.shopping || [], plan: data.plan || [], pantry: data.pantry || [] };
+    return { tools: data.tools || [], recipes: data.recipes || [], shopping: data.shopping || [], plan: data.plan || [], pantry: data.pantry || [], menus: data.menus || [] };
   } catch {
-    return { tools: [], recipes: [], shopping: [], plan: [], pantry: [] };
+    return { tools: [], recipes: [], shopping: [], plan: [], pantry: [], menus: [] };
   }
 }
 
 function write(state) {
-  localStorage.setItem(KEY, JSON.stringify({ tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan, pantry: state.pantry }));
+  localStorage.setItem(KEY, JSON.stringify({ tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan, pantry: state.pantry, menus: state.menus }));
 }
 
 export function createLocalAdapter() {
@@ -24,7 +24,7 @@ export function createLocalAdapter() {
 
   function commit() {
     write(state);
-    onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping], plan: [...state.plan], pantry: [...state.pantry] });
+    onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping], plan: [...state.plan], pantry: [...state.pantry], menus: [...state.menus] });
   }
 
   return {
@@ -33,7 +33,7 @@ export function createLocalAdapter() {
     async start(cb) {
       onChange = cb;
       // Emissione iniziale dello stato salvato.
-      onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping], plan: [...state.plan], pantry: [...state.pantry] });
+      onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping], plan: [...state.plan], pantry: [...state.pantry], menus: [...state.menus] });
     },
 
     async addTool(tool) {
@@ -107,12 +107,27 @@ export function createLocalAdapter() {
       commit();
     },
 
+    async addMenu(menu) {
+      state.menus.push(menu);
+      commit();
+    },
+    async updateMenu(id, patch) {
+      const mm = state.menus.find((x) => x.id === id);
+      if (mm) Object.assign(mm, patch);
+      commit();
+    },
+    async deleteMenu(id) {
+      state.menus = state.menus.filter((mm) => mm.id !== id);
+      commit();
+    },
+
     async replaceAll(data) {
       state.tools = data.tools || [];
       state.recipes = data.recipes || [];
       state.shopping = data.shopping || [];
       state.plan = data.plan || [];
       state.pantry = data.pantry || [];
+      state.menus = data.menus || [];
       commit();
     }
   };

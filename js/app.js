@@ -3,6 +3,9 @@
 import * as store from "./store.js";
 import * as ui from "./ui.js";
 import { isCloudConfigured } from "./config.js";
+import { applyTheme } from "./theme.js";
+
+applyTheme();
 
 const root = document.getElementById("view");
 let mounted = false;
