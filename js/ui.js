@@ -8,6 +8,7 @@ import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
 import { importFromUrl } from "./import-recipe.js";
+import { translateRecipe } from "./translate.js";
 import { isImportConfigured, APP_VERSION } from "./config.js";
 import { fileToDataUrl } from "./image.js";
 import { getTheme, setTheme } from "./theme.js";
@@ -172,8 +173,8 @@ export function mount(rootEl) {
   if (help) help.addEventListener("click", () => openGuide());
   // Guida al primo avvio.
   try {
-    if (!localStorage.getItem("ricettario.guide.v6")) {
-      localStorage.setItem("ricettario.guide.v6", "1");
+    if (!localStorage.getItem("ricettario.guide.v7")) {
+      localStorage.setItem("ricettario.guide.v7", "1");
       setTimeout(() => openGuide(true), 500);
     }
   } catch {}
@@ -1152,9 +1153,20 @@ function renderOnlineTab() {
   body.querySelectorAll(".meal-card[data-meal]").forEach((card) => {
     let data;
     try { data = JSON.parse(card.dataset.meal); } catch (e) { return; }
-    card.querySelector('[data-act="save"]').addEventListener("click", () =>
-      openRecipeForm({ prefill: { title: data.title, url: data.link, ingredients: data.ingredients || [], steps: data.steps || [] } })
-    );
+    const saveBtn = card.querySelector('[data-act="save"]');
+    saveBtn.addEventListener("click", async () => {
+      // Le ricette di TheMealDB sono in inglese: traduco in italiano al salvataggio.
+      const old = saveBtn.innerHTML;
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = `${iconHtml("download-simple")} Traduco...`;
+      let prefill = { title: data.title, url: data.link, ingredients: data.ingredients || [], steps: data.steps || [] };
+      try {
+        const tr = await translateRecipe({ title: data.title, ingredients: prefill.ingredients, steps: prefill.steps });
+        prefill = { ...prefill, title: tr.title, ingredients: tr.ingredients, steps: tr.steps };
+      } catch (e) { /* in caso di errore tengo l'inglese */ }
+      saveBtn.disabled = false; saveBtn.innerHTML = old;
+      openRecipeForm({ prefill });
+    });
   });
 }
 
@@ -1193,7 +1205,7 @@ const GUIDE_SECTIONS = [
   { icon: "cooking-pot", title: "Strumenti & ricette", text: "Organizza le ricette per strumento di cottura. Crea uno strumento (forno, friggitrice ad aria…) e salva sotto le ricette con foto, link, ingredienti, porzioni, passi e categorie." },
   { icon: "calendar-dots", title: "Oggi si mangia", text: "In cima alla schermata Strumenti trovi le ricette che hai pianificato per oggi: toccale per aprirle al volo." },
   { icon: "image", title: "Aggiungi senza fatica", text: "Tre scorciatoie nel form ricetta: incolla un link e tocca \"Importa\" (ingredienti e passi si compilano da soli), oppure \"Scansiona da una foto\" per leggere una ricetta da un libro o quaderno, o salva dal Ricettario online." },
-  { icon: "book-open", title: "Ricettario", text: "Cerca idee online o tra i siti italiani; tocca \"Salva\" per aggiungerle a uno dei tuoi strumenti." },
+  { icon: "book-open", title: "Ricettario", text: "Cerca idee online o tra i siti italiani; tocca \"Salva\" per aggiungerle a uno dei tuoi strumenti. Le ricette online sono in inglese: al salvataggio vengono tradotte in italiano in automatico." },
   { icon: "fork-knife", title: "Porzioni su misura", text: "Apri una ricetta e cambia il numero di persone con + e −: le quantità degli ingredienti si ricalcolano da sole." },
   { icon: "carrot", title: "Valori nutrizionali", text: "In una ricetta tocca \"Calcola\" sotto gli ingredienti: l'app stima calorie e macronutrienti (proteine, carboidrati, grassi) per porzione e totali. Per ciò che non conosce cerca online su Open Food Facts e ti mostra anche cosa non ha conteggiato. È una stima: cambia con il numero di porzioni." },
   { icon: "heart", title: "Trova al volo", text: "Dalla schermata Strumenti cerca per nome o ingrediente e usa i filtri: Preferiti, Più cucinate, Di recente, per tempo (≤15 e ≤30 min) e le categorie. Indica il tempo di preparazione nella ricetta (modifica) per usare i filtri rapidi. Dai un voto a stelle e \"Segna come cucinata\" per il conto." },
