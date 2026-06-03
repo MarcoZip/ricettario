@@ -56,8 +56,11 @@ export default {
     const recipe = extractRecipe(html) || extractMicrodata(html);
     if (recipe) return json(recipe, 200);
 
-    // Nessuna ricetta trovata: distingui una pagina di sfida da una pagina senza dati.
-    if (/Just a moment\.\.\.|cf-browser-verification|Checking your browser before|Attention Required! \| Cloudflare/i.test(html)) {
+    // Nessuna ricetta trovata: distingui una pagina di sfida anti-bot da una
+    // pagina senza dati. Qui l'estrazione è GIÀ fallita, quindi i segnali tipici
+    // di Cloudflare/Turnstile indicano con buona certezza un blocco (su una
+    // ricetta vera la pagina sarebbe stata estratta sopra).
+    if (/Just a moment|cf-browser-verification|Checking your browser|Attention Required|challenge-platform|turnstile|cf-chl|_cf_chl|enable javascript and cookies/i.test(html)) {
       return json({ error: "blocked", message: "Questo sito blocca la lettura automatica." }, 200);
     }
     return json({ error: "notfound", message: "Nessuna ricetta strutturata trovata" }, 404);
