@@ -140,8 +140,8 @@ export function mount(rootEl) {
   if (help) help.addEventListener("click", () => openGuide());
   // Guida al primo avvio.
   try {
-    if (!localStorage.getItem("ricettario.guide.v5")) {
-      localStorage.setItem("ricettario.guide.v5", "1");
+    if (!localStorage.getItem("ricettario.guide.v6")) {
+      localStorage.setItem("ricettario.guide.v6", "1");
       setTimeout(() => openGuide(true), 500);
     }
   } catch {}
@@ -223,6 +223,8 @@ function renderHomeBody() {
     else if (homeFilter === "fav") { results = store.getFavorites(); emptyIcon = "heart"; emptyMsg = "Nessun preferito: tocca il cuore in una ricetta."; }
     else if (homeFilter === "cooked") { results = store.getMostCooked(); emptyIcon = "fire"; emptyMsg = "Nessuna ricetta ancora segnata come cucinata."; }
     else if (homeFilter === "recent") { results = store.getRecentCooked(); emptyIcon = "timer"; emptyMsg = "Niente cucinato di recente."; }
+    else if (homeFilter === "t15") { results = store.getAllRecipes().filter((r) => r.time && r.time <= 15); emptyIcon = "timer"; emptyMsg = "Nessuna ricetta entro 15 minuti. Aggiungi il tempo nelle ricette (modifica)."; }
+    else if (homeFilter === "t30") { results = store.getAllRecipes().filter((r) => r.time && r.time <= 30); emptyIcon = "timer"; emptyMsg = "Nessuna ricetta entro 30 minuti. Aggiungi il tempo nelle ricette (modifica)."; }
     else results = store.getByTag(homeFilter);
     body.innerHTML = results.length
       ? results.map(recipeResultRow).join("")
@@ -286,6 +288,8 @@ function renderStrumenti() {
     { k: "fav", label: "Preferiti", icon: "heart" },
     { k: "cooked", label: "Più cucinate", icon: "fire" },
     { k: "recent", label: "Di recente", icon: "timer" },
+    { k: "t15", label: "≤15 min", icon: "timer" },
+    { k: "t30", label: "≤30 min", icon: "timer" },
     { k: "menu", label: "Menu", icon: "book-bookmark" }
   ];
   const chips = specials.map((s) => `<button class="filter-chip ${homeFilter === s.k ? "is-on" : ""}" data-filter="${s.k}">${iconHtml(s.icon)} ${s.label}</button>`).join("") +
@@ -343,6 +347,7 @@ function renderToolDetail() {
           if (r.rating) meta.push(`<span class="meta-star">${iconHtml("star")} ${r.rating}</span>`);
           if (r.ingredients && r.ingredients.length) meta.push(`${iconHtml("list-bullets")} ${r.ingredients.length} ingr.`);
           if (r.servings) meta.push(`${iconHtml("fork-knife")} per ${r.servings}`);
+          if (r.time) meta.push(`${iconHtml("timer")} ${r.time} min`);
           if (safeUrl(r.url)) meta.push(iconHtml("link-simple"));
           if (r.notes) meta.push(iconHtml("note-pencil"));
           const metaHtml = meta.length
@@ -465,7 +470,7 @@ function renderRecipeDetail() {
       ${tool ? `<span class="recipe-tool-chip" style="margin:0">${iconHtml(tool.icon)} ${escapeHtml(tool.name)}</span>` : "<span></span>"}
       ${ratingRow}
     </div>
-    ${tagsArr.length ? `<div class="tag-row">${tagsArr.map((t) => `<span class="tagchip tagchip--ro">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
+    ${(tagsArr.length || r.time) ? `<div class="tag-row">${r.time ? `<span class="tagchip tagchip--ro">${iconHtml("timer")} ${r.time} min</span>` : ""}${tagsArr.map((t) => `<span class="tagchip tagchip--ro">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
     ${url ? `<a class="btn btn--block" id="openLink" href="${escapeHtml(url)}" target="_blank" rel="noopener" style="margin-bottom:16px">${iconHtml("arrow-square-out")} Apri la ricetta</a>` : ""}
 
     <div class="section-card">
@@ -559,10 +564,15 @@ function nutritionCardHtml(r, base, detailServings) {
   const rows = [];
   if (perPortion) rows.push(`<div class="nutri-row"><span class="nutri-lbl">Per porzione</span><span class="nutri-val">${macroLine(perPortion)}</span></div>`);
   rows.push(`<div class="nutri-row"><span class="nutri-lbl">Totale${detailServings ? ` (${detailServings} porz.)` : ""}</span><span class="nutri-val">${macroLine(totalScaled)}</span></div>`);
-  const note = nut.skipped ? `<div class="hint" style="margin-top:8px">Stima da ${nut.used} ingredienti${nut.skipped > 0 ? ` · ${nut.skipped} non conteggiati` : ""}.</div>` : "";
+  const missing = Array.isArray(nut.skippedNames) ? nut.skippedNames : [];
+  const note = `<div class="hint" style="margin-top:8px">Stima da ${nut.used} ingredienti${missing.length ? ` · ${missing.length} non conteggiati` : ""}.</div>`;
+  const missList = missing.length
+    ? `<div class="nutri-missing">Non conteggiati: ${missing.map((m) => escapeHtml(m)).join(", ")}.<br>Aggiungili nelle note o correggi la riga per migliorare la stima.</div>`
+    : "";
   return `${title}
     <div class="nutri-box">${rows.join("")}</div>
     ${note}
+    ${missList}
     <button class="btn btn--ghost btn--block" id="nutriCalc" style="margin-top:10px">${iconHtml("sparkle")} Ricalcola</button>`;
 }
 
@@ -587,15 +597,15 @@ async function wireNutrition(r, base, detailServings) {
         const enriched = await enrichWithOFF(est, (done, tot) => {
           btn.innerHTML = `${iconHtml("download-simple")} Online ${done}/${tot}…`;
         });
-        result = { total: enriched.total, used: enriched.used, skipped: enriched.stillMissing.length };
+        result = { total: enriched.total, used: enriched.used, skippedNames: enriched.stillMissing };
       } catch (e) {
-        result = { total: est.total, used: est.used, skipped: est.skipped.length };
+        result = { total: est.total, used: est.used, skippedNames: est.skipped.map((s) => s.name) };
       }
       btn.disabled = false;
     } else {
-      result = { total: est.total, used: est.used, skipped: est.skipped.length };
+      result = { total: est.total, used: est.used, skippedNames: est.skipped.map((s) => s.name) };
     }
-    const nutrition = { ...result.total, used: result.used, skipped: result.skipped };
+    const nutrition = { ...result.total, used: result.used, skipped: result.skippedNames.length, skippedNames: result.skippedNames };
     await store.updateRecipe(r.id, { nutrition });
     r.nutrition = nutrition;
     card.innerHTML = nutritionCardHtml(r, base, detailServings);
@@ -844,6 +854,7 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
   const url = recipe ? recipe.url : prefill ? prefill.url : "";
   const notes = recipe ? recipe.notes : "";
   const servings = recipe ? (recipe.servings || "") : (prefill && prefill.servings ? prefill.servings : "");
+  const time = recipe ? (recipe.time || "") : (prefill && prefill.time ? prefill.time : "");
   const ingText = recipe
     ? (recipe.ingredients || []).map((i) => i.raw || ingredientText(i)).join("\n")
     : (prefill && prefill.ingredients ? prefill.ingredients.join("\n") : "");
@@ -883,9 +894,15 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       <input type="url" id="rUrl" inputmode="url" placeholder="https://..." value="${escapeHtml(url)}" />
       ${importBtn}
     </div>
-    <div class="field">
-      <label>Per quante persone? (facoltativo)</label>
-      <input type="number" id="rServings" inputmode="numeric" min="1" placeholder="Es. 4" value="${escapeHtml(servings)}" />
+    <div class="field-row">
+      <div class="field">
+        <label>Per quante persone?</label>
+        <input type="number" id="rServings" inputmode="numeric" min="1" placeholder="Es. 4" value="${escapeHtml(servings)}" />
+      </div>
+      <div class="field">
+        <label>Tempo (minuti)</label>
+        <input type="number" id="rTime" inputmode="numeric" min="1" placeholder="Es. 30" value="${escapeHtml(time)}" />
+      </div>
     </div>
     <div class="field">
       <label>Ingredienti (uno per riga)</label>
@@ -1003,6 +1020,7 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       notes: m.el.querySelector("#rNotes").value.trim(),
       ingredients: parseList(m.el.querySelector("#rIngredients").value),
       servings: parseInt(m.el.querySelector("#rServings").value, 10) || null,
+      time: parseInt(m.el.querySelector("#rTime").value, 10) || null,
       steps: m.el.querySelector("#rSteps").value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean),
       photo: photo,
       tags: tags
@@ -1138,14 +1156,14 @@ const GUIDE_SECTIONS = [
   { icon: "image", title: "Aggiungi senza fatica", text: "Tre scorciatoie nel form ricetta: incolla un link e tocca \"Importa\" (ingredienti e passi si compilano da soli), oppure \"Scansiona da una foto\" per leggere una ricetta da un libro o quaderno, o salva dal Ricettario online." },
   { icon: "book-open", title: "Ricettario", text: "Cerca idee online o tra i siti italiani; tocca \"Salva\" per aggiungerle a uno dei tuoi strumenti." },
   { icon: "fork-knife", title: "Porzioni su misura", text: "Apri una ricetta e cambia il numero di persone con + e −: le quantità degli ingredienti si ricalcolano da sole." },
-  { icon: "carrot", title: "Valori nutrizionali", text: "In una ricetta tocca \"Calcola\" sotto gli ingredienti: l'app stima calorie e macronutrienti (proteine, carboidrati, grassi) per porzione e totali. Per ciò che non conosce cerca online su Open Food Facts. È una stima: cambia con il numero di porzioni." },
-  { icon: "heart", title: "Trova al volo", text: "Dalla schermata Strumenti cerca per nome o ingrediente e usa i filtri: Preferiti (cuore), Più cucinate, Di recente e le categorie. Dai un voto a stelle e tocca \"Segna come cucinata\" per tenere il conto." },
-  { icon: "shopping-cart-simple", title: "Spesa & Dispensa", text: "Aggiungi gli ingredienti alla lista della spesa (uniti e per reparto). Spunta ciò che prendi e con \"Spesa fatta\" passa tutto in dispensa. In Dispensa tieni ciò che hai già — con la scadenza, e l'app ti avvisa quando qualcosa sta per scadere — e \"Cosa posso cucinare\" suggerisce le ricette con quello che hai." },
+  { icon: "carrot", title: "Valori nutrizionali", text: "In una ricetta tocca \"Calcola\" sotto gli ingredienti: l'app stima calorie e macronutrienti (proteine, carboidrati, grassi) per porzione e totali. Per ciò che non conosce cerca online su Open Food Facts e ti mostra anche cosa non ha conteggiato. È una stima: cambia con il numero di porzioni." },
+  { icon: "heart", title: "Trova al volo", text: "Dalla schermata Strumenti cerca per nome o ingrediente e usa i filtri: Preferiti, Più cucinate, Di recente, per tempo (≤15 e ≤30 min) e le categorie. Indica il tempo di preparazione nella ricetta (modifica) per usare i filtri rapidi. Dai un voto a stelle e \"Segna come cucinata\" per il conto." },
+  { icon: "shopping-cart-simple", title: "Spesa & Dispensa", text: "Aggiungi gli ingredienti alla lista della spesa (uniti e per reparto). Tocca il nome per spuntare un articolo e la quantità per modificarla. Con \"Spesa fatta\" passa tutto in dispensa. In Dispensa tieni ciò che hai già — con la scadenza, e l'app ti avvisa quando qualcosa sta per scadere — e \"Cosa posso cucinare\" suggerisce le ricette con quello che hai." },
   { icon: "fire", title: "Modalità cucina", text: "Nelle ricette con i passi, tocca \"Modalità cucina\": istruzioni passo-passo, più timer con nome (pasta, forno…), lettura vocale (🔊) e schermo sempre acceso mentre cucini." },
   { icon: "calendar-blank", title: "Pianificazione", text: "Nel calendario (vista Mese o Settimana) assegna le ricette ai giorni in pranzo o cena, usa \"Riempi le cene\" per riempire la settimana e genera la spesa del mese o della settimana." },
   { icon: "book-bookmark", title: "Menu", text: "Dalla schermata Strumenti, filtro \"Menu\": raggruppa più ricette (es. \"Cena con amici\") e genera un'unica lista della spesa." },
   { icon: "arrow-square-out", title: "Condividi", text: "Da una ricetta tocca \"Condividi\" per inviarla a qualcuno (WhatsApp, email…) con ingredienti e preparazione." },
-  { icon: "calendar-dots", title: "Promemoria", text: "In Opzioni attiva i \"Promemoria\": l'app ti avvisa con una notifica delle scadenze in dispensa e del pasto pianificato di oggi quando la apri. Su iPhone aggiungi prima l'app alla schermata Home." },
+  { icon: "calendar-dots", title: "Promemoria", text: "In Opzioni attiva i \"Promemoria\": ricevi una notifica delle scadenze in dispensa e del pasto di oggi. Puoi scegliere l'ora dell'avviso e aggiungere un secondo avviso serale con l'anteprima dei pasti di domani. Su iPhone aggiungi prima l'app alla schermata Home." },
   { icon: "sparkle", title: "Personalizza", text: "In Opzioni scegli il tema chiaro o scuro. Con l'accesso le ricette sono salvate nel cloud e sincronizzate su tutti i dispositivi; puoi anche esportare un backup." }
 ];
 
@@ -1177,9 +1195,36 @@ function shopRow(it) {
   return `
     <div class="shop-row ${it.checked ? "is-checked" : ""}" data-id="${it.id}">
       <button class="check" data-act="check">${it.checked ? iconHtml("check") : ""}</button>
-      <span class="shop-row__name">${escapeHtml(it.name)}${amount ? ` <span class="shop-row__amt">${escapeHtml(amount)}</span>` : ""}</span>
+      <span class="shop-row__name" data-act="toggle">${escapeHtml(it.name)}</span>
+      <button class="shop-row__amt" data-act="qty" title="Modifica quantità">${amount ? escapeHtml(amount) : iconHtml("pencil-simple")}</button>
       <button class="icon-btn icon-btn--danger shop-row__del" data-act="del">${iconHtml("trash")}</button>
     </div>`;
+}
+
+// Modale per modificare a mano quantità e unità di un articolo della spesa.
+function editShoppingQty(it) {
+  const m = openModal(`
+    <h3 class="modal__title">Quantità</h3>
+    <div class="field">
+      <label>${escapeHtml(it.name)}</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="eqQty" inputmode="decimal" placeholder="Quantità" value="${it.qty != null ? String(it.qty).replace(".", ",") : ""}" style="flex:1" />
+        <input type="text" id="eqUnit" placeholder="Unità (g, ml…)" value="${escapeHtml(it.unit && it.unit !== "q.b." ? it.unit : "")}" style="flex:1" />
+      </div>
+    </div>
+    <div class="modal__actions">
+      <button class="btn" data-act="cancel">Annulla</button>
+      <button class="btn btn--primary" data-act="save">Salva</button>
+    </div>`);
+  setTimeout(() => m.el.querySelector("#eqQty").focus(), 50);
+  m.el.querySelector('[data-act="cancel"]').onclick = m.close;
+  m.el.querySelector('[data-act="save"]').onclick = async () => {
+    const qv = m.el.querySelector("#eqQty").value.trim().replace(",", ".");
+    const uv = m.el.querySelector("#eqUnit").value.trim();
+    const qty = qv === "" ? null : (parseFloat(qv) || null);
+    await store.updateShoppingItem(it.id, { qty, unit: uv });
+    m.close();
+  };
 }
 
 function renderShopping() {
@@ -1252,11 +1297,20 @@ function renderShoppingList() {
 
   wrap.querySelectorAll(".shop-row").forEach((rowEl) => {
     const id = rowEl.dataset.id;
-    rowEl.querySelector('[data-act="check"]').addEventListener("click", () => {
+    const toggle = () => {
       const it = store.getShopping().find((s) => s.id === id);
       store.toggleShoppingItem(id, !(it && it.checked));
+    };
+    rowEl.querySelector('[data-act="check"]').addEventListener("click", toggle);
+    const nameEl = rowEl.querySelector('[data-act="toggle"]');
+    if (nameEl) nameEl.addEventListener("click", toggle); // tap sul nome = spunta rapida
+    const qtyEl = rowEl.querySelector('[data-act="qty"]');
+    if (qtyEl) qtyEl.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const it = store.getShopping().find((s) => s.id === id);
+      if (it) editShoppingQty(it);
     });
-    rowEl.querySelector('[data-act="del"]').addEventListener("click", () => store.deleteShoppingItem(id));
+    rowEl.querySelector('[data-act="del"]').addEventListener("click", (e) => { e.stopPropagation(); store.deleteShoppingItem(id); });
   });
 
   const tp = wrap.querySelector("#toPantry");
@@ -1690,6 +1744,11 @@ function openMenuSheet(menuId) {
 
 // ---------------- Schermata: Impostazioni ----------------
 // ---- Promemoria / notifiche (impostazioni) ----
+function hourOptions(selected, from, to) {
+  let s = "";
+  for (let h = from; h <= to; h++) s += `<option value="${h}" ${h === selected ? "selected" : ""}>${String(h).padStart(2, "0")}:00</option>`;
+  return s;
+}
 function notifyGroupHtml() {
   if (!notifySupported()) {
     return `<div class="setting-group"><div class="setting-row"><div>
@@ -1742,7 +1801,28 @@ function notifyGroupHtml() {
         <div class="setting-row__label">Anche ad app chiusa</div>
         <div class="setting-row__desc" id="pushStatus">Verifico…</div>
       </div>
-    </div>` : ""}
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-row__label">Ora del promemoria</div>
+        <div class="setting-row__desc">Quando inviare l'avviso del mattino.</div>
+      </div>
+      <select id="ntHour" class="mini-select">${hourOptions(prefs.hour, 6, 14)}</select>
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-row__label">Secondo avviso (sera)</div>
+        <div class="setting-row__desc">Anteprima dei pasti di domani.</div>
+      </div>
+      <input type="checkbox" id="ntEvening" class="mini-check" ${prefs.evening ? "checked" : ""} />
+    </div>
+    ${prefs.evening ? `<div class="setting-row">
+      <div>
+        <div class="setting-row__label">Ora avviso serale</div>
+        <div class="setting-row__desc">Quando inviare l'anteprima di domani.</div>
+      </div>
+      <select id="ntEveningHour" class="mini-select">${hourOptions(prefs.eveningHour, 17, 23)}</select>
+    </div>` : ""}` : ""}
     <div class="setting-row">
       <div>
         <div class="setting-row__label">Prova le notifiche</div>
@@ -1801,6 +1881,12 @@ function wireNotify() {
   if (meals) meals.addEventListener("change", () => { setNotifyPref("meals", meals.checked); pushRefreshSafe(); });
   const days = root.querySelector("#ntDays");
   if (days) days.addEventListener("change", () => { setNotifyPref("days", parseInt(days.value, 10)); pushRefreshSafe(); });
+  const ntHour = root.querySelector("#ntHour");
+  if (ntHour) ntHour.addEventListener("change", () => { setNotifyPref("hour", parseInt(ntHour.value, 10)); pushRefreshSafe(); });
+  const ntEvening = root.querySelector("#ntEvening");
+  if (ntEvening) ntEvening.addEventListener("change", () => { setNotifyPref("evening", ntEvening.checked); pushRefreshSafe(); renderImpostazioni(); });
+  const ntEveningHour = root.querySelector("#ntEveningHour");
+  if (ntEveningHour) ntEveningHour.addEventListener("change", () => { setNotifyPref("eveningHour", parseInt(ntEveningHour.value, 10)); pushRefreshSafe(); });
   const test = root.querySelector("#ntTest");
   if (test) test.addEventListener("click", async () => {
     try { await sendTestNotification(); toast("Notifica inviata", "success"); }

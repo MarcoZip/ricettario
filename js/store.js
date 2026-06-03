@@ -105,7 +105,7 @@ export async function deleteTool(id) {
   await adapter.deleteTool(id);
 }
 
-export async function addRecipe({ toolId, title, url, notes, ingredients, servings, steps, favorite, rating, photo, tags }) {
+export async function addRecipe({ toolId, title, url, notes, ingredients, servings, steps, favorite, rating, photo, tags, time }) {
   await adapter.addRecipe({
     id: newId(),
     toolId,
@@ -114,6 +114,7 @@ export async function addRecipe({ toolId, title, url, notes, ingredients, servin
     notes: (notes || "").trim(),
     ingredients: Array.isArray(ingredients) ? ingredients : [],
     servings: servings || null,
+    time: time || null,
     steps: Array.isArray(steps) ? steps : [],
     favorite: Boolean(favorite),
     rating: rating || 0,
@@ -212,6 +213,9 @@ export async function addShoppingItems(rawItems) {
 
 export async function toggleShoppingItem(id, checked) {
   await adapter.updateShopping(id, { checked });
+}
+export async function updateShoppingItem(id, patch) {
+  await adapter.updateShopping(id, patch);
 }
 export async function deleteShoppingItem(id) {
   await adapter.deleteShopping(id);

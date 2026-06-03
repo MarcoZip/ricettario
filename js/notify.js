@@ -9,6 +9,9 @@ const K = {
   expiry: "ricettario.notify.expiry",
   meals: "ricettario.notify.meals",
   days: "ricettario.notify.days",
+  hour: "ricettario.notify.hour",
+  evening: "ricettario.notify.evening",
+  eveningHour: "ricettario.notify.eveningHour",
   lastExpiry: "ricettario.notify.lastExpiry",
   lastMeals: "ricettario.notify.lastMeals"
 };
@@ -41,16 +44,21 @@ function flag(key, def) {
 }
 
 export function getNotifyPrefs() {
+  const hour = parseInt(localStorage.getItem(K.hour), 10);
+  const eveningHour = parseInt(localStorage.getItem(K.eveningHour), 10);
   return {
     enabled: localStorage.getItem(K.enabled) === "1",
     expiry: flag(K.expiry, true),
     meals: flag(K.meals, true),
-    days: parseInt(localStorage.getItem(K.days), 10) || 3
+    days: parseInt(localStorage.getItem(K.days), 10) || 3,
+    hour: isNaN(hour) ? 9 : hour,
+    evening: flag(K.evening, false),
+    eveningHour: isNaN(eveningHour) ? 20 : eveningHour
   };
 }
 
 export function setNotifyPref(key, value) {
-  if (key === "days") localStorage.setItem(K.days, String(value));
+  if (key === "days" || key === "hour" || key === "eveningHour") localStorage.setItem(K[key], String(value));
   else if (K[key]) localStorage.setItem(K[key], value ? "1" : "0");
 }
 

@@ -6,7 +6,6 @@ import { VAPID_PUBLIC_KEY, PUSH_WORKER_URL, isPushConfigured } from "./config.js
 import { getNotifyPrefs } from "./notify.js";
 
 const DAYS_AHEAD = 14;   // quanti giorni in avanti programmare
-const SEND_HOUR = 9;     // ora locale di invio
 
 export function pushSupported() {
   return "serviceWorker" in navigator && "PushManager" in window && typeof Notification !== "undefined";
@@ -77,12 +76,18 @@ export function buildReminders(store, prefs) {
     }
   }
 
-  const reminders = [];
-  for (const [key, info] of byDay) {
+  const hour = prefs.hour != null ? prefs.hour : 9;
+  const atHour = (key, h) => {
     const [y, m, dd] = key.split("-").map(Number);
-    const when = new Date(y, m - 1, dd, SEND_HOUR, 0, 0, 0);
-    let sendAt = when.getTime();
-    if (sendAt <= now) sendAt = now + 2 * 60 * 1000; // se l'ora è già passata, tra ~2 minuti
+    let t = new Date(y, m - 1, dd, h, 0, 0, 0).getTime();
+    if (t <= now) t = now + 2 * 60 * 1000; // se l'ora è già passata, tra ~2 minuti
+    return t;
+  };
+
+  const reminders = [];
+
+  // Avviso del mattino: pasti di oggi + scadenze del giorno.
+  for (const [key, info] of byDay) {
     const parts = [];
     let title = "Promemoria Fornelli";
     if (info.meals.length) {
@@ -91,8 +96,22 @@ export function buildReminders(store, prefs) {
     }
     if (info.expCount) parts.push(`${info.expCount} ${info.expCount === 1 ? "alimento in scadenza" : "alimenti in scadenza"}`);
     if (!parts.length) continue;
-    reminders.push({ id: key, sendAt, title, body: parts.join(" · ") });
+    reminders.push({ id: key, sendAt: atHour(key, hour), title, body: parts.join(" · ") });
   }
+
+  // Avviso serale (facoltativo): cosa si mangia DOMANI, per organizzarsi.
+  if (prefs.evening && prefs.meals) {
+    const eh = prefs.eveningHour != null ? prefs.eveningHour : 20;
+    for (let off = 0; off < DAYS_AHEAD; off++) {
+      const d = new Date(today); d.setDate(d.getDate() + off);
+      const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + off + 1);
+      const meals = store.getPlanByDate(dayKey(tomorrow)).filter((e) => store.getRecipe(e.recipeId));
+      if (!meals.length) continue;
+      const titoli = meals.map((e) => store.getRecipe(e.recipeId).title).slice(0, 3).join(", ");
+      reminders.push({ id: "eve-" + dayKey(d), sendAt: atHour(dayKey(d), eh), title: "Domani si mangia", body: titoli + (meals.length > 3 ? "…" : "") });
+    }
+  }
+
   // solo futuri, ordinati
   return reminders.filter((r) => r.sendAt > now).sort((a, b) => a.sendAt - b.sendAt);
 }
