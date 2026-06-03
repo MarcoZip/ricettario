@@ -1041,6 +1041,7 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       if (data.time) m.el.querySelector("#rTime").value = data.time;
       if (data.ingredients && data.ingredients.length) m.el.querySelector("#rIngredients").value = data.ingredients.join("\n");
       if (data.steps && data.steps.length) m.el.querySelector("#rSteps").value = data.steps.join("\n");
+      if (data.image && !photo) { photo = data.image; renderPhoto(); }
       toast("Ricetta importata", "success");
     } catch (e) {
       toast(e.message || "Import non riuscito", "error");
