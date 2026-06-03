@@ -44,20 +44,23 @@ export default {
       return json({ error: "unreachable", message: "Lettura pagina fallita" }, 502);
     }
 
-    // Siti dietro una "sfida" anti-bot (Cloudflare, ecc.): non leggibili automaticamente.
+    // Siti dietro una "sfida" anti-bot (Cloudflare, ecc.): rispondono con un
+    // codice di errore. NB: la sola presenza di script Cloudflare in una pagina
+    // valida non è un blocco, quindi prima si prova comunque a estrarre.
     if (res.status === 403 || res.status === 503 || res.status === 429) {
       return json({ error: "blocked", message: "Questo sito blocca la lettura automatica." }, 200);
     }
     if (!res.ok) return json({ error: "unreachable", message: "Pagina non raggiungibile" }, 502);
 
     html = await res.text();
-    if (/Just a moment\.\.\.|cf-browser-verification|Checking your browser|challenge-platform|Attention Required/i.test(html)) {
+    const recipe = extractRecipe(html) || extractMicrodata(html);
+    if (recipe) return json(recipe, 200);
+
+    // Nessuna ricetta trovata: distingui una pagina di sfida da una pagina senza dati.
+    if (/Just a moment\.\.\.|cf-browser-verification|Checking your browser before|Attention Required! \| Cloudflare/i.test(html)) {
       return json({ error: "blocked", message: "Questo sito blocca la lettura automatica." }, 200);
     }
-
-    const recipe = extractRecipe(html) || extractMicrodata(html);
-    if (!recipe) return json({ error: "notfound", message: "Nessuna ricetta strutturata trovata" }, 404);
-    return json(recipe, 200);
+    return json({ error: "notfound", message: "Nessuna ricetta strutturata trovata" }, 404);
   }
 };
 
