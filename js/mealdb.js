@@ -3,6 +3,20 @@
 
 const BASE = "https://www.themealdb.com/api/json/v1/1";
 
+// Fetch con timeout: se il servizio non risponde entro N secondi, interrompe
+// (così la ricerca non "gira a vuoto" all'infinito su reti lente o bloccate).
+async function fetchJson(url, timeoutMs = 9000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function normalize(meal) {
   if (!meal) return null;
   const link =
@@ -36,17 +50,14 @@ function normalize(meal) {
 }
 
 export async function searchMeals(query) {
-  const url = `${BASE}/search.php?s=${encodeURIComponent(query)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("Errore di rete");
-  const data = await res.json();
+  const data = await fetchJson(`${BASE}/search.php?s=${encodeURIComponent(query)}`);
   return (data.meals || []).map(normalize).filter(Boolean);
 }
 
 export async function randomMeals(count = 6) {
   // L'endpoint random restituisce un piatto per volta: ne chiediamo alcuni.
   const calls = Array.from({ length: count }, () =>
-    fetch(`${BASE}/random.php`).then((r) => r.json()).catch(() => null)
+    fetchJson(`${BASE}/random.php`).catch(() => null)
   );
   const results = await Promise.all(calls);
   const meals = results.map((d) => normalize(d && d.meals && d.meals[0])).filter(Boolean);

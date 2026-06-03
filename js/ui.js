@@ -1135,7 +1135,7 @@ function renderOnlineTab() {
     try {
       mealResults = await mealdb.searchMeals(q);
     } catch (e) {
-      mealError = "Connessione assente o servizio non raggiungibile.";
+      mealError = "Servizio non raggiungibile o troppo lento. Controlla la connessione e tocca di nuovo Cerca.";
       mealResults = null;
     }
     mealLoading = false; renderOnlineTab();
@@ -1145,7 +1145,7 @@ function renderOnlineTab() {
   body.querySelector("#mealRandom").addEventListener("click", async () => {
     mealLoading = true; mealError = ""; mealQuery = ""; renderOnlineTab();
     try { mealResults = await mealdb.randomMeals(6); }
-    catch (e) { mealError = "Connessione assente o servizio non raggiungibile."; mealResults = null; }
+    catch (e) { mealError = "Servizio non raggiungibile o troppo lento. Controlla la connessione e riprova."; mealResults = null; }
     mealLoading = false; renderOnlineTab();
   });
 
