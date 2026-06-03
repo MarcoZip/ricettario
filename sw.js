@@ -1,7 +1,7 @@
 // Service worker: mette in cache l'app per l'uso offline e l'installazione.
 // I dati (Firestore/TheMealDB) NON passano da qui: vanno sempre in rete / cache propria.
 
-const CACHE = "ricettario-v29";
+const CACHE = "ricettario-v30";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -82,7 +82,7 @@ self.addEventListener("fetch", (event) => {
   // aggiornata (così config.js e il codice nuovo arrivano subito); offline si
   // ricade sulla copia in cache.
   event.respondWith(
-    fetch(req)
+    fetch(req, { cache: "no-store" })
       .then((res) => {
         if (res && res.status === 200 && res.type === "basic") {
           const copy = res.clone();
