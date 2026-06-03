@@ -1,7 +1,7 @@
 // Service worker: mette in cache l'app per l'uso offline e l'installazione.
 // I dati (Firestore/TheMealDB) NON passano da qui: vanno sempre in rete / cache propria.
 
-const CACHE = "ricettario-v16";
+const CACHE = "ricettario-v17";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -18,6 +18,7 @@ const APP_SHELL = [
   "./js/icons-data.js",
   "./js/ingredients.js",
   "./js/nutrition.js",
+  "./js/notify.js",
   "./js/import-recipe.js",
   "./js/image.js",
   "./js/ocr.js",
@@ -39,6 +40,32 @@ self.addEventListener("activate", (event) => {
       Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
+});
+
+// Tocco su una notifica: porta in primo piano l'app (o la apre).
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for (const c of list) { if ("focus" in c) return c.focus(); }
+      if (self.clients.openWindow) return self.clients.openWindow("./");
+    })
+  );
+});
+
+// Predisposizione per le push dal server (in futuro): mostra la notifica ricevuta.
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) { /* payload non JSON */ }
+  const title = data.title || "Fornelli";
+  const opts = {
+    body: data.body || "",
+    tag: data.tag || "fornelli",
+    icon: "./icons/icon-192.png",
+    badge: "./icons/icon-192.png",
+    data: { url: data.url || "./" }
+  };
+  event.waitUntil(self.registration.showNotification(title, opts));
 });
 
 self.addEventListener("fetch", (event) => {

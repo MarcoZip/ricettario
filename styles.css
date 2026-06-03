@@ -758,6 +758,7 @@ html[data-theme="dark"] .alert-banner { color: #ffcf94; }
 
 /* ---------- Select mini (tema) ---------- */
 .mini-select { border: 1px solid var(--surface-3); background: var(--input-bg); color: var(--text); border-radius: 10px; padding: 8px 10px; font-size: 0.9rem; font-weight: 700; }
+.mini-check { width: 24px; height: 24px; flex-shrink: 0; accent-color: var(--primary); cursor: pointer; }
 
 /* ---------- Più cucinate / thumb risultati ---------- */
 .meta-cooked { color: #ff9a3d; }

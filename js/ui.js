@@ -5,6 +5,7 @@ import { ITALIAN_SITES } from "./sites.js";
 import { iconHtml, rawIcon, ICON_PICKER, resolveIcon } from "./icons.js";
 import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from "./ingredients.js";
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
+import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { importFromUrl } from "./import-recipe.js";
 import { isImportConfigured } from "./config.js";
 import { fileToDataUrl } from "./image.js";
@@ -138,8 +139,8 @@ export function mount(rootEl) {
   if (help) help.addEventListener("click", () => openGuide());
   // Guida al primo avvio.
   try {
-    if (!localStorage.getItem("ricettario.guide.v4")) {
-      localStorage.setItem("ricettario.guide.v4", "1");
+    if (!localStorage.getItem("ricettario.guide.v5")) {
+      localStorage.setItem("ricettario.guide.v5", "1");
       setTimeout(() => openGuide(true), 500);
     }
   } catch {}
@@ -1143,6 +1144,7 @@ const GUIDE_SECTIONS = [
   { icon: "calendar-blank", title: "Pianificazione", text: "Nel calendario (vista Mese o Settimana) assegna le ricette ai giorni in pranzo o cena, usa \"Riempi le cene\" per riempire la settimana e genera la spesa del mese o della settimana." },
   { icon: "book-bookmark", title: "Menu", text: "Dalla schermata Strumenti, filtro \"Menu\": raggruppa più ricette (es. \"Cena con amici\") e genera un'unica lista della spesa." },
   { icon: "arrow-square-out", title: "Condividi", text: "Da una ricetta tocca \"Condividi\" per inviarla a qualcuno (WhatsApp, email…) con ingredienti e preparazione." },
+  { icon: "calendar-dots", title: "Promemoria", text: "In Opzioni attiva i \"Promemoria\": l'app ti avvisa con una notifica delle scadenze in dispensa e del pasto pianificato di oggi quando la apri. Su iPhone aggiungi prima l'app alla schermata Home." },
   { icon: "sparkle", title: "Personalizza", text: "In Opzioni scegli il tema chiaro o scuro. Con l'accesso le ricette sono salvate nel cloud e sincronizzate su tutti i dispositivi; puoi anche esportare un backup." }
 ];
 
@@ -1686,6 +1688,93 @@ function openMenuSheet(menuId) {
 }
 
 // ---------------- Schermata: Impostazioni ----------------
+// ---- Promemoria / notifiche (impostazioni) ----
+function notifyGroupHtml() {
+  if (!notifySupported()) {
+    return `<div class="setting-group"><div class="setting-row"><div>
+      <div class="setting-row__label">Promemoria</div>
+      <div class="setting-row__desc">Questo dispositivo non supporta le notifiche.</div>
+    </div></div></div>`;
+  }
+  const on = notifyEnabled();
+  const prefs = getNotifyPrefs();
+  const iosHint = (!on && isIosNotInstalled())
+    ? `<div class="setting-row__desc" style="color:var(--primary-2)">Su iPhone: tocca Condividi → "Aggiungi a Home", apri l'app installata e torna qui.</div>`
+    : "";
+  const main = `
+    <div class="setting-row">
+      <div>
+        <div class="setting-row__label">Promemoria</div>
+        <div class="setting-row__desc">Avvisi per scadenze e pasto di oggi. Appaiono quando apri l'app.${iosHint ? "" : ""}</div>
+        ${iosHint}
+      </div>
+      <button class="btn ${on ? "" : "btn--primary"}" id="notifyToggle">${on ? "Disattiva" : "Attiva"}</button>
+    </div>`;
+  const sub = on ? `
+    <div class="setting-row">
+      <div>
+        <div class="setting-row__label">Scadenze in dispensa</div>
+        <div class="setting-row__desc">Avviso quando qualcosa sta per scadere.</div>
+      </div>
+      <input type="checkbox" id="ntExpiry" class="mini-check" ${prefs.expiry ? "checked" : ""} />
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-row__label">Anticipo scadenze</div>
+        <div class="setting-row__desc">Quanti giorni prima avvisare.</div>
+      </div>
+      <select id="ntDays" class="mini-select">
+        <option value="1" ${prefs.days === 1 ? "selected" : ""}>1 giorno</option>
+        <option value="3" ${prefs.days === 3 ? "selected" : ""}>3 giorni</option>
+        <option value="7" ${prefs.days === 7 ? "selected" : ""}>1 settimana</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-row__label">Pasto di oggi</div>
+        <div class="setting-row__desc">Promemoria di ciò che hai pianificato.</div>
+      </div>
+      <input type="checkbox" id="ntMeals" class="mini-check" ${prefs.meals ? "checked" : ""} />
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="setting-row__label">Prova le notifiche</div>
+        <div class="setting-row__desc">Invia subito una notifica di esempio.</div>
+      </div>
+      <button class="btn" id="ntTest">Invia</button>
+    </div>` : "";
+  return `<div class="setting-group">${main}${sub}</div>`;
+}
+
+function wireNotify() {
+  const toggle = root.querySelector("#notifyToggle");
+  if (toggle) toggle.addEventListener("click", async () => {
+    if (notifyEnabled()) {
+      disableNotify();
+      toast("Promemoria disattivati");
+    } else {
+      try {
+        await enableNotify();
+        toast("Promemoria attivati", "success");
+      } catch (e) {
+        toast(e.message || "Impossibile attivare le notifiche", "error");
+      }
+    }
+    renderImpostazioni();
+  });
+  const exp = root.querySelector("#ntExpiry");
+  if (exp) exp.addEventListener("change", () => setNotifyPref("expiry", exp.checked));
+  const meals = root.querySelector("#ntMeals");
+  if (meals) meals.addEventListener("change", () => setNotifyPref("meals", meals.checked));
+  const days = root.querySelector("#ntDays");
+  if (days) days.addEventListener("change", () => setNotifyPref("days", parseInt(days.value, 10)));
+  const test = root.querySelector("#ntTest");
+  if (test) test.addEventListener("click", async () => {
+    try { await sendTestNotification(); toast("Notifica inviata", "success"); }
+    catch (e) { toast("Invio non riuscito", "error"); }
+  });
+}
+
 function renderImpostazioni() {
   const info = handlers.getAccountInfo();
   let accountGroup = "";
@@ -1741,6 +1830,7 @@ function renderImpostazioni() {
         </select>
       </div>
     </div>
+    ${notifyGroupHtml()}
     <div class="setting-group">
       <div class="setting-row">
         <div>
@@ -1783,6 +1873,8 @@ function renderImpostazioni() {
   const themeSel = root.querySelector("#themeSel");
   themeSel.value = getTheme();
   themeSel.addEventListener("change", () => setTheme(themeSel.value));
+
+  wireNotify();
 
   root.querySelector("#exportBtn").addEventListener("click", () => {
     const data = store.exportData();

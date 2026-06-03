@@ -4,6 +4,13 @@ import * as store from "./store.js";
 import * as ui from "./ui.js";
 import { isCloudConfigured } from "./config.js";
 import { applyTheme } from "./theme.js";
+import { runDailyReminders } from "./notify.js";
+
+// Mostra i promemoria (scadenze / pasto di oggi) lasciando il tempo ai dati
+// cloud di arrivare. È idempotente: al massimo una notifica al giorno per tipo.
+function scheduleReminders() {
+  setTimeout(() => runDailyReminders(store).catch(() => {}), 3000);
+}
 
 applyTheme();
 
@@ -44,6 +51,7 @@ async function startLocal() {
   ui.setLoginMode(false);
   ui.navigate("strumenti");
   updateBadge();
+  scheduleReminders();
 }
 
 async function startCloud() {
@@ -80,6 +88,7 @@ async function startCloud() {
       ui.setLoginMode(false);
       ui.navigate("strumenti");
       updateBadge();
+      scheduleReminders();
     } else {
       accountEmail = null;
       ensureMounted();
@@ -105,6 +114,11 @@ async function boot() {
 
 window.addEventListener("online", updateBadge);
 window.addEventListener("offline", updateBadge);
+
+// Ricontrolla i promemoria quando l'app torna in primo piano.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") runDailyReminders(store).catch(() => {});
+});
 
 // Registrazione del service worker (per il funzionamento offline / installazione).
 if ("serviceWorker" in navigator) {
