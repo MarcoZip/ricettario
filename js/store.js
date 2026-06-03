@@ -58,14 +58,26 @@ const DEFAULT_TOOLS = [
   { name: "Piano a induzione", icon: "lightning" },
   { name: "Fornello a gas", icon: "fire" },
   { name: "Vaporiera", icon: "wind" },
-  { name: "Pentola a pressione", icon: "cooking-pot" }
+  { name: "Pentola a pressione", icon: "cooking-pot" },
+  { name: "Microonde", icon: "bowl-steam" },
+  { name: "Barbecue", icon: "fire" },
+  { name: "Planetaria", icon: "cake" },
+  { name: "Tostapane", icon: "bread" },
+  { name: "Wok", icon: "bowl-food" }
 ];
 
+// Aggiunge gli strumenti predefiniti che mancano (per nome). Non duplica quelli
+// già presenti e non tocca quelli personalizzati. Ritorna quanti ne ha aggiunti.
 export async function seedDefaults() {
-  let order = 0;
+  const existing = new Set(state.tools.map((t) => (t.name || "").toLowerCase().trim()));
+  let order = state.tools.length ? Math.max(...state.tools.map((t) => t.order ?? 0)) + 1 : 0;
+  let added = 0;
   for (const t of DEFAULT_TOOLS) {
+    if (existing.has(t.name.toLowerCase())) continue;
     await adapter.addTool({ id: newId(), name: t.name, icon: t.icon, order: order++, createdAt: now() });
+    added++;
   }
+  return added;
 }
 
 // ---- Letture (sincrone, dallo stato in memoria) ----

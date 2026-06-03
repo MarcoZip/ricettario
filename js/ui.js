@@ -13,7 +13,7 @@ import { fileToDataUrl } from "./image.js";
 import { getTheme, setTheme } from "./theme.js";
 
 // Tag suggeriti nel form ricetta.
-const TAG_SUGGESTIONS = ["Primi", "Secondi", "Contorni", "Antipasti", "Dolci", "Veloce", "Vegetariano", "Pesce", "Per ospiti"];
+const TAG_SUGGESTIONS = ["Primi", "Secondi", "Contorni", "Antipasti", "Dolci", "Colazione", "Merenda", "Zuppe", "Insalate", "Lievitati", "Veloce", "Vegetariano", "Vegano", "Pesce", "Carne", "Senza glutine", "Per ospiti", "Bambini"];
 
 // Animazioni: rispetta la preferenza di sistema "riduci animazioni".
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1971,7 +1971,7 @@ function renderImpostazioni() {
       <div class="setting-row">
         <div>
           <div class="setting-row__label">Ripristina strumenti predefiniti</div>
-          <div class="setting-row__desc">Aggiunge gli strumenti di base (non cancella i tuoi).</div>
+          <div class="setting-row__desc">Aggiunge gli strumenti di base mancanti (senza duplicare né cancellare i tuoi).</div>
         </div>
         <button class="btn" id="seedBtn">Aggiungi</button>
       </div>
@@ -2033,8 +2033,8 @@ function renderImpostazioni() {
   });
 
   root.querySelector("#seedBtn").addEventListener("click", async () => {
-    await store.seedDefaults();
-    toast("Strumenti predefiniti aggiunti", "success");
+    const added = await store.seedDefaults();
+    toast(added ? `${added} ${added === 1 ? "strumento aggiunto" : "strumenti aggiunti"}` : "Hai già tutti gli strumenti predefiniti", added ? "success" : "");
   });
 }
 
