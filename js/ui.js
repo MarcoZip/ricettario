@@ -583,8 +583,9 @@ function openCookingMode(recipe) {
   if (!steps.length) return;
   let idx = 0;
   let wakeLock = null;
-  let timer = null;
-  let remaining = 0; // secondi
+  let timers = []; // { id, label, remaining, running }
+  let ticker = null;
+  let tseq = 0;
   let speak = false; // lettura vocale
 
   const host = document.getElementById("modalRoot");
@@ -615,20 +616,42 @@ function openCookingMode(recipe) {
   lock();
 
   function fmt(s) { const m = Math.floor(s / 60); const ss = s % 60; return `${m}:${String(ss).padStart(2, "0")}`; }
-  function tick() {
-    remaining--;
-    if (remaining <= 0) {
-      clearInterval(timer); timer = null; remaining = 0;
-      beep();
-      toast("Timer finito! ⏰", "success");
-    }
-    paintTimer();
+  function ensureTicker() {
+    const anyRunning = timers.some((t) => t.running);
+    if (anyRunning && !ticker) ticker = setInterval(tickAll, 1000);
+    else if (!anyRunning && ticker) { clearInterval(ticker); ticker = null; }
   }
-  function paintTimer() {
-    const t = el.querySelector("#ckTime");
-    if (t) t.textContent = fmt(remaining);
-    const tg = el.querySelector("#ckToggle");
-    if (tg) tg.textContent = timer ? "Pausa" : "Avvia";
+  function tickAll() {
+    for (const t of timers) {
+      if (!t.running) continue;
+      t.remaining--;
+      if (t.remaining <= 0) { t.remaining = 0; t.running = false; beep(); toast(`⏰ ${t.label} finito!`, "success"); }
+    }
+    ensureTicker();
+    paintTimers();
+  }
+  function addTimer(mins, label) {
+    const m = Math.max(1, parseInt(mins, 10) || 0);
+    timers.push({ id: ++tseq, label: (label || "").trim() || `Timer ${timers.length + 1}`, remaining: m * 60, running: true });
+    ensureTicker();
+    paintTimers();
+  }
+  function paintTimers() {
+    const box = el.querySelector("#ckTimers");
+    if (!box) return;
+    if (!timers.length) { box.innerHTML = `<div class="cook__notim">Nessun timer attivo</div>`; return; }
+    box.innerHTML = timers.map((t) => `<div class="ctimer ${t.remaining <= 0 ? "is-done" : ""}" data-id="${t.id}">
+      <span class="ctimer__lbl">${escapeHtml(t.label)}</span>
+      <span class="ctimer__time">${fmt(t.remaining)}</span>
+      <button class="ctimer__btn" data-act="toggle">${t.running ? "⏸" : "▶"}</button>
+      <button class="ctimer__btn" data-act="del">✕</button>
+    </div>`).join("");
+    box.querySelectorAll(".ctimer").forEach((row) => {
+      const id = parseInt(row.dataset.id, 10);
+      const t = timers.find((x) => x.id === id);
+      row.querySelector('[data-act="toggle"]').onclick = () => { if (t.remaining <= 0) return; t.running = !t.running; ensureTicker(); paintTimers(); };
+      row.querySelector('[data-act="del"]').onclick = () => { timers = timers.filter((x) => x.id !== id); ensureTicker(); paintTimers(); };
+    });
   }
   function beep() {
     try {
@@ -649,11 +672,11 @@ function openCookingMode(recipe) {
       </div>
       <div class="cook__track"><div class="cook__fill" style="width:${((idx + 1) / steps.length) * 100}%"></div></div>
       <div class="cook__body"><div class="cook__step">${escapeHtml(steps[idx])}</div></div>
-      <div class="cook__timer">
-        <button class="cook__tbtn" id="ckMinus">−1′</button>
-        <span class="cook__time" id="ckTime">${fmt(remaining)}</span>
-        <button class="cook__tbtn" id="ckPlus">+1′</button>
-        <button class="btn btn--primary cook__toggle" id="ckToggle">${timer ? "Pausa" : "Avvia"}</button>
+      <div class="cook__timers" id="ckTimers"></div>
+      <div class="cook__addtimer">
+        <input type="number" id="tMin" min="1" inputmode="numeric" value="5" />
+        <input type="text" id="tName" placeholder="Nome (es. pasta)" />
+        <button class="btn btn--primary" id="tAdd">${iconHtml("plus")} Timer</button>
       </div>
       <div class="cook__nav">
         <button class="btn btn--block" id="ckPrev" ${idx === 0 ? "disabled" : ""}>${iconHtml("caret-left")} Indietro</button>
@@ -664,17 +687,12 @@ function openCookingMode(recipe) {
     el.querySelector("#ckSpeak").onclick = () => { speak = !speak; if (speak) speakStep(); else stopSpeak(); el.querySelector("#ckSpeak").classList.toggle("is-on", speak); };
     el.querySelector("#ckPrev").onclick = () => { if (idx > 0) { idx--; draw(); speakStep(); } };
     el.querySelector("#ckNext").onclick = () => { if (idx < steps.length - 1) { idx++; draw(); speakStep(); } else { store.markCooked(recipe.id); close(); } };
-    el.querySelector("#ckMinus").onclick = () => { remaining = Math.max(0, remaining - 60); paintTimer(); };
-    el.querySelector("#ckPlus").onclick = () => { remaining += 60; paintTimer(); };
-    el.querySelector("#ckToggle").onclick = () => {
-      if (timer) { clearInterval(timer); timer = null; }
-      else if (remaining > 0) { timer = setInterval(tick, 1000); }
-      paintTimer();
-    };
+    el.querySelector("#tAdd").onclick = () => { addTimer(el.querySelector("#tMin").value, el.querySelector("#tName").value); el.querySelector("#tName").value = ""; };
+    paintTimers();
   }
 
   function close() {
-    if (timer) clearInterval(timer);
+    if (ticker) clearInterval(ticker);
     release();
     stopSpeak();
     document.removeEventListener("visibilitychange", onVis);

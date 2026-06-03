@@ -766,6 +766,20 @@ html[data-theme="dark"] .alert-banner { color: #ffcf94; }
 .week-meal b { color: var(--primary-2); }
 .week-empty { color: var(--text-soft); font-size: 0.85rem; padding: 2px 0; }
 
+/* ---------- Multi-timer (modalità cucina) ---------- */
+.cook__timers { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; max-height: 30vh; overflow-y: auto; }
+.cook__notim { color: #8b8478; text-align: center; font-size: 0.85rem; padding: 6px; }
+.ctimer { display: flex; align-items: center; gap: 10px; background: #1b1c22; border: 1px solid #2c2d36; border-radius: 12px; padding: 8px 12px; color: #ece7df; }
+.ctimer.is-done { border-color: var(--primary); animation: pulse 1s infinite; }
+.ctimer__lbl { flex: 1; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ctimer__time { font-variant-numeric: tabular-nums; font-weight: 800; font-size: 1.1rem; min-width: 58px; text-align: right; }
+.ctimer__btn { background: #2c2d36; border: none; color: #fff; width: 34px; height: 34px; border-radius: 9px; font-size: 0.95rem; flex-shrink: 0; }
+.cook__addtimer { display: flex; gap: 8px; margin-bottom: 12px; }
+.cook__addtimer input { border: 1px solid #2c2d36; background: #15161b; color: #fff; border-radius: 10px; padding: 10px; font-size: 0.95rem; }
+.cook__addtimer input[type="number"] { width: 66px; }
+.cook__addtimer input[type="text"] { flex: 1; min-width: 0; }
+
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideup { from { transform: translateY(34px); opacity: 0.5; } to { transform: translateY(0); opacity: 1; } }
