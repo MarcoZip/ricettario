@@ -129,9 +129,23 @@ document.addEventListener("visibilitychange", () => {
 });
 
 // Registrazione del service worker (per il funzionamento offline / installazione).
+// Quando arriva una versione nuova, la pagina si ricarica da sola così l'utente
+// vede subito l'aggiornamento (niente più "chiudi e riapri" manuale).
 if ("serviceWorker" in navigator) {
+  let refreshing = false;
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing || !hadController) return; // non ricaricare alla primissima installazione
+    refreshing = true;
+    window.location.reload();
+  });
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
+    navigator.serviceWorker.register("sw.js").then((reg) => {
+      // Controlla se c'è una versione nuova quando l'app torna in primo piano.
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") reg.update().catch(() => {});
+      });
+    }).catch(() => {});
   });
 }
 
