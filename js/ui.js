@@ -205,6 +205,35 @@ function changelogHtml(entries) {
     </div>`).join("");
 }
 
+// Esporta tutte le ricette in una pagina stampabile (da cui "Salva come PDF").
+const PRINT_CSS = `* { box-sizing: border-box; } body { font-family: Georgia, "Times New Roman", serif; color: #222; margin: 28px; } h1 { text-align: center; color: #df5117; } h2 { color: #df5117; border-bottom: 2px solid #ffb86b; padding-bottom: 4px; margin-top: 26px; } .pr { page-break-inside: avoid; margin: 14px 0 22px; } .pr h3 { margin: 0 0 4px; font-size: 1.25rem; } .pr .meta { color: #777; font-size: 0.85rem; margin-bottom: 8px; } .pr img { max-height: 240px; max-width: 100%; border-radius: 8px; display: block; margin: 8px 0; } .pr b { display: block; margin-top: 8px; } @media print { body { margin: 12mm; } }`;
+function recipePrintHtml(r) {
+  const ing = (r.ingredients || []).map((i) => `<li>${escapeHtml(i.raw || ingredientText(i))}</li>`).join("");
+  const steps = (r.steps || []).map((s) => `<li>${escapeHtml(s)}</li>`).join("");
+  const meta = [r.servings ? `Per ${r.servings}` : "", r.time ? `${r.time} min` : ""].filter(Boolean).join(" · ");
+  return `<div class="pr">
+    <h3>${escapeHtml(r.title)}</h3>
+    ${meta ? `<div class="meta">${meta}</div>` : ""}
+    ${r.photo ? `<img src="${escapeHtml(r.photo)}" alt="" />` : ""}
+    ${ing ? `<b>Ingredienti</b><ul>${ing}</ul>` : ""}
+    ${steps ? `<b>Preparazione</b><ol>${steps}</ol>` : ""}
+    ${r.notes ? `<p><i>${escapeHtml(r.notes)}</i></p>` : ""}
+  </div>`;
+}
+function exportRecipesPdf() {
+  const recipes = store.getAllRecipes();
+  if (!recipes.length) { toast("Nessuna ricetta da esportare", "error"); return; }
+  let body = "";
+  for (const t of store.getTools()) {
+    const rs = store.getRecipesByTool(t.id);
+    if (rs.length) body += `<h2>${escapeHtml(t.name)}</h2>` + rs.map(recipePrintHtml).join("");
+  }
+  const html = `<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Ricettario Fornelli</title><style>${PRINT_CSS}</style></head><body><h1>Il mio ricettario</h1>${body}<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>`;
+  const w = window.open("", "_blank");
+  if (!w) { toast("Consenti i popup del browser per esportare", "error"); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
 // Diario e statistiche di cucina (dai dati già raccolti).
 function openStats() {
   const recipes = store.getAllRecipes();
@@ -396,6 +425,15 @@ function renderStrumenti() {
     ? `<button class="alert-banner" id="expAlert">${iconHtml("basket")} <span>${exp.length} ${exp.length === 1 ? "alimento in scadenza" : "alimenti in scadenza"} — controlla la dispensa</span></button>`
     : "";
 
+  // "Usa prima che scada": ricette che sfruttano gli alimenti in scadenza
+  const useFirst = exp.length ? store.recipesForExpiring(3).slice(0, 4) : [];
+  const useFirstCard = useFirst.length
+    ? `<div class="today-card">
+        <div class="today__h">${iconHtml("basket")} Usa prima che scada</div>
+        ${useFirst.map((r) => `<button class="today__item" data-recipe="${r.id}"><span class="today__name">${escapeHtml(r.title)}</span>${iconHtml("caret-right")}</button>`).join("")}
+      </div>`
+    : "";
+
   const specials = [
     { k: "fav", label: "Preferiti", icon: "heart" },
     { k: "cooked", label: "Più cucinate", icon: "fire" },
@@ -417,6 +455,7 @@ function renderStrumenti() {
       <button class="home-hero__btn" id="heroAdd">${iconHtml("plus")} Nuova ricetta</button>
     </div>
     ${expBanner}
+    ${useFirstCard}
     ${todayCard}
     ${banner}
     <div class="search-bar">
@@ -641,6 +680,15 @@ function renderRecipeDetail() {
 
     ${r.notes ? `<div class="section-card"><h3 class="section-title">${iconHtml("note-pencil")} Note</h3><div class="recipe-item__notes" style="margin-top:0">${escapeHtml(r.notes)}</div></div>` : ""}
 
+    <div class="section-card">
+      <h3 class="section-title">${iconHtml("image")} Le mie creazioni</h3>
+      <div class="gallery">
+        ${(Array.isArray(r.gallery) ? r.gallery : []).map((g, i) => `<div class="gallery__item"><img src="${escapeHtml(g)}" data-gi="${i}" alt="" /><button class="gallery__del" data-del="${i}" title="Elimina">✕</button></div>`).join("")}
+        <button class="gallery__add" id="galAdd">${iconHtml("image")}<span>Aggiungi foto</span></button>
+      </div>
+      <input type="file" id="galFile" accept="image/*" capture="environment" hidden />
+    </div>
+
     <button class="btn btn--block" id="cookedBtn" style="margin-bottom:10px">${iconHtml("fire")} Segna come cucinata${r.cookCount ? ` · ${r.cookCount} ${r.cookCount === 1 ? "volta" : "volte"}` : ""}</button>
     <button class="btn btn--block" id="shareImg" style="margin-bottom:10px">${iconHtml("image")} Condividi come immagine</button>
     <div style="display:flex;gap:8px;margin-top:4px">
@@ -691,6 +739,38 @@ function renderRecipeDetail() {
   if (cookBtn) cookBtn.addEventListener("click", () => openCookingMode(r));
 
   root.querySelector("#cookedBtn").addEventListener("click", async (e) => { fxBurstFrom(e.currentTarget); await store.markCooked(r.id); toast("Segnata come cucinata 🔥", "success"); });
+
+  // Galleria "Le mie creazioni"
+  const galFile = root.querySelector("#galFile");
+  const galAdd = root.querySelector("#galAdd");
+  if (galAdd) galAdd.addEventListener("click", () => galFile.click());
+  if (galFile) galFile.addEventListener("change", async () => {
+    const f = galFile.files[0]; galFile.value = "";
+    if (!f) return;
+    try {
+      const url = await fileToDataUrl(f);
+      const gallery = [...(Array.isArray(r.gallery) ? r.gallery : []), url];
+      await store.updateRecipe(r.id, { gallery });
+      r.gallery = gallery;
+      fxBurstFrom(galAdd, { emojis: ["📸", "✨"] });
+      render();
+    } catch (e) { toast("Foto non valida", "error"); }
+  });
+  root.querySelectorAll(".gallery__item img[data-gi]").forEach((img) => img.addEventListener("click", () => {
+    const m = openModal(`<img src="${escapeHtml(img.src)}" alt="" style="width:100%;border-radius:14px;display:block" /><div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>`);
+    m.el.querySelector('[data-act="ok"]').onclick = m.close;
+  }));
+  root.querySelectorAll(".gallery__del").forEach((b) => b.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const i = parseInt(b.dataset.del, 10);
+    const ok = await confirmDialog({ title: "Eliminare la foto?", confirmText: "Elimina", danger: true });
+    if (ok) {
+      const gallery = (Array.isArray(r.gallery) ? r.gallery : []).filter((_, j) => j !== i);
+      await store.updateRecipe(r.id, { gallery });
+      r.gallery = gallery;
+      render();
+    }
+  }));
 
   const shareImgBtn = root.querySelector("#shareImg");
   if (shareImgBtn) shareImgBtn.addEventListener("click", async () => {
@@ -871,11 +951,54 @@ function openCookingMode(recipe) {
   let ticker = null;
   let tseq = 0;
   let speak = false; // lettura vocale
+  let voiceOn = false; // comandi vocali a mani libere
+  let vrec = null;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   const host = document.getElementById("modalRoot");
   const el = document.createElement("div");
   el.className = "cook";
   host.appendChild(el);
+
+  function goNext() {
+    if (idx < steps.length - 1) { idx++; draw(); speakStep(); }
+    else { store.markCooked(recipe.id); close(); }
+  }
+  function goPrev() { if (idx > 0) { idx--; draw(); speakStep(); } }
+
+  // Comandi vocali: avanti / indietro / timer N minuti / leggi.
+  const NUMWORDS = { uno: 1, una: 1, un: 1, due: 2, tre: 3, quattro: 4, cinque: 5, sei: 6, sette: 7, otto: 8, nove: 9, dieci: 10, undici: 11, dodici: 12, quindici: 15, venti: 20, venticinque: 25, trenta: 30, quaranta: 40, quarantacinque: 45, sessanta: 60 };
+  function handleVoiceCommand(text) {
+    const t = (text || "").toLowerCase();
+    if (/\b(avanti|prossim|continua|vai)\b/.test(t)) { goNext(); return; }
+    if (/\b(indietro|precedent|torna)\b/.test(t)) { goPrev(); return; }
+    if (/\b(leggi|ripeti)\b/.test(t)) { speak = true; speakStep(); return; }
+    if (/\b(ferma|stop|basta|zitt)\b/.test(t)) { stopSpeak(); return; }
+    const mt = t.match(/timer\D*(\d+)/) || t.match(/(\d+)\s*minut/);
+    if (mt) { addTimer(parseInt(mt[1], 10), "Voce"); return; }
+    const wm = t.match(/timer\s+([a-zà]+)/);
+    if (wm && NUMWORDS[wm[1]]) { addTimer(NUMWORDS[wm[1]], "Voce"); return; }
+  }
+  function startVoice() {
+    if (!SR) return;
+    try {
+      vrec = new SR();
+      vrec.lang = "it-IT";
+      vrec.continuous = true;
+      vrec.interimResults = false;
+      vrec.onresult = (e) => { for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) handleVoiceCommand(e.results[i][0].transcript); };
+      vrec.onend = () => { if (voiceOn) { try { vrec.start(); } catch (e) {} } };
+      vrec.onerror = (e) => { if (e && e.error === "not-allowed") { voiceOn = false; toast("Permesso microfono negato", "error"); draw(); } };
+      vrec.start();
+    } catch (e) { voiceOn = false; }
+  }
+  function stopVoice() { voiceOn = false; if (vrec) { try { vrec.stop(); } catch (e) {} vrec = null; } }
+  function toggleVoice() {
+    voiceOn = !voiceOn;
+    if (voiceOn) { startVoice(); toast("Comandi vocali attivi: \"avanti\", \"indietro\", \"timer 10 minuti\"", "success"); }
+    else stopVoice();
+    draw();
+  }
 
   function speakStep() {
     if (!speak || !window.speechSynthesis) return;
@@ -952,6 +1075,7 @@ function openCookingMode(recipe) {
       <div class="cook__bar">
         <button class="cook__close" id="ckClose">${iconHtml("x")}</button>
         <div class="cook__progress">Passo ${idx + 1} di ${steps.length}</div>
+        ${SR ? `<button class="cook__close ${voiceOn ? "is-on" : ""}" id="ckVoice" title="Comandi vocali">🎤</button>` : ""}
         <button class="cook__close ${speak ? "is-on" : ""}" id="ckSpeak" title="Leggi ad alta voce">🔊</button>
       </div>
       <div class="cook__track"><div class="cook__fill" style="width:${((idx + 1) / steps.length) * 100}%"></div></div>
@@ -970,8 +1094,10 @@ function openCookingMode(recipe) {
     `;
     el.querySelector("#ckClose").onclick = close;
     el.querySelector("#ckSpeak").onclick = () => { speak = !speak; if (speak) speakStep(); else stopSpeak(); el.querySelector("#ckSpeak").classList.toggle("is-on", speak); };
-    el.querySelector("#ckPrev").onclick = () => { if (idx > 0) { idx--; draw(); speakStep(); } };
-    el.querySelector("#ckNext").onclick = () => { if (idx < steps.length - 1) { idx++; draw(); speakStep(); } else { store.markCooked(recipe.id); close(); } };
+    const ckVoice = el.querySelector("#ckVoice");
+    if (ckVoice) ckVoice.onclick = toggleVoice;
+    el.querySelector("#ckPrev").onclick = goPrev;
+    el.querySelector("#ckNext").onclick = goNext;
     el.querySelector("#tAdd").onclick = () => { addTimer(el.querySelector("#tMin").value, el.querySelector("#tName").value); el.querySelector("#tName").value = ""; };
     el.querySelectorAll("[data-qmin]").forEach((b) => b.onclick = () => addTimer(parseInt(b.dataset.qmin, 10), "Passo " + (idx + 1)));
     paintTimers();
@@ -981,6 +1107,7 @@ function openCookingMode(recipe) {
     if (ticker) clearInterval(ticker);
     release();
     stopSpeak();
+    stopVoice();
     document.removeEventListener("visibilitychange", onVis);
     el.remove();
   }
@@ -2229,6 +2356,13 @@ function renderImpostazioni() {
         </div>
         <button class="btn" id="importBtn">Importa</button>
       </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-row__label">Ricettario in PDF</div>
+          <div class="setting-row__desc">Stampa o salva tutte le ricette in un PDF.</div>
+        </div>
+        <button class="btn" id="pdfBtn">Esporta</button>
+      </div>
     </div>
     <div class="setting-group">
       <div class="setting-row">
@@ -2300,6 +2434,8 @@ function renderImpostazioni() {
     }
     fileInput.value = "";
   });
+
+  root.querySelector("#pdfBtn").addEventListener("click", () => exportRecipesPdf());
 
   root.querySelector("#seedBtn").addEventListener("click", async () => {
     const added = await store.seedDefaults();

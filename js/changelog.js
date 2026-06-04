@@ -4,6 +4,16 @@
 
 export const CHANGELOG = [
   {
+    v: "2.2",
+    d: "2026-06-04",
+    items: [
+      "Comandi vocali a mani libere in Modalità cucina: di' \"avanti\", \"indietro\", \"timer 10 minuti\".",
+      "\"Usa prima che scada\": in home, ricette che usano gli alimenti in scadenza (anti-spreco).",
+      "\"Le mie creazioni\": aggiungi le foto dei tuoi piatti a ogni ricetta.",
+      "Esporta tutto il ricettario in PDF (da Opzioni) per stamparlo o conservarlo."
+    ]
+  },
+  {
     v: "2.1",
     d: "2026-06-04",
     items: [

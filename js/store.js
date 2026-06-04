@@ -341,6 +341,23 @@ export async function deletePantryItem(id) {
   await adapter.deletePantry(id);
 }
 
+// Ricette che usano alimenti in scadenza entro N giorni (anti-spreco).
+export function recipesForExpiring(days = 3) {
+  const exp = getExpiringPantry(days);
+  const names = exp.map((e) => (e.name || "").toLowerCase().trim()).filter(Boolean);
+  if (!names.length) return [];
+  const res = [];
+  for (const r of state.recipes) {
+    let count = 0;
+    for (const it of (r.ingredients || [])) {
+      const n = (it.name || "").toLowerCase().trim();
+      if (n && names.some((en) => n.includes(en) || en.includes(n))) count++;
+    }
+    if (count) res.push({ r, count });
+  }
+  return res.sort((a, b) => b.count - a.count).map((x) => x.r);
+}
+
 // Suggerisce ricette in base a ciò che è in dispensa.
 export function suggestFromPantry() {
   if (!state.pantry.length) return [];

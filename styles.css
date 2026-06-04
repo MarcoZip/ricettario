@@ -756,6 +756,14 @@ a { color: var(--primary-2); }
 .stat-row:last-child { border-bottom: none; }
 .stat-row b { color: var(--primary-2); flex-shrink: 0; }
 
+/* Galleria "Le mie creazioni" */
+.gallery { display: flex; flex-wrap: wrap; gap: 10px; }
+.gallery__item { position: relative; width: 88px; height: 88px; }
+.gallery__item img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; cursor: pointer; }
+.gallery__del { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; border-radius: 50%; background: var(--danger); color: #fff; border: 2px solid var(--surface); font-size: 0.7rem; line-height: 1; cursor: pointer; padding: 0; }
+.gallery__add { width: 88px; height: 88px; border-radius: 12px; border: 1.5px dashed var(--surface-3); background: var(--input-bg); color: var(--text-soft); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 0.72rem; cursor: pointer; }
+.gallery__add .ic { font-size: 1.3rem; }
+
 /* ---------- Lista della spesa ---------- */
 .shop-group { margin-bottom: 18px; }
 .shop-group__title { font-size: 0.74rem; letter-spacing: 0.5px; text-transform: uppercase; color: var(--primary-2); font-weight: 800; margin-bottom: 9px; }
