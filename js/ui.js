@@ -10,6 +10,7 @@ import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregister
 import { importFromUrl } from "./import-recipe.js";
 import { translateRecipe } from "./translate.js";
 import { isImportConfigured, APP_VERSION } from "./config.js";
+import { CHANGELOG } from "./changelog.js";
 import { fileToDataUrl } from "./image.js";
 import { getTheme, setTheme } from "./theme.js";
 
@@ -178,6 +179,39 @@ export function mount(rootEl) {
       setTimeout(() => openGuide(true), 500);
     }
   } catch {}
+  maybeShowWhatsNew();
+}
+
+// Mostra le novità quando la versione è cambiata dall'ultima volta (non al primo
+// avvio assoluto). Salva la versione vista in localStorage.
+function maybeShowWhatsNew() {
+  try {
+    const KEY = "ricettario.seenVersion";
+    const seen = localStorage.getItem(KEY);
+    localStorage.setItem(KEY, APP_VERSION);
+    if (!seen || seen === APP_VERSION) return; // primo avvio o nessun cambio
+    const idx = CHANGELOG.findIndex((c) => c.v === seen);
+    const fresh = idx > 0 ? CHANGELOG.slice(0, idx) : (idx === 0 ? [] : [CHANGELOG[0]]);
+    if (fresh.length) setTimeout(() => openChangelog(fresh, { whatsNew: true }), 700);
+  } catch (e) { /* ignora */ }
+}
+
+function changelogHtml(entries) {
+  return entries.map((c) => `
+    <div class="cl-entry">
+      <div class="cl-ver">v${escapeHtml(c.v)} <span class="cl-date">${escapeHtml(c.d || "")}</span></div>
+      <ul class="cl-list">${(c.items || []).map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>
+    </div>`).join("");
+}
+
+function openChangelog(entries, opts = {}) {
+  const m = openModal(`
+    <h3 class="modal__title">${opts.whatsNew ? "✨ Novità di Fornelli" : "Novità e modifiche"}</h3>
+    ${opts.whatsNew ? `<p class="hint" style="margin-top:-6px;margin-bottom:6px">Cosa è cambiato con l'ultimo aggiornamento:</p>` : ""}
+    <div class="cl-scroll">${changelogHtml(entries)}</div>
+    <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Ho capito</button></div>
+  `);
+  m.el.querySelector('[data-act="ok"]').onclick = m.close;
 }
 
 export function navigate(route) {
@@ -1992,6 +2026,13 @@ function renderImpostazioni() {
       </div>
       <div class="setting-row">
         <div>
+          <div class="setting-row__label">Novità e modifiche</div>
+          <div class="setting-row__desc">Lo storico degli aggiornamenti dell'app.</div>
+        </div>
+        <button class="btn" id="changelogBtn">Apri</button>
+      </div>
+      <div class="setting-row">
+        <div>
           <div class="setting-row__label">Tema</div>
           <div class="setting-row__desc">Aspetto chiaro o scuro.</div>
         </div>
@@ -2040,6 +2081,7 @@ function renderImpostazioni() {
   });
 
   root.querySelector("#guideBtn").addEventListener("click", () => openGuide());
+  root.querySelector("#changelogBtn").addEventListener("click", () => openChangelog(CHANGELOG, {}));
 
   const themeSel = root.querySelector("#themeSel");
   themeSel.value = getTheme();
