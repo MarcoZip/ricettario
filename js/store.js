@@ -316,7 +316,7 @@ export async function deletePlan(id) {
 export function getPantry() {
   return [...state.pantry];
 }
-function inPantry(name) {
+export function inPantry(name) {
   const n = (name || "").toLowerCase().trim();
   if (!n) return false;
   return state.pantry.some((p) => {

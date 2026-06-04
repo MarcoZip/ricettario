@@ -13,7 +13,7 @@ import { shareRecipeImage } from "./share-image.js";
 import { isImportConfigured, APP_VERSION } from "./config.js";
 import { CHANGELOG } from "./changelog.js";
 import { fileToDataUrl } from "./image.js";
-import { getTheme, setTheme } from "./theme.js";
+import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS } from "./theme.js";
 
 // Tag suggeriti nel form ricetta.
 const TAG_SUGGESTIONS = ["Primi", "Secondi", "Contorni", "Antipasti", "Dolci", "Colazione", "Merenda", "Zuppe", "Insalate", "Lievitati", "Veloce", "Vegetariano", "Vegano", "Pesce", "Carne", "Senza glutine", "Per ospiti", "Bambini"];
@@ -203,6 +203,49 @@ function changelogHtml(entries) {
       <div class="cl-ver">v${escapeHtml(c.v)} <span class="cl-date">${escapeHtml(c.d || "")}</span></div>
       <ul class="cl-list">${(c.items || []).map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>
     </div>`).join("");
+}
+
+// Diario e statistiche di cucina (dai dati già raccolti).
+function openStats() {
+  const recipes = store.getAllRecipes();
+  const totalCooked = recipes.reduce((s, r) => s + (r.cookCount || 0), 0);
+  const favs = recipes.filter((r) => r.favorite).length;
+  const top = recipes.filter((r) => (r.cookCount || 0) > 0).sort((a, b) => (b.cookCount || 0) - (a.cookCount || 0)).slice(0, 5);
+  const recent = store.getRecentCooked().slice(0, 5);
+  const ingCount = {};
+  recipes.forEach((r) => (r.ingredients || []).forEach((it) => {
+    const n = (it.name || "").toLowerCase().trim();
+    if (n) ingCount[n] = (ingCount[n] || 0) + 1;
+  }));
+  const topIng = Object.entries(ingCount).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const toolStats = store.getTools()
+    .map((t) => ({ name: t.name, icon: t.icon, cooked: store.getRecipesByTool(t.id).reduce((s, r) => s + (r.cookCount || 0), 0), n: store.countRecipes(t.id) }))
+    .filter((x) => x.n > 0)
+    .sort((a, b) => b.cooked - a.cooked || b.n - a.n);
+
+  const stat = (num, lbl) => `<div class="stat-tile"><div class="stat-num">${num}</div><div class="stat-lbl">${lbl}</div></div>`;
+  const listBlock = (title, items) => items.length
+    ? `<div class="stat-block"><div class="stat-block__t">${title}</div>${items.join("")}</div>` : "";
+
+  const topHtml = listBlock(`${iconHtml("fire")} Piatti più cucinati`, top.map((r) => `<div class="stat-row"><span>${escapeHtml(r.title)}</span><b>${r.cookCount}×</b></div>`));
+  const recentHtml = listBlock(`${iconHtml("timer")} Cucinate di recente`, recent.map((r) => `<div class="stat-row"><span>${escapeHtml(r.title)}</span></div>`));
+  const ingHtml = listBlock(`${iconHtml("list-bullets")} Ingredienti più usati`, topIng.map(([n, c]) => `<div class="stat-row"><span>${escapeHtml(n)}</span><b>${c}</b></div>`));
+  const toolHtml = listBlock(`${iconHtml("cooking-pot")} Strumenti più usati`, toolStats.slice(0, 5).map((t) => `<div class="stat-row"><span>${iconHtml(t.icon)} ${escapeHtml(t.name)}</span><b>${t.cooked ? t.cooked + "×" : t.n + " ric."}</b></div>`));
+
+  const m = openModal(`
+    <h3 class="modal__title">${iconHtml("fire")} Diario di cucina</h3>
+    <div class="cl-scroll">
+      <div class="stat-tiles">
+        ${stat(recipes.length, recipes.length === 1 ? "ricetta" : "ricette")}
+        ${stat(totalCooked, "volte ai fornelli")}
+        ${stat(favs, favs === 1 ? "preferito" : "preferiti")}
+      </div>
+      ${!recipes.length ? `<div class="hint">Aggiungi ricette e segna \"cucinata\" per riempire il diario.</div>` : ""}
+      ${topHtml}${recentHtml}${toolHtml}${ingHtml}
+    </div>
+    <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
+  `);
+  m.el.querySelector('[data-act="ok"]').onclick = m.close;
 }
 
 function openChangelog(entries, opts = {}) {
@@ -551,11 +594,17 @@ function renderRecipeDetail() {
       </div>${!base ? `<div class="hint">Imposta le porzioni nella ricetta (modifica) per ricalcolare le quantità.</div>` : ""}`
     : "";
 
+  const pantryActive = store.getPantry().length > 0;
+  const missingCount = pantryActive ? ingredients.filter((it) => !store.inPantry(it.name)).length : 0;
   const ingList = ingredients.length
     ? `<div class="ing-list">${ingredients
-        .map((it, i) => `<div class="ing-row"><span class="ing-dot" style="--ac:${ACCENTS[i % ACCENTS.length]}"></span>${escapeHtml(ingredientText(it, factor))}</div>`)
+        .map((it, i) => {
+          const miss = pantryActive && !store.inPantry(it.name);
+          return `<div class="ing-row${miss ? " ing-row--missing" : ""}"><span class="ing-dot" style="--ac:${ACCENTS[i % ACCENTS.length]}"></span><span class="ing-row__txt">${escapeHtml(ingredientText(it, factor))}</span>${miss ? `<span class="ing-miss">manca</span>` : ""}</div>`;
+        })
         .join("")}</div>
-       <button class="btn btn--primary btn--block" id="addToCart" style="margin-top:14px">${iconHtml("shopping-cart-simple")} Aggiungi alla lista della spesa</button>`
+       <button class="btn btn--primary btn--block" id="addToCart" style="margin-top:14px">${iconHtml("shopping-cart-simple")} Aggiungi alla lista della spesa</button>
+       ${missingCount ? `<button class="btn btn--block" id="addMissing" style="margin-top:8px">${iconHtml("basket")} Aggiungi solo i ${missingCount} mancanti</button>` : ""}`
     : `<div class="hint">Nessun ingrediente salvato. Aggiungili con <b>Modifica</b>.</div>`;
 
   const ratingRow = `<div class="rating" id="rating">${[1, 2, 3, 4, 5]
@@ -624,6 +673,16 @@ function renderRecipeDetail() {
       qty: it.qty != null ? it.qty * factor : null,
       category: categorize(it.name)
     }));
+    const res = await store.addShoppingItems(items);
+    toast(shoppingToast(res), "success");
+  });
+
+  const addMissing = root.querySelector("#addMissing");
+  if (addMissing) addMissing.addEventListener("click", async () => {
+    const items = ingredients
+      .filter((it) => !store.inPantry(it.name))
+      .map((it) => ({ name: it.name, unit: it.unit || "", qty: it.qty != null ? it.qty * factor : null, category: categorize(it.name) }));
+    if (!items.length) { toast("Hai già tutto in dispensa", "success"); return; }
     const res = await store.addShoppingItems(items);
     toast(shoppingToast(res), "success");
   });
@@ -783,6 +842,26 @@ function shoppingToast(res) {
 }
 
 // ---------------- Modalità cucina ----------------
+// Estrae le durate citate in un passo (es. "10 minuti", "1 ora e 30", "mezz'ora").
+function parseDurations(text) {
+  let t = " " + String(text || "").toLowerCase() + " ";
+  const mins = [];
+  const seen = new Set();
+  const push = (m) => { m = Math.round(m); if (m >= 1 && m <= 600 && !seen.has(m)) { seen.add(m); mins.push(m); } };
+  t = t.replace(/(\d+)\s*or[ae]\s*(?:e\s*)?(\d+)\s*minut\w*/g, (_, a, b) => { push(+a * 60 + +b); return " "; });
+  t = t.replace(/(\d+)\s*minut\w*/g, (_, a) => { push(+a); return " "; });
+  t = t.replace(/(\d+)\s*min\b/g, (_, a) => { push(+a); return " "; });
+  t = t.replace(/(\d+)\s*or[ae]\b/g, (_, a) => { push(+a * 60); return " "; });
+  t = t.replace(/mezz['\s]?or[ae]/g, () => { push(30); return " "; });
+  t = t.replace(/un['\s]?or[ae]/g, () => { push(60); return " "; });
+  return mins.sort((a, b) => a - b);
+}
+function fmtDur(mins) {
+  if (mins < 60) return mins + " min";
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h + "h" + (m ? " " + m : "");
+}
+
 function openCookingMode(recipe) {
   const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
   if (!steps.length) return;
@@ -878,6 +957,7 @@ function openCookingMode(recipe) {
       <div class="cook__track"><div class="cook__fill" style="width:${((idx + 1) / steps.length) * 100}%"></div></div>
       <div class="cook__body"><div class="cook__step">${escapeHtml(steps[idx])}</div></div>
       <div class="cook__timers" id="ckTimers"></div>
+      ${(() => { const ds = parseDurations(steps[idx]); return ds.length ? `<div class="cook__quick">${ds.map((d) => `<button class="chip" data-qmin="${d}">${iconHtml("timer")} ${fmtDur(d)}</button>`).join("")}</div>` : ""; })()}
       <div class="cook__addtimer">
         <input type="number" id="tMin" min="1" inputmode="numeric" value="5" />
         <input type="text" id="tName" placeholder="Nome (es. pasta)" />
@@ -893,6 +973,7 @@ function openCookingMode(recipe) {
     el.querySelector("#ckPrev").onclick = () => { if (idx > 0) { idx--; draw(); speakStep(); } };
     el.querySelector("#ckNext").onclick = () => { if (idx < steps.length - 1) { idx++; draw(); speakStep(); } else { store.markCooked(recipe.id); close(); } };
     el.querySelector("#tAdd").onclick = () => { addTimer(el.querySelector("#tMin").value, el.querySelector("#tName").value); el.querySelector("#tName").value = ""; };
+    el.querySelectorAll("[data-qmin]").forEach((b) => b.onclick = () => addTimer(parseInt(b.dataset.qmin, 10), "Passo " + (idx + 1)));
     paintTimers();
   }
 
@@ -2109,6 +2190,13 @@ function renderImpostazioni() {
       </div>
       <div class="setting-row">
         <div>
+          <div class="setting-row__label">Diario di cucina</div>
+          <div class="setting-row__desc">Statistiche: piatti più cucinati, ingredienti top…</div>
+        </div>
+        <button class="btn" id="statsBtn">Apri</button>
+      </div>
+      <div class="setting-row">
+        <div>
           <div class="setting-row__label">Tema</div>
           <div class="setting-row__desc">Aspetto chiaro o scuro.</div>
         </div>
@@ -2116,6 +2204,13 @@ function renderImpostazioni() {
           <option value="dark">🌙 Scuro</option>
           <option value="light">☀️ Chiaro</option>
         </select>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-row__label">Colore dell'app</div>
+          <div class="setting-row__desc">Scegli il colore d'accento.</div>
+        </div>
+        <div class="accent-row">${Object.entries(ACCENT_PRESETS).map(([k, a]) => `<button class="accent-sw ${getAccent() === k ? "is-on" : ""}" data-accent="${k}" style="background:${a.p}" title="${a.label}" aria-label="${a.label}"></button>`).join("")}</div>
       </div>
     </div>
     ${notifyGroupHtml()}
@@ -2158,10 +2253,15 @@ function renderImpostazioni() {
 
   root.querySelector("#guideBtn").addEventListener("click", () => openGuide());
   root.querySelector("#changelogBtn").addEventListener("click", () => openChangelog(CHANGELOG, {}));
+  root.querySelector("#statsBtn").addEventListener("click", () => openStats());
 
   const themeSel = root.querySelector("#themeSel");
   themeSel.value = getTheme();
   themeSel.addEventListener("change", () => setTheme(themeSel.value));
+  root.querySelectorAll(".accent-sw").forEach((b) => b.addEventListener("click", () => {
+    setAccent(b.dataset.accent);
+    renderImpostazioni();
+  }));
 
   wireNotify();
 

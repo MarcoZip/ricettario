@@ -732,6 +732,30 @@ a { color: var(--primary-2); }
 .cl-list { margin: 0; padding-left: 18px; }
 .cl-list li { margin: 4px 0; font-size: 0.92rem; line-height: 1.4; }
 
+/* Timer rapidi nei passi (Modalità cucina) */
+.cook__quick { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
+.cook__quick .chip { cursor: pointer; }
+
+/* Ingrediente mancante in dispensa */
+.ing-row__txt { flex: 1; }
+.ing-miss { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; color: #ff8f8f; background: rgba(239, 77, 77, 0.14); border: 1px solid rgba(239, 77, 77, 0.3); border-radius: 999px; padding: 2px 8px; flex-shrink: 0; }
+
+/* Selettore colore d'accento */
+.accent-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.accent-sw { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.accent-sw.is-on { border-color: var(--text); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text); }
+
+/* Diario / statistiche */
+.stat-tiles { display: flex; gap: 10px; margin-bottom: 8px; }
+.stat-tile { flex: 1; background: var(--input-bg); border: 1px solid var(--border); border-radius: 14px; padding: 12px 8px; text-align: center; }
+.stat-num { font-size: 1.5rem; font-weight: 800; color: var(--primary-2); line-height: 1; }
+.stat-lbl { font-size: 0.72rem; color: var(--text-soft); margin-top: 4px; }
+.stat-block { margin-top: 14px; }
+.stat-block__t { font-weight: 800; font-size: 0.9rem; margin-bottom: 6px; }
+.stat-row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); font-size: 0.92rem; }
+.stat-row:last-child { border-bottom: none; }
+.stat-row b { color: var(--primary-2); flex-shrink: 0; }
+
 /* ---------- Lista della spesa ---------- */
 .shop-group { margin-bottom: 18px; }
 .shop-group__title { font-size: 0.74rem; letter-spacing: 0.5px; text-transform: uppercase; color: var(--primary-2); font-weight: 800; margin-bottom: 9px; }

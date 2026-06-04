@@ -4,6 +4,16 @@
 
 export const CHANGELOG = [
   {
+    v: "2.1",
+    d: "2026-06-04",
+    items: [
+      "Diario di cucina: statistiche su piatti più cucinati, ingredienti e strumenti top (in Opzioni).",
+      "In Modalità cucina, i tempi citati nei passi (es. \"10 minuti\") diventano timer da avviare al volo.",
+      "Aprendo una ricetta, gli ingredienti che non hai in dispensa sono segnati \"manca\", con tasto per aggiungere solo i mancanti alla spesa.",
+      "Puoi scegliere il colore dell'app (arancione, rosso, verde, blu, viola, rosa) in Opzioni."
+    ]
+  },
+  {
     v: "2.0",
     d: "2026-06-04",
     items: [
