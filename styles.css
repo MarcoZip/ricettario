@@ -448,6 +448,8 @@ a { color: var(--primary-2); }
   color: var(--text);
 }
 .search-bar input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(255, 122, 61, 0.16); }
+.mic-btn { flex-shrink: 0; padding: 0 15px; font-size: 1.25rem; line-height: 1; }
+.mic-btn.is-listening { color: var(--danger); animation: pulse 1s infinite; }
 .tabs { display: flex; gap: 8px; margin-bottom: 18px; }
 .tab-btn {
   border: 1px solid var(--surface-3); background: var(--surface);

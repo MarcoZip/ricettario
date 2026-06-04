@@ -4,6 +4,16 @@
 
 export const CHANGELOG = [
   {
+    v: "2.0",
+    d: "2026-06-04",
+    items: [
+      "\"Cosa cucino oggi?\": un tocco e l'app pesca una ricetta a caso tra le tue.",
+      "Condividi una ricetta come bella immagine (cartolina) da inviare su WhatsApp.",
+      "Ricerca vocale: tocca il microfono e detta cosa cercare.",
+      "Riepilogo nutrizionale del giorno nel Piano (calorie e macro dei pasti)."
+    ]
+  },
+  {
     v: "1.9",
     d: "2026-06-04",
     items: [

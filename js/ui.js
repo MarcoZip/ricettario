@@ -9,6 +9,7 @@ import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNo
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
 import { importFromUrl } from "./import-recipe.js";
 import { translateRecipe } from "./translate.js";
+import { shareRecipeImage } from "./share-image.js";
 import { isImportConfigured, APP_VERSION } from "./config.js";
 import { CHANGELOG } from "./changelog.js";
 import { fileToDataUrl } from "./image.js";
@@ -331,6 +332,7 @@ function renderStrumenti() {
 
   const total = tools.reduce((s, t) => s + store.countRecipes(t.id), 0);
   const allTags = store.getAllTags();
+  const voiceOK = ("webkitSpeechRecognition" in window) || ("SpeechRecognition" in window);
 
   // Oggi si mangia
   const today = store.getPlanByDate(todayStr()).filter((e) => store.getRecipe(e.recipeId));
@@ -376,7 +378,9 @@ function renderStrumenti() {
     ${banner}
     <div class="search-bar">
       <input type="search" id="homeSearch" placeholder="Cerca tra le tue ricette..." value="${escapeHtml(homeQuery)}" />
+      ${voiceOK ? `<button class="btn mic-btn" id="homeMic" title="Cerca a voce" aria-label="Cerca a voce">🎤</button>` : ""}
     </div>
+    ${total ? `<button class="btn btn--block" id="surpriseBtn" style="margin:4px 0 12px">${iconHtml("shuffle")} Cosa cucino oggi?</button>` : ""}
     <div class="home-tags">${chips}</div>
     <div id="homeBody"></div>
   `;
@@ -396,8 +400,40 @@ function renderStrumenti() {
     homeFilter = homeFilter === c.dataset.filter ? "" : c.dataset.filter; homeQuery = "";
     renderStrumenti();
   }));
+
+  const surprise = root.querySelector("#surpriseBtn");
+  if (surprise) surprise.addEventListener("click", () => {
+    const all = store.getAllRecipes();
+    if (!all.length) { toast("Aggiungi prima qualche ricetta", "error"); return; }
+    const r = all[Math.floor(Math.random() * all.length)];
+    fxBurstFrom(surprise, { emojis: ["🍽️", "🎲", "✨"] });
+    setTimeout(() => openRecipe(r.id), 130);
+  });
+
+  const mic = root.querySelector("#homeMic");
+  if (mic) mic.addEventListener("click", () => startVoiceSearch());
+
   renderHomeBody();
   countUp(root.querySelector("#heroNum"), total);
+}
+
+// Ricerca vocale (it-IT): detta il termine, l'app cerca tra le ricette.
+function startVoiceSearch() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  const mic = root.querySelector("#homeMic");
+  const rec = new SR();
+  rec.lang = "it-IT";
+  rec.interimResults = false;
+  rec.maxAlternatives = 1;
+  if (mic) mic.classList.add("is-listening");
+  rec.onresult = (e) => {
+    const text = ((e.results[0] && e.results[0][0] && e.results[0][0].transcript) || "").trim();
+    if (text) { homeQuery = text; homeFilter = ""; renderStrumenti(); }
+  };
+  rec.onerror = (e) => { if (e && e.error !== "aborted" && e.error !== "no-speech") toast("Non ho capito, riprova", "error"); };
+  rec.onend = () => { const m = root.querySelector("#homeMic"); if (m) m.classList.remove("is-listening"); };
+  try { rec.start(); } catch (e) { /* già in ascolto */ }
 }
 
 // ---------------- Schermata: dettaglio strumento ----------------
@@ -557,6 +593,7 @@ function renderRecipeDetail() {
     ${r.notes ? `<div class="section-card"><h3 class="section-title">${iconHtml("note-pencil")} Note</h3><div class="recipe-item__notes" style="margin-top:0">${escapeHtml(r.notes)}</div></div>` : ""}
 
     <button class="btn btn--block" id="cookedBtn" style="margin-bottom:10px">${iconHtml("fire")} Segna come cucinata${r.cookCount ? ` · ${r.cookCount} ${r.cookCount === 1 ? "volta" : "volte"}` : ""}</button>
+    <button class="btn btn--block" id="shareImg" style="margin-bottom:10px">${iconHtml("image")} Condividi come immagine</button>
     <div style="display:flex;gap:8px;margin-top:4px">
       <button class="btn btn--ghost" id="editRecipe">${iconHtml("pencil-simple")} Modifica</button>
       <button class="btn btn--ghost" id="shareRecipe">${iconHtml("arrow-square-out")} Condividi</button>
@@ -595,6 +632,19 @@ function renderRecipeDetail() {
   if (cookBtn) cookBtn.addEventListener("click", () => openCookingMode(r));
 
   root.querySelector("#cookedBtn").addEventListener("click", async (e) => { fxBurstFrom(e.currentTarget); await store.markCooked(r.id); toast("Segnata come cucinata 🔥", "success"); });
+
+  const shareImgBtn = root.querySelector("#shareImg");
+  if (shareImgBtn) shareImgBtn.addEventListener("click", async () => {
+    const old = shareImgBtn.innerHTML;
+    shareImgBtn.disabled = true;
+    shareImgBtn.innerHTML = `${iconHtml("image")} Preparo l'immagine...`;
+    try {
+      const lines = ingredients.map((it) => ingredientText(it, factor));
+      const res = await shareRecipeImage(r, tool ? tool.name : "", lines);
+      if (res === "downloaded") toast("Immagine salvata", "success");
+    } catch (e) { toast("Impossibile creare l'immagine", "error"); }
+    shareImgBtn.disabled = false; shareImgBtn.innerHTML = old;
+  });
 
   root.querySelector("#editRecipe").addEventListener("click", () => openRecipeForm({ recipe: r }));
   root.querySelector("#shareRecipe").addEventListener("click", async () => {
@@ -1686,6 +1736,23 @@ function dayRowHtml(e) {
   </div>`;
 }
 
+// Somma stimata di calorie/macro dei pasti del giorno (per porzione a pasto).
+function dayNutrition(entries) {
+  const t = { kcal: 0, p: 0, c: 0, f: 0 };
+  let counted = 0, total = 0;
+  for (const e of entries) {
+    const r = store.getRecipe(e.recipeId);
+    if (!r) continue;
+    total++;
+    const n = r.nutrition;
+    if (!n) continue;
+    const base = r.servings || 1;
+    t.kcal += n.kcal / base; t.p += n.p / base; t.c += n.c / base; t.f += n.f / base;
+    counted++;
+  }
+  return { kcal: Math.round(t.kcal), p: Math.round(t.p), c: Math.round(t.c), f: Math.round(t.f), counted, total };
+}
+
 function openDaySheet(date) {
   const entries = store.getPlanByDate(date);
   let groupsHtml = "";
@@ -1699,9 +1766,18 @@ function openDaySheet(date) {
     groupsHtml = `<div class="hint">Nessuna ricetta per questo giorno.</div>`;
   }
 
+  // Riepilogo nutrizionale stimato della giornata (1 porzione per pasto).
+  const dn = dayNutrition(entries);
+  const nutriHtml = dn.counted
+    ? `<div class="nutri-box" style="margin-top:6px">
+        <div class="nutri-row"><span class="nutri-lbl">${iconHtml("carrot")} Stima del giorno</span><span class="nutri-val"><b>${dn.kcal}</b> kcal · P ${dn.p} · C ${dn.c} · G ${dn.f}</span></div>
+      </div>${dn.counted < dn.total ? `<div class="hint" style="margin-top:4px">${dn.total - dn.counted} pasti senza valori (calcolali nella ricetta).</div>` : ""}`
+    : "";
+
   const m = openModal(`
     <h3 class="modal__title">${formatDateLong(date)}</h3>
     <div id="dayRows">${groupsHtml}</div>
+    ${nutriHtml}
     <div style="display:flex;gap:8px;margin-top:14px">
       <button class="btn btn--primary" style="flex:1" data-slot="pranzo">${iconHtml("plus")} Pranzo</button>
       <button class="btn btn--primary" style="flex:1" data-slot="cena">${iconHtml("plus")} Cena</button>
