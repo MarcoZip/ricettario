@@ -89,6 +89,15 @@ async function startCloud() {
   };
   // Salva il nickname anche sull'account (sincronizzato tra dispositivi).
   ui.handlers.onSetNickname = async (nick) => { try { await auth.setDisplayName(nick); } catch (e) { /* ignora */ } };
+  ui.handlers.onSendReset = async (email) => {
+    try { await auth.sendReset(email); } catch (e) { throw new Error(auth.authErrorMessage(e)); }
+  };
+  ui.handlers.onChangeEmail = async (newEmail, pass) => {
+    try { await auth.changeEmail(newEmail, pass); } catch (e) { throw new Error(auth.authErrorMessage(e)); }
+  };
+  ui.handlers.onChangePassword = async (newPass, pass) => {
+    try { await auth.changePassword(newPass, pass); } catch (e) { throw new Error(auth.authErrorMessage(e)); }
+  };
 
   // Reagisce ai cambi di stato dell'accesso.
   await auth.observeAuth(async (user) => {

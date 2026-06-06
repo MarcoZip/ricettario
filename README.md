@@ -144,6 +144,20 @@ con un *Cron Trigger*. È gratuito.
 
 ---
 
+## (Admin) Avvisare tutti di una novità (notifica push)
+
+L'amministratore può inviare una notifica push a **tutti** gli utenti iscritti
+(Opzioni → "Avvisa tutti"). Serve una chiave segreta sul worker push:
+
+1. Worker **fornelli-push** → **Settings → Variables and Secrets** → **Add** →
+   tipo **Secret**: nome **`ADMIN_KEY`**, valore = una password a tua scelta.
+2. Ripubblica il worker con il codice aggiornato di `worker/push-sender.js`
+   (ha il nuovo endpoint `/broadcast`).
+3. Nell'app, in "Avvisa tutti", inserisci quella stessa chiave (viene ricordata
+   sul tuo dispositivo). Gli utenti la riceveranno come notifica.
+
+---
+
 ## (Admin) Statistiche accessi
 
 L'app registra gli accessi di ogni utente in Firestore (`accessStats/{uid}`) e

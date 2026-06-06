@@ -56,6 +56,39 @@ export async function logout() {
   await mod.signOut(auth);
 }
 
+export function currentEmail() {
+  return authInstance && authInstance.currentUser ? (authInstance.currentUser.email || "") : "";
+}
+
+// Invia l'email per reimpostare la password (password dimenticata).
+export async function sendReset(email) {
+  const auth = await ensureApp();
+  await mod.sendPasswordResetEmail(auth, email);
+}
+
+// Ri-autentica con la password attuale (richiesto prima di cambi sensibili).
+async function reauth(currentPassword) {
+  const auth = await ensureApp();
+  const u = auth.currentUser;
+  if (!u || !u.email) throw new Error("Non sei connesso.");
+  const cred = mod.EmailAuthProvider.credential(u.email, currentPassword);
+  await mod.reauthenticateWithCredential(u, cred);
+}
+
+// Cambia email: invia un link di conferma al NUOVO indirizzo (poi diventa attivo).
+export async function changeEmail(newEmail, currentPassword) {
+  const auth = await ensureApp();
+  await reauth(currentPassword);
+  if (mod.verifyBeforeUpdateEmail) await mod.verifyBeforeUpdateEmail(auth.currentUser, newEmail);
+  else await mod.updateEmail(auth.currentUser, newEmail);
+}
+
+export async function changePassword(newPassword, currentPassword) {
+  const auth = await ensureApp();
+  await reauth(currentPassword);
+  await mod.updatePassword(auth.currentUser, newPassword);
+}
+
 // Traduce i codici di errore Firebase in messaggi in italiano.
 export function authErrorMessage(err) {
   const code = err && err.code ? err.code : "";
@@ -68,7 +101,10 @@ export function authErrorMessage(err) {
     "auth/email-already-in-use": "Esiste già un account con questa email.",
     "auth/weak-password": "La password deve avere almeno 6 caratteri.",
     "auth/network-request-failed": "Connessione assente. Riprova quando sei online.",
-    "auth/too-many-requests": "Troppi tentativi. Attendi qualche minuto."
+    "auth/too-many-requests": "Troppi tentativi. Attendi qualche minuto.",
+    "auth/requires-recent-login": "Per sicurezza, esci e rientra, poi riprova.",
+    "auth/missing-password": "Inserisci la password.",
+    "auth/operation-not-allowed": "Operazione non consentita dal provider."
   };
   return map[code] || "Si è verificato un errore. Riprova.";
 }

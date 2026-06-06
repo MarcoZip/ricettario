@@ -13,7 +13,7 @@ import { shareRecipeImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
 import { estimateCost } from "./cost.js";
 import { getNickname, setNickname } from "./profile.js";
-import { isImportConfigured, APP_VERSION } from "./config.js";
+import { isImportConfigured, APP_VERSION, PUSH_WORKER_URL } from "./config.js";
 import { CHANGELOG } from "./changelog.js";
 import { fileToDataUrl } from "./image.js";
 import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS } from "./theme.js";
@@ -103,6 +103,10 @@ export const handlers = {
   onLogin: async () => {},
   onSignup: async () => {},
   onLogout: async () => {},
+  onSetNickname: async () => {},
+  onSendReset: async () => {},
+  onChangeEmail: async () => {},
+  onChangePassword: async () => {},
   getAccountInfo: () => ({ cloud: false, configured: false, email: null })
 };
 
@@ -239,6 +243,87 @@ function openNicknamePrompt() {
   };
 }
 
+function openChangeNickname() {
+  const m = openModal(`
+    <h3 class="modal__title">Cambia nickname</h3>
+    <div class="field"><input type="text" id="nkInput" placeholder="Es. Paola" value="${escapeHtml(getNickname())}" /></div>
+    <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button><button class="btn btn--primary" data-act="save">Salva</button></div>
+  `);
+  setTimeout(() => { const i = m.el.querySelector("#nkInput"); if (i) i.focus(); }, 50);
+  m.el.querySelector('[data-act="cancel"]').onclick = m.close;
+  m.el.querySelector('[data-act="save"]').onclick = () => {
+    const n = (m.el.querySelector("#nkInput").value || "").trim();
+    setNickname(n);
+    if (n && handlers.onSetNickname) handlers.onSetNickname(n);
+    m.close();
+    toast("Nickname aggiornato", "success");
+    render();
+  };
+}
+
+function openChangeEmail() {
+  const m = openModal(`
+    <h3 class="modal__title">Cambia email</h3>
+    <div class="field"><label>Nuova email</label><input type="email" id="ceNew" inputmode="email" placeholder="nuova@esempio.it" /></div>
+    <div class="field"><label>Password attuale</label><input type="password" id="cePass" autocomplete="current-password" placeholder="••••••" /></div>
+    <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button><button class="btn btn--primary" data-act="save">Cambia</button></div>
+  `);
+  m.el.querySelector('[data-act="cancel"]').onclick = m.close;
+  m.el.querySelector('[data-act="save"]').onclick = async () => {
+    const email = m.el.querySelector("#ceNew").value.trim();
+    const pass = m.el.querySelector("#cePass").value;
+    if (!email || !pass) { toast("Compila tutti i campi", "error"); return; }
+    const btn = m.el.querySelector('[data-act="save"]'); btn.disabled = true; btn.textContent = "Attendere…";
+    try {
+      await handlers.onChangeEmail(email, pass);
+      m.close();
+      toast("Ti ho inviato una mail al nuovo indirizzo: confermala per attivarlo.", "success");
+    } catch (e) { toast(e.message || "Errore", "error"); btn.disabled = false; btn.textContent = "Cambia"; }
+  };
+}
+
+function openChangePassword() {
+  const m = openModal(`
+    <h3 class="modal__title">Cambia password</h3>
+    <div class="field"><label>Password attuale</label><input type="password" id="cpOld" autocomplete="current-password" placeholder="••••••" /></div>
+    <div class="field"><label>Nuova password</label><input type="password" id="cpNew" autocomplete="new-password" placeholder="almeno 6 caratteri" /></div>
+    <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button><button class="btn btn--primary" data-act="save">Cambia</button></div>
+  `);
+  m.el.querySelector('[data-act="cancel"]').onclick = m.close;
+  m.el.querySelector('[data-act="save"]').onclick = async () => {
+    const oldP = m.el.querySelector("#cpOld").value;
+    const newP = m.el.querySelector("#cpNew").value;
+    if (!oldP || !newP) { toast("Compila tutti i campi", "error"); return; }
+    if (newP.length < 6) { toast("La nuova password deve avere almeno 6 caratteri", "error"); return; }
+    const btn = m.el.querySelector('[data-act="save"]'); btn.disabled = true; btn.textContent = "Attendere…";
+    try {
+      await handlers.onChangePassword(newP, oldP);
+      m.close();
+      toast("Password aggiornata", "success");
+    } catch (e) { toast(e.message || "Errore", "error"); btn.disabled = false; btn.textContent = "Cambia"; }
+  };
+}
+
+function openForgotPassword(prefillEmail) {
+  const m = openModal(`
+    <h3 class="modal__title">Password dimenticata</h3>
+    <p class="hint" style="margin-top:-6px">Inserisci la tua email: ti invieremo un link per reimpostarla.</p>
+    <div class="field"><input type="email" id="fpEmail" inputmode="email" placeholder="email@esempio.it" value="${escapeHtml(prefillEmail || "")}" /></div>
+    <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button><button class="btn btn--primary" data-act="send">Invia</button></div>
+  `);
+  m.el.querySelector('[data-act="cancel"]').onclick = m.close;
+  m.el.querySelector('[data-act="send"]').onclick = async () => {
+    const email = m.el.querySelector("#fpEmail").value.trim();
+    if (!email) { toast("Inserisci l'email", "error"); return; }
+    const btn = m.el.querySelector('[data-act="send"]'); btn.disabled = true; btn.textContent = "Invio…";
+    try {
+      await handlers.onSendReset(email);
+      m.close();
+      toast("Email inviata! Controlla la posta (anche lo spam).", "success");
+    } catch (e) { toast(e.message || "Errore", "error"); btn.disabled = false; btn.textContent = "Invia"; }
+  };
+}
+
 function changelogHtml(entries) {
   return entries.map((c) => `
     <div class="cl-entry">
@@ -343,6 +428,45 @@ async function openAccessStats() {
     if (ss) { ss.value = sort; ss.onchange = () => { sort = ss.value; draw(); }; }
   };
   draw();
+}
+
+// (Admin) Invia una notifica push a tutti gli utenti per annunciare una novità.
+function openBroadcast() {
+  const latest = CHANGELOG.find((c) => !c.minor);
+  const defBody = latest ? latest.items.join(" ") : "C'è una novità in Fornelli, dai un'occhiata!";
+  let savedKey = ""; try { savedKey = localStorage.getItem("ricettario.adminKey") || ""; } catch (e) {}
+  const m = openModal(`
+    <h3 class="modal__title">📣 Avvisa tutti di una novità</h3>
+    <p class="hint" style="margin-top:-6px">Invia una notifica push a tutti gli utenti iscritti, per invogliarli ad aprire l'app.</p>
+    <div class="field"><label>Titolo</label><input type="text" id="bcTitle" value="Novità in Fornelli ✨" /></div>
+    <div class="field"><label>Messaggio</label><textarea id="bcBody">${escapeHtml(defBody)}</textarea></div>
+    <div class="field"><label>Chiave admin</label><input type="password" id="bcKey" value="${escapeHtml(savedKey)}" placeholder="la chiave segreta del worker" /></div>
+    <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button><button class="btn btn--primary" data-act="send">Invia a tutti</button></div>
+  `);
+  m.el.querySelector('[data-act="cancel"]').onclick = m.close;
+  m.el.querySelector('[data-act="send"]').onclick = async () => {
+    const title = m.el.querySelector("#bcTitle").value.trim() || "Fornelli";
+    const body = m.el.querySelector("#bcBody").value.trim();
+    const key = m.el.querySelector("#bcKey").value.trim();
+    if (!key) { toast("Inserisci la chiave admin", "error"); return; }
+    if (!PUSH_WORKER_URL) { toast("Le push non sono configurate", "error"); return; }
+    try { localStorage.setItem("ricettario.adminKey", key); } catch (e) {}
+    const btn = m.el.querySelector('[data-act="send"]'); btn.disabled = true; btn.textContent = "Invio…";
+    try {
+      const res = await fetch(PUSH_WORKER_URL.replace(/\/$/, "") + "/broadcast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-key": key },
+        body: JSON.stringify({ title, body })
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const j = await res.json();
+      m.close();
+      toast(`Notifica inviata a ${j.sent} utenti`, "success");
+    } catch (e) {
+      toast("Invio non riuscito (chiave errata o worker da aggiornare).", "error");
+      btn.disabled = false; btn.textContent = "Invia a tutti";
+    }
+  };
 }
 
 // Convertitore da cucina: quantità (tazze/cucchiai/ml/g) e temperatura.
@@ -2552,6 +2676,20 @@ function renderImpostazioni() {
         </div>
         <div class="setting-row">
           <div>
+            <div class="setting-row__label">Cambia email</div>
+            <div class="setting-row__desc">Aggiorna l'indirizzo dell'account.</div>
+          </div>
+          <button class="btn" id="chEmailBtn">Cambia</button>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-row__label">Cambia password</div>
+            <div class="setting-row__desc">Imposta una nuova password.</div>
+          </div>
+          <button class="btn" id="chPassBtn">Cambia</button>
+        </div>
+        <div class="setting-row">
+          <div>
             <div class="setting-row__label">Backup nel cloud attivo ${iconHtml("cloud-check")}</div>
             <div class="setting-row__desc">Le ricette si sincronizzano automaticamente.</div>
           </div>
@@ -2592,12 +2730,26 @@ function renderImpostazioni() {
         </div>
         <button class="btn" id="convBtn">Apri</button>
       </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-row__label">Nickname</div>
+          <div class="setting-row__desc">${getNickname() ? "Come ti salutiamo: " + escapeHtml(getNickname()) : "Scegli come farti salutare."}</div>
+        </div>
+        <button class="btn" id="nickBtn">Cambia</button>
+      </div>
       ${info.email === ADMIN_EMAIL ? `<div class="setting-row">
         <div>
           <div class="setting-row__label">Accessi utenti (admin)</div>
           <div class="setting-row__desc">Statistiche sugli accessi di tutti gli utenti.</div>
         </div>
         <button class="btn" id="accStatsBtn">Apri</button>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-row__label">Avvisa tutti (admin)</div>
+          <div class="setting-row__desc">Invia una notifica push per annunciare una novità.</div>
+        </div>
+        <button class="btn" id="bcastBtn">Invia</button>
       </div>` : ""}
       <div class="setting-row">
         <div>
@@ -2666,8 +2818,15 @@ function renderImpostazioni() {
   root.querySelector("#changelogBtn").addEventListener("click", () => openChangelog(CHANGELOG, {}));
   root.querySelector("#statsBtn").addEventListener("click", () => openStats());
   root.querySelector("#convBtn").addEventListener("click", () => openConverter());
+  root.querySelector("#nickBtn").addEventListener("click", () => openChangeNickname());
+  const chEmailBtn = root.querySelector("#chEmailBtn");
+  if (chEmailBtn) chEmailBtn.addEventListener("click", () => openChangeEmail());
+  const chPassBtn = root.querySelector("#chPassBtn");
+  if (chPassBtn) chPassBtn.addEventListener("click", () => openChangePassword());
   const accStatsBtn = root.querySelector("#accStatsBtn");
   if (accStatsBtn) accStatsBtn.addEventListener("click", () => openAccessStats());
+  const bcastBtn = root.querySelector("#bcastBtn");
+  if (bcastBtn) bcastBtn.addEventListener("click", () => openBroadcast());
 
   const themeSel = root.querySelector("#themeSel");
   themeSel.value = getTheme();
@@ -2757,6 +2916,7 @@ export function renderLogin() {
         <button class="btn btn--ghost btn--block" id="toggleMode" style="margin-top:10px">
           ${isRegister ? "Hai già un account? Accedi" : "Non hai un account? Registrati"}
         </button>
+        ${isRegister ? "" : `<button class="btn btn--ghost btn--block" id="forgotBtn" style="margin-top:4px;color:var(--text-soft)">Password dimenticata?</button>`}
       </div>
     `;
     const submit = async () => {
@@ -2779,6 +2939,8 @@ export function renderLogin() {
     root.querySelector("#loginSubmit").addEventListener("click", submit);
     root.querySelector("#loginPass").addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
     root.querySelector("#toggleMode").addEventListener("click", () => { isRegister = !isRegister; draw(); });
+    const forgot = root.querySelector("#forgotBtn");
+    if (forgot) forgot.addEventListener("click", () => openForgotPassword(root.querySelector("#loginEmail").value.trim()));
   };
   draw();
 }

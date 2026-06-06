@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    v: "2.9",
+    d: "2026-06-04",
+    minor: true,
+    items: [
+      "In Opzioni puoi cambiare email, password e nickname.",
+      "Password dimenticata? Dalla schermata di accesso puoi reimpostarla via email."
+    ]
+  },
+  {
     v: "2.8",
     d: "2026-06-04",
     minor: true,

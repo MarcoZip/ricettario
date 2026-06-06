@@ -19,7 +19,7 @@ const VAPID_SUBJECT = "mailto:marcozeta73@gmail.com";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type"
+  "Access-Control-Allow-Headers": "Content-Type, x-admin-key"
 };
 
 // ---------- utilità base64url / byte ----------
@@ -135,6 +135,31 @@ async function handleUnregister(request, env) {
   return new Response(JSON.stringify({ ok: true }), { headers: { ...CORS, "Content-Type": "application/json" } });
 }
 
+// Invia una notifica a TUTTI gli iscritti (solo admin, via header x-admin-key).
+async function handleBroadcast(request, env) {
+  if (!env.ADMIN_KEY || request.headers.get("x-admin-key") !== env.ADMIN_KEY) {
+    return new Response("Non autorizzato", { status: 401, headers: CORS });
+  }
+  const data = await request.json();
+  const msg = { title: data.title || "Fornelli", body: data.body || "", url: "./" };
+  let sent = 0, removed = 0, cursor;
+  do {
+    const list = await env.PUSH_KV.list({ prefix: "sub:", cursor });
+    cursor = list.list_complete ? null : list.cursor;
+    for (const k of list.keys) {
+      const raw = await env.PUSH_KV.get(k.name);
+      if (!raw) continue;
+      const entry = JSON.parse(raw);
+      try {
+        const status = await sendPush(entry.subscription, msg, env.VAPID_PRIVATE);
+        if (status === 404 || status === 410) { await env.PUSH_KV.delete(k.name); removed++; }
+        else sent++;
+      } catch (e) { /* salta */ }
+    }
+  } while (cursor);
+  return new Response(JSON.stringify({ ok: true, sent, removed }), { headers: { ...CORS, "Content-Type": "application/json" } });
+}
+
 // Cron: invia i promemoria scaduti e li rimuove; elimina le iscrizioni morte.
 async function runScheduled(env) {
   const now = Date.now();
@@ -181,6 +206,7 @@ export default {
     try {
       if (request.method === "POST" && url.pathname === "/register") return await handleRegister(request, env);
       if (request.method === "POST" && url.pathname === "/unregister") return await handleUnregister(request, env);
+      if (request.method === "POST" && url.pathname === "/broadcast") return await handleBroadcast(request, env);
       if (url.pathname === "/" || url.pathname === "/health") {
         return new Response("Fornelli push worker attivo", { headers: CORS });
       }
