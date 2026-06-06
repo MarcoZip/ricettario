@@ -4,6 +4,15 @@
 
 export const CHANGELOG = [
   {
+    v: "2.3",
+    d: "2026-06-04",
+    items: [
+      "Convertitore in cucina (Opzioni): tazze, cucchiai, grammi, °C/°F e pesi degli ingredienti.",
+      "Allergeni sulle ricette (glutine, lattosio, uova…) con badge e filtri 'Senza glutine' / 'Senza lattosio'.",
+      "\"Menù settimana\": riempie le cene pescando dai preferiti senza ripetere e prepara la spesa."
+    ]
+  },
+  {
     v: "2.2",
     d: "2026-06-04",
     items: [

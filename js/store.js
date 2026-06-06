@@ -117,7 +117,7 @@ export async function deleteTool(id) {
   await adapter.deleteTool(id);
 }
 
-export async function addRecipe({ toolId, title, url, notes, ingredients, servings, steps, favorite, rating, photo, tags, time }) {
+export async function addRecipe({ toolId, title, url, notes, ingredients, servings, steps, favorite, rating, photo, tags, time, allergens }) {
   await adapter.addRecipe({
     id: newId(),
     toolId,
@@ -127,6 +127,7 @@ export async function addRecipe({ toolId, title, url, notes, ingredients, servin
     ingredients: Array.isArray(ingredients) ? ingredients : [],
     servings: servings || null,
     time: time || null,
+    allergens: Array.isArray(allergens) ? allergens : [],
     steps: Array.isArray(steps) ? steps : [],
     favorite: Boolean(favorite),
     rating: rating || 0,

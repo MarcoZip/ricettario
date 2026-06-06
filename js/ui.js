@@ -17,6 +17,7 @@ import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS } from "./them
 
 // Tag suggeriti nel form ricetta.
 const TAG_SUGGESTIONS = ["Primi", "Secondi", "Contorni", "Antipasti", "Dolci", "Colazione", "Merenda", "Zuppe", "Insalate", "Lievitati", "Veloce", "Vegetariano", "Vegano", "Pesce", "Carne", "Senza glutine", "Per ospiti", "Bambini"];
+const ALLERGENS = ["Glutine", "Lattosio", "Uova", "Frutta a guscio", "Arachidi", "Pesce", "Crostacei", "Soia", "Sedano"];
 
 // Animazioni: rispetta la preferenza di sistema "riduci animazioni".
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -234,6 +235,57 @@ function exportRecipesPdf() {
   w.document.open(); w.document.write(html); w.document.close();
 }
 
+// Convertitore da cucina: quantità (tazze/cucchiai/ml/g) e temperatura.
+function openConverter() {
+  const U = { cucchiaino: 5, cucchiaio: 15, tazza: 240, bicchiere: 200, ml: 1, cl: 10, dl: 100, l: 1000, g: 1, kg: 1000 };
+  const opts = Object.keys(U).map((u) => `<option value="${u}">${u}</option>`).join("");
+  const m = openModal(`
+    <h3 class="modal__title">${iconHtml("jar")} Convertitore</h3>
+    <div class="field">
+      <label>Quantità</label>
+      <div class="conv-line">
+        <input type="text" id="cvAmt" inputmode="decimal" value="1" />
+        <select id="cvFrom" class="mini-select">${opts}</select>
+        <span class="conv-arrow">→</span>
+        <select id="cvTo" class="mini-select">${opts}</select>
+      </div>
+      <div id="cvRes" class="conv-res"></div>
+      <div class="hint" style="margin-top:0">Per i liquidi 1 ml ≈ 1 g.</div>
+    </div>
+    <div class="field">
+      <label>Temperatura</label>
+      <div class="conv-line">
+        <input type="text" id="cvT" inputmode="decimal" value="180" />
+        <select id="cvTU" class="mini-select"><option value="C">°C → °F</option><option value="F">°F → °C</option></select>
+      </div>
+      <div id="cvTRes" class="conv-res"></div>
+    </div>
+    <div class="field">
+      <label>1 tazza di… (circa)</label>
+      <div class="hint" style="line-height:1.7;margin-top:0">Farina 120 g · Zucchero 200 g · Zucchero a velo 130 g · Riso 190 g · Burro 225 g · Cacao 100 g · Latte/acqua 240 g</div>
+    </div>
+    <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
+  `);
+  m.el.querySelector("#cvFrom").value = "tazza";
+  m.el.querySelector("#cvTo").value = "g";
+  const round = (n) => Math.round(n * 100) / 100;
+  const calc = () => {
+    const a = parseFloat((m.el.querySelector("#cvAmt").value || "").replace(",", ".")) || 0;
+    const f = U[m.el.querySelector("#cvFrom").value], t = U[m.el.querySelector("#cvTo").value];
+    m.el.querySelector("#cvRes").textContent = `= ${round(a * f / t)} ${m.el.querySelector("#cvTo").value}`;
+  };
+  const calcT = () => {
+    const v = parseFloat((m.el.querySelector("#cvT").value || "").replace(",", ".")) || 0;
+    const mode = m.el.querySelector("#cvTU").value;
+    const r = mode === "C" ? v * 9 / 5 + 32 : (v - 32) * 5 / 9;
+    m.el.querySelector("#cvTRes").textContent = `= ${Math.round(r * 10) / 10} °${mode === "C" ? "F" : "C"}`;
+  };
+  m.el.querySelectorAll("#cvAmt,#cvFrom,#cvTo").forEach((e) => e.addEventListener("input", calc));
+  m.el.querySelectorAll("#cvT,#cvTU").forEach((e) => e.addEventListener("input", calcT));
+  m.el.querySelector('[data-act="ok"]').onclick = m.close;
+  calc(); calcT();
+}
+
 // Diario e statistiche di cucina (dai dati già raccolti).
 function openStats() {
   const recipes = store.getAllRecipes();
@@ -365,6 +417,8 @@ function renderHomeBody() {
     else if (homeFilter === "recent") { results = store.getRecentCooked(); emptyIcon = "timer"; emptyMsg = "Niente cucinato di recente."; }
     else if (homeFilter === "t15") { results = store.getAllRecipes().filter((r) => r.time && r.time <= 15); emptyIcon = "timer"; emptyMsg = "Nessuna ricetta entro 15 minuti. Aggiungi il tempo nelle ricette (modifica)."; }
     else if (homeFilter === "t30") { results = store.getAllRecipes().filter((r) => r.time && r.time <= 30); emptyIcon = "timer"; emptyMsg = "Nessuna ricetta entro 30 minuti. Aggiungi il tempo nelle ricette (modifica)."; }
+    else if (homeFilter === "ng") { results = store.getAllRecipes().filter((r) => !(r.allergens || []).includes("Glutine")); emptyIcon = "carrot"; emptyMsg = "Nessuna ricetta senza glutine. Segna gli allergeni nelle ricette (modifica)."; }
+    else if (homeFilter === "nl") { results = store.getAllRecipes().filter((r) => !(r.allergens || []).includes("Lattosio")); emptyIcon = "carrot"; emptyMsg = "Nessuna ricetta senza lattosio. Segna gli allergeni nelle ricette (modifica)."; }
     else results = store.getByTag(homeFilter);
     body.innerHTML = results.length
       ? results.map((r, i) => recipeResultRow(r, i)).join("")
@@ -440,6 +494,8 @@ function renderStrumenti() {
     { k: "recent", label: "Di recente", icon: "timer" },
     { k: "t15", label: "≤15 min", icon: "timer" },
     { k: "t30", label: "≤30 min", icon: "timer" },
+    { k: "ng", label: "Senza glutine", icon: "carrot" },
+    { k: "nl", label: "Senza lattosio", icon: "carrot" },
     { k: "menu", label: "Menu", icon: "book-bookmark" }
   ];
   const chips = specials.map((s) => `<button class="filter-chip ${homeFilter === s.k ? "is-on" : ""}" data-filter="${s.k}">${iconHtml(s.icon)} ${s.label}</button>`).join("") +
@@ -662,6 +718,7 @@ function renderRecipeDetail() {
       ${ratingRow}
     </div>
     ${(tagsArr.length || r.time) ? `<div class="tag-row">${r.time ? `<span class="tagchip tagchip--ro">${iconHtml("timer")} ${r.time} min</span>` : ""}${tagsArr.map((t) => `<span class="tagchip tagchip--ro">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
+    ${Array.isArray(r.allergens) && r.allergens.length ? `<div class="tag-row">${r.allergens.map((a) => `<span class="tagchip tagchip--allerg">⚠ ${escapeHtml(a)}</span>`).join("")}</div>` : ""}
     ${url ? `<a class="btn btn--block" id="openLink" href="${escapeHtml(url)}" target="_blank" rel="noopener" style="margin-bottom:16px">${iconHtml("arrow-square-out")} Apri la ricetta</a>` : ""}
 
     <div class="section-card">
@@ -1192,6 +1249,7 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
     : (prefill && prefill.steps ? prefill.steps.join("\n") : "");
   let photo = recipe ? (recipe.photo || "") : (prefill && prefill.image ? prefill.image : "");
   let tags = recipe ? [...(recipe.tags || [])] : [];
+  let allergens = recipe ? [...(recipe.allergens || [])] : [];
 
   const importBtn = isImportConfigured()
     ? `<button type="button" class="btn btn--ghost" id="rImport" style="margin-top:8px">${iconHtml("download-simple")} Importa ingredienti dal link</button>`
@@ -1217,6 +1275,10 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       <div class="tagedit" id="tagEdit"></div>
       <input type="text" id="rTagInput" placeholder="Aggiungi e premi Invio" />
       <div class="tag-suggest" id="tagSuggest"></div>
+    </div>
+    <div class="field">
+      <label>Allergeni (facoltativi)</label>
+      <div class="tag-suggest" id="allergEdit">${ALLERGENS.map((a) => `<button type="button" class="tag-add allerg-chip${allergens.includes(a) ? " is-on" : ""}" data-allerg="${escapeHtml(a)}">${escapeHtml(a)}</button>`).join("")}</div>
     </div>
     <div class="field">
       <label>Link della ricetta (facoltativo)</label>
@@ -1299,6 +1361,14 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
   });
   renderTags();
 
+  // --- Allergeni (toggle) ---
+  m.el.querySelectorAll("#allergEdit .allerg-chip").forEach((b) => b.addEventListener("click", () => {
+    const a = b.dataset.allerg;
+    const i = allergens.indexOf(a);
+    if (i >= 0) allergens.splice(i, 1); else allergens.push(a);
+    b.classList.toggle("is-on");
+  }));
+
   // --- OCR: scansiona da una foto ---
   const ocrBtn = m.el.querySelector("#rOcr");
   const ocrFile = m.el.querySelector("#rOcrFile");
@@ -1354,7 +1424,8 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       time: parseInt(m.el.querySelector("#rTime").value, 10) || null,
       steps: m.el.querySelector("#rSteps").value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean),
       photo: photo,
-      tags: tags
+      tags: tags,
+      allergens: allergens
     };
     if (!data.title) { toast("Inserisci un titolo", "error"); return; }
     // Se cambiano gli ingredienti o le porzioni, la stima nutrizionale salvata
@@ -1882,6 +1953,7 @@ function renderPlanWeek() {
     <div class="week-list">${cards}</div>
     <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
       <button class="btn btn--ghost" id="weekToday">Oggi</button>
+      <button class="btn btn--primary" id="genWeek">${iconHtml("sparkle")} Menù settimana</button>
       <button class="btn btn--ghost" id="fillWeek">${iconHtml("sparkle")} Riempi le cene</button>
       <button class="btn btn--ghost" id="weekShop">${iconHtml("shopping-cart-simple")} Spesa settimana</button>
     </div>
@@ -1916,6 +1988,32 @@ function renderPlanWeek() {
     if (!entries.length) { toast("Nessuna ricetta pianificata questa settimana", "error"); return; }
     const res = await store.addShoppingItems(collectIngredients(entries));
     toast(shoppingToast(res), "success");
+  });
+
+  // Menù settimana: riempie le cene vuote pescando dai preferiti (poi da tutte),
+  // senza ripetere, e genera la spesa della settimana.
+  root.querySelector("#genWeek").addEventListener("click", async () => {
+    const recipes = allRecipes();
+    if (!recipes.length) { toast("Aggiungi prima qualche ricetta", "error"); return; }
+    const favs = recipes.filter((r) => r.favorite);
+    const base = favs.length >= 3 ? favs : recipes;
+    const used = new Set();
+    let added = 0;
+    for (const d of days) {
+      const ds = ymd(d.getFullYear(), d.getMonth(), d.getDate());
+      if (store.getPlanByDate(ds).some((e) => e.slot === "cena")) continue;
+      let cand = base.filter((r) => !used.has(r.id));
+      if (!cand.length) { used.clear(); cand = base.slice(); }
+      const r = cand[Math.floor(Math.random() * cand.length)];
+      used.add(r.id);
+      await store.addPlan(ds, r.id, "cena");
+      added++;
+    }
+    if (!added) { toast("Le cene sono già pianificate", ""); return; }
+    const set = new Set(days.map((d) => ymd(d.getFullYear(), d.getMonth(), d.getDate())));
+    const entries = store.getPlan().filter((p) => set.has(p.date));
+    const res = await store.addShoppingItems(collectIngredients(entries));
+    toast(`Menù creato: ${added} cene · ${shoppingToast(res)}`, "success");
   });
 }
 
@@ -2324,6 +2422,13 @@ function renderImpostazioni() {
       </div>
       <div class="setting-row">
         <div>
+          <div class="setting-row__label">Convertitore in cucina</div>
+          <div class="setting-row__desc">Tazze, cucchiai, grammi, °C/°F.</div>
+        </div>
+        <button class="btn" id="convBtn">Apri</button>
+      </div>
+      <div class="setting-row">
+        <div>
           <div class="setting-row__label">Tema</div>
           <div class="setting-row__desc">Aspetto chiaro o scuro.</div>
         </div>
@@ -2388,6 +2493,7 @@ function renderImpostazioni() {
   root.querySelector("#guideBtn").addEventListener("click", () => openGuide());
   root.querySelector("#changelogBtn").addEventListener("click", () => openChangelog(CHANGELOG, {}));
   root.querySelector("#statsBtn").addEventListener("click", () => openStats());
+  root.querySelector("#convBtn").addEventListener("click", () => openConverter());
 
   const themeSel = root.querySelector("#themeSel");
   themeSel.value = getTheme();

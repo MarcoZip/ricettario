@@ -756,6 +756,16 @@ a { color: var(--primary-2); }
 .stat-row:last-child { border-bottom: none; }
 .stat-row b { color: var(--primary-2); flex-shrink: 0; }
 
+/* Allergeni */
+.allerg-chip.is-on { background: rgba(239, 77, 77, 0.16); border-color: rgba(239, 77, 77, 0.45); color: #ff9090; font-weight: 700; }
+.tagchip--allerg { background: rgba(239, 77, 77, 0.14); border: 1px solid rgba(239, 77, 77, 0.32); color: #ff9090; }
+
+/* Convertitore */
+.conv-line { display: flex; gap: 8px; align-items: center; }
+.conv-line input { flex: 1; min-width: 0; }
+.conv-arrow { color: var(--text-soft); }
+.conv-res { margin-top: 8px; font-weight: 800; color: var(--primary-2); font-size: 1.1rem; }
+
 /* Galleria "Le mie creazioni" */
 .gallery { display: flex; flex-wrap: wrap; gap: 10px; }
 .gallery__item { position: relative; width: 88px; height: 88px; }
