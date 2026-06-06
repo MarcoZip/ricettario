@@ -374,6 +374,14 @@ export function suggestFromPantry() {
   return res;
 }
 
+// ---- Statistiche accessi (solo modalità cloud / admin) ----
+export async function recordAccess(email) {
+  if (adapter && adapter.recordAccess) await adapter.recordAccess(email);
+}
+export async function getAccessStats() {
+  return adapter && adapter.getAccessStats ? adapter.getAccessStats() : [];
+}
+
 // ---- Esporta / Importa (backup manuale) ----
 export function exportData() {
   return { version: 5, exportedAt: now(), tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan, pantry: state.pantry, menus: state.menus };

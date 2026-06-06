@@ -4,6 +4,15 @@
 
 export const CHANGELOG = [
   {
+    v: "2.4",
+    d: "2026-06-04",
+    items: [
+      "Sostituzioni ingredienti: nelle ricette trovi alternative pronte (niente burro? usa olio…).",
+      "Costo stimato della ricetta, totale e a porzione (prezzi indicativi).",
+      "Lista della spesa ordinabile per reparto, nell'ordine in cui giri al supermercato."
+    ]
+  },
+  {
     v: "2.3",
     d: "2026-06-04",
     items: [

@@ -93,6 +93,7 @@ async function startCloud() {
       const seed = sessionStorage.getItem("ricettario.seed") === "1";
       sessionStorage.removeItem("ricettario.seed");
       await store.initCloud(user.uid, { seedIfEmpty: seed });
+      store.recordAccess(user.email).catch(() => {});
       ensureMounted();
       ui.setLoginMode(false);
       ui.navigate("strumenti");

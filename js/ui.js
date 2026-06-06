@@ -10,6 +10,8 @@ import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregister
 import { importFromUrl } from "./import-recipe.js";
 import { translateRecipe } from "./translate.js";
 import { shareRecipeImage } from "./share-image.js";
+import { findSubstitutions } from "./substitutions.js";
+import { estimateCost } from "./cost.js";
 import { isImportConfigured, APP_VERSION } from "./config.js";
 import { CHANGELOG } from "./changelog.js";
 import { fileToDataUrl } from "./image.js";
@@ -233,6 +235,37 @@ function exportRecipesPdf() {
   const w = window.open("", "_blank");
   if (!w) { toast("Consenti i popup del browser per esportare", "error"); return; }
   w.document.open(); w.document.write(html); w.document.close();
+}
+
+const ADMIN_EMAIL = "marcozeta73@gmail.com";
+
+// Statistiche accessi degli utenti (solo amministratore).
+async function openAccessStats() {
+  const m = openModal(`
+    <h3 class="modal__title">${iconHtml("cloud-check")} Accessi utenti</h3>
+    <div id="accBody" class="cl-scroll"><div class="hint">Carico…</div></div>
+    <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
+  `);
+  m.el.querySelector('[data-act="ok"]').onclick = m.close;
+  const body = m.el.querySelector("#accBody");
+  try {
+    const stats = await store.getAccessStats();
+    if (!stats.length) { body.innerHTML = `<div class="hint">Nessun accesso registrato per ora.</div>`; return; }
+    const fmt = (ts) => {
+      try { const d = ts && ts.toDate ? ts.toDate() : (ts && ts.seconds ? new Date(ts.seconds * 1000) : null); return d ? d.toLocaleString("it-IT") : "—"; } catch (e) { return "—"; }
+    };
+    const totAccess = stats.reduce((s, u) => s + (u.count || 0), 0);
+    const rows = stats.sort((a, b) => (b.count || 0) - (a.count || 0)).map((u) => `
+      <div class="stat-row"><span>${escapeHtml(u.email || u.uid)}<br><small style="color:var(--text-soft)">ultimo: ${fmt(u.lastAccess)}</small></span><b>${u.count || 0}</b></div>`).join("");
+    body.innerHTML = `
+      <div class="stat-tiles">
+        <div class="stat-tile"><div class="stat-num">${stats.length}</div><div class="stat-lbl">utenti</div></div>
+        <div class="stat-tile"><div class="stat-num">${totAccess}</div><div class="stat-lbl">accessi totali</div></div>
+      </div>
+      <div class="stat-block"><div class="stat-block__t">Per utente (accessi)</div>${rows}</div>`;
+  } catch (e) {
+    body.innerHTML = `<div class="hint">Impossibile leggere le statistiche. Assicurati di aver pubblicato le regole Firestore aggiornate e di essere connesso.</div>`;
+  }
 }
 
 // Convertitore da cucina: quantità (tazze/cucchiai/ml/g) e temperatura.
@@ -706,6 +739,22 @@ function renderRecipeDetail() {
     .map((v) => `<button class="star ${v <= (r.rating || 0) ? "is-on" : ""}" data-v="${v}">${iconHtml("star")}</button>`)
     .join("")}</div>`;
 
+  // Costo stimato (scala con le porzioni) e sostituzioni ingredienti.
+  const cost = ingredients.length ? estimateCost(ingredients) : { counted: 0 };
+  const costCard = cost.counted ? `<div class="section-card">
+      <h3 class="section-title">${iconHtml("basket")} Costo stimato</h3>
+      <div class="nutri-box">
+        ${base ? `<div class="nutri-row"><span class="nutri-lbl">A porzione</span><span class="nutri-val"><b>€ ${(cost.total / base).toFixed(2)}</b></span></div>` : ""}
+        <div class="nutri-row"><span class="nutri-lbl">Totale${detailServings ? ` (${detailServings} porz.)` : ""}</span><span class="nutri-val"><b>€ ${(cost.total * factor).toFixed(2)}</b></span></div>
+      </div>
+      <div class="hint" style="margin-top:6px">Stima su ${cost.counted}${cost.counted < cost.total_n ? ` di ${cost.total_n}` : ""} ingredienti · prezzi indicativi.</div>
+    </div>` : "";
+  const subs = ingredients.length ? findSubstitutions(ingredients) : [];
+  const subsCard = subs.length ? `<div class="section-card">
+      <h3 class="section-title">${iconHtml("shuffle")} Sostituzioni</h3>
+      <div class="subs-list">${subs.map((s) => `<div class="subs-row"><b>${escapeHtml(s.name)}</b> → ${escapeHtml(s.sub)}</div>`).join("")}</div>
+    </div>` : "";
+
   root.innerHTML = `
     <div class="toolbar">
       <button class="back-btn" id="back">${iconHtml("arrow-left")}</button>
@@ -728,6 +777,9 @@ function renderRecipeDetail() {
     </div>
 
     ${ingredients.length ? `<div class="section-card" id="nutriCard">${nutritionCardHtml(r, base, detailServings)}</div>` : ""}
+
+    ${costCard}
+    ${subsCard}
 
     ${steps.length ? `<div class="section-card">
       <h3 class="section-title">${iconHtml("fork-knife")} Preparazione</h3>
@@ -1667,7 +1719,7 @@ function renderShoppingList() {
   } else {
     const groups = {};
     active.forEach((it) => { const c = it.category || "Altro"; (groups[c] = groups[c] || []).push(it); });
-    const orderedCats = CATEGORY_ORDER.filter((c) => groups[c]);
+    const orderedCats = getAisleOrder().filter((c) => groups[c]);
     const groupsHtml = orderedCats
       .map((cat) => `
         <div class="shop-group">
@@ -1691,7 +1743,8 @@ function renderShoppingList() {
     </div>
     <div id="shopBody">${body}</div>
     ${done.length ? `<button class="btn btn--primary btn--block" id="toPantry" style="margin-top:18px">${iconHtml("basket")} Spesa fatta: presi in dispensa</button>` : ""}
-    ${items.length ? `<div style="display:flex;gap:8px;margin-top:${done.length ? "8px" : "18px"}">
+    ${items.length ? `<div style="display:flex;gap:8px;margin-top:${done.length ? "8px" : "18px"};flex-wrap:wrap">
+      <button class="btn btn--ghost" id="aisleBtn">${iconHtml("sliders-horizontal")} Reparti</button>
       <button class="btn btn--ghost" id="clearDone">Svuota presi</button>
       <button class="btn btn--ghost" id="clearAll" style="color:var(--danger)">Svuota tutto</button>
     </div>` : ""}
@@ -1736,6 +1789,41 @@ function renderShoppingList() {
     const ok = await confirmDialog({ title: "Svuotare la lista?", message: "Tutti gli articoli verranno rimossi.", confirmText: "Svuota", danger: true });
     if (ok) store.clearAllShopping();
   });
+  const ab = wrap.querySelector("#aisleBtn");
+  if (ab) ab.addEventListener("click", openAisleOrder);
+}
+
+// Ordine dei reparti nella lista della spesa (personalizzabile per corsia).
+function getAisleOrder() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("ricettario.aisleOrder") || "null");
+    if (Array.isArray(saved) && saved.length) {
+      const merged = saved.filter((c) => CATEGORY_ORDER.includes(c));
+      for (const c of CATEGORY_ORDER) if (!merged.includes(c)) merged.push(c);
+      return merged;
+    }
+  } catch (e) { /* ignora */ }
+  return [...CATEGORY_ORDER];
+}
+function setAisleOrder(arr) {
+  try { localStorage.setItem("ricettario.aisleOrder", JSON.stringify(arr)); } catch (e) { /* ignora */ }
+}
+function openAisleOrder() {
+  let order = getAisleOrder();
+  const m = openModal(`
+    <h3 class="modal__title">${iconHtml("sliders-horizontal")} Ordine reparti</h3>
+    <p class="hint" style="margin-top:-6px">Spostali nell'ordine in cui giri al supermercato.</p>
+    <div id="aisleList"></div>
+    <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Fatto</button></div>
+  `);
+  const list = m.el.querySelector("#aisleList");
+  const draw = () => {
+    list.innerHTML = order.map((c, i) => `<div class="aisle-row"><span class="aisle-row__name">${escapeHtml(c)}</span><button class="aisle-btn" data-up="${i}" ${i === 0 ? "disabled" : ""}>↑</button><button class="aisle-btn" data-down="${i}" ${i === order.length - 1 ? "disabled" : ""}>↓</button></div>`).join("");
+    list.querySelectorAll("[data-up]").forEach((b) => b.onclick = () => { const i = +b.dataset.up; [order[i - 1], order[i]] = [order[i], order[i - 1]]; setAisleOrder(order); draw(); });
+    list.querySelectorAll("[data-down]").forEach((b) => b.onclick = () => { const i = +b.dataset.down; [order[i + 1], order[i]] = [order[i], order[i + 1]]; setAisleOrder(order); draw(); });
+  };
+  draw();
+  m.el.querySelector('[data-act="ok"]').onclick = () => { m.close(); renderShoppingList(); };
 }
 
 function daysUntil(ds) {
@@ -2427,6 +2515,13 @@ function renderImpostazioni() {
         </div>
         <button class="btn" id="convBtn">Apri</button>
       </div>
+      ${info.email === ADMIN_EMAIL ? `<div class="setting-row">
+        <div>
+          <div class="setting-row__label">Accessi utenti (admin)</div>
+          <div class="setting-row__desc">Statistiche sugli accessi di tutti gli utenti.</div>
+        </div>
+        <button class="btn" id="accStatsBtn">Apri</button>
+      </div>` : ""}
       <div class="setting-row">
         <div>
           <div class="setting-row__label">Tema</div>
@@ -2494,6 +2589,8 @@ function renderImpostazioni() {
   root.querySelector("#changelogBtn").addEventListener("click", () => openChangelog(CHANGELOG, {}));
   root.querySelector("#statsBtn").addEventListener("click", () => openStats());
   root.querySelector("#convBtn").addEventListener("click", () => openConverter());
+  const accStatsBtn = root.querySelector("#accStatsBtn");
+  if (accStatsBtn) accStatsBtn.addEventListener("click", () => openAccessStats());
 
   const themeSel = root.querySelector("#themeSel");
   themeSel.value = getTheme();

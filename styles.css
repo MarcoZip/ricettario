@@ -760,6 +760,17 @@ a { color: var(--primary-2); }
 .allerg-chip.is-on { background: rgba(239, 77, 77, 0.16); border-color: rgba(239, 77, 77, 0.45); color: #ff9090; font-weight: 700; }
 .tagchip--allerg { background: rgba(239, 77, 77, 0.14); border: 1px solid rgba(239, 77, 77, 0.32); color: #ff9090; }
 
+/* Sostituzioni */
+.subs-list { display: flex; flex-direction: column; gap: 6px; }
+.subs-row { font-size: 0.92rem; line-height: 1.4; }
+.subs-row b { color: var(--primary-2); }
+
+/* Ordina reparti */
+.aisle-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.aisle-row:last-child { border-bottom: none; }
+.aisle-row__name { flex: 1; font-weight: 600; }
+.aisle-btn { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 1rem; }
+
 /* Convertitore */
 .conv-line { display: flex; gap: 8px; align-items: center; }
 .conv-line input { flex: 1; min-width: 0; }

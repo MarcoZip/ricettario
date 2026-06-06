@@ -144,6 +144,19 @@ con un *Cron Trigger*. È gratuito.
 
 ---
 
+## (Admin) Statistiche accessi
+
+L'app registra gli accessi di ogni utente in Firestore (`accessStats/{uid}`) e
+l'amministratore (l'email in `firestore.rules`, ora `marcozeta73@gmail.com`) può
+vederli in **Impostazioni → "Accessi utenti (admin)"**.
+
+Perché funzioni serve **ripubblicare le regole**: Firebase Console → Firestore
+Database → **Regole** → incolla il contenuto aggiornato di `firestore.rules` →
+**Pubblica**. (Le regole consentono a ciascuno di scrivere solo il proprio accesso
+e solo all'admin di leggerli tutti.)
+
+---
+
 ## Backup manuale (sempre disponibile)
 
 In **Impostazioni** puoi **Esportare** tutte le ricette in un file e

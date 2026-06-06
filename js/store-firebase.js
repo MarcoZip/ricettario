@@ -9,7 +9,7 @@ import { firebaseConfig } from "./config.js";
 const SDK = "https://www.gstatic.com/firebasejs/10.12.5";
 
 export async function createFirebaseAdapter(uid) {
-  const { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch, getDocs } =
+  const { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, writeBatch, getDocs, increment, serverTimestamp } =
     await import(`${SDK}/firebase-firestore.js`);
   const { getApp } = await import(`${SDK}/firebase-app.js`);
 
@@ -167,6 +167,22 @@ export async function createFirebaseAdapter(uid) {
         batch.set(doc(menusCol, id), rest);
       });
       await batch.commit();
+    },
+
+    // Registra un accesso dell'utente (per le statistiche admin).
+    async recordAccess(email) {
+      try {
+        await setDoc(doc(db, "accessStats", uid), {
+          email: email || "",
+          lastAccess: serverTimestamp(),
+          count: increment(1)
+        }, { merge: true });
+      } catch (e) { /* permessi/offline: ignora */ }
+    },
+    // Legge le statistiche di accesso di tutti gli utenti (solo admin via regole).
+    async getAccessStats() {
+      const snap = await getDocs(collection(db, "accessStats"));
+      return snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
     }
   };
 }
