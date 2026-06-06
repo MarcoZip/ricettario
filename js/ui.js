@@ -195,7 +195,9 @@ function maybeShowWhatsNew() {
     localStorage.setItem(KEY, APP_VERSION);
     if (!seen || seen === APP_VERSION) return; // primo avvio o nessun cambio
     const idx = CHANGELOG.findIndex((c) => c.v === seen);
-    const fresh = idx > 0 ? CHANGELOG.slice(0, idx) : (idx === 0 ? [] : [CHANGELOG[0]]);
+    const all = idx > 0 ? CHANGELOG.slice(0, idx) : (idx === 0 ? [] : [CHANGELOG[0]]);
+    // Nel popup solo le novità "degne di nota" (niente correzioni minori).
+    const fresh = all.filter((c) => !c.minor);
     if (!fresh.length) return;
     // Aspetta che la splash di avvio sia sparita, così la finestra Novità non
     // viene coperta e appare DOPO l'animazione.
@@ -211,7 +213,7 @@ function maybeShowWhatsNew() {
 function changelogHtml(entries) {
   return entries.map((c) => `
     <div class="cl-entry">
-      <div class="cl-ver">v${escapeHtml(c.v)} <span class="cl-date">${escapeHtml(c.d || "")}</span></div>
+      <div class="cl-ver">v${escapeHtml(c.v)} <span class="cl-date">${escapeHtml(c.d || "")}</span>${c.minor ? `<span class="cl-tag">correzione</span>` : ""}</div>
       <ul class="cl-list">${(c.items || []).map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>
     </div>`).join("");
 }
@@ -279,6 +281,8 @@ async function openAccessStats() {
   }
   const weekTot = {};
   for (const [d, c] of Object.entries(dayTot)) { const w = weekStart(d); weekTot[w] = (weekTot[w] || 0) + c; }
+  const datedSum = Object.values(dayTot).reduce((s, c) => s + c, 0);
+  const undated = Math.max(0, totalAll - datedSum); // accessi vecchi senza data
   const todayCount = dayTot[today] || 0;
   const thisWeek = weekTot[weekStart(today)] || 0;
   const thisMonth = monthTot[today.slice(0, 7)] || 0;
@@ -297,7 +301,7 @@ async function openAccessStats() {
   const draw = () => {
     let list;
     if (view === "utenti") list = `<div style="margin-bottom:8px"><select id="accSort" class="mini-select"><option value="count">Più accessi</option><option value="last">Ultimo accesso</option><option value="name">Nome</option></select></div>${usersRows()}`;
-    else if (view === "giorno") list = periodRows(dayTot, fmtDay);
+    else if (view === "giorno") list = periodRows(dayTot, fmtDay) + (undated ? `<div class="stat-row"><span style="color:var(--text-soft)">Precedenti (non datati)</span><b>${undated}</b></div>` : "");
     else if (view === "settimana") list = periodRows(weekTot, (w) => "sett. " + fmtDay(w));
     else list = periodRows(monthTot, fmtMonth);
     body.innerHTML = `

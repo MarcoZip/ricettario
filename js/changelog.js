@@ -1,8 +1,19 @@
 // Storico delle novità (il più recente in cima). A ogni pubblicazione: aggiungere
 // una voce qui e alzare APP_VERSION in config.js. La finestra "Novità" mostra le
-// voci più recenti di quella già vista dall'utente.
+// voci più recenti di quella già vista dall'utente, MA solo quelle "degne di nota"
+// (le voci con `minor: true` — correzioni/ritocchi — restano nello storico in
+// Opzioni ma non fanno comparire il popup).
 
 export const CHANGELOG = [
+  {
+    v: "2.7",
+    d: "2026-06-04",
+    minor: true,
+    items: [
+      "Le novità distinguono ora le nuove funzioni dalle semplici correzioni.",
+      "Statistiche accessi (admin): mostrati anche gli accessi precedenti non datati."
+    ]
+  },
   {
     v: "2.6",
     d: "2026-06-04",
@@ -13,6 +24,7 @@ export const CHANGELOG = [
   {
     v: "2.5",
     d: "2026-06-04",
+    minor: true,
     items: [
       "La finestra delle Novità ora appare dopo l'animazione di avvio (prima a volte spariva subito)."
     ]
@@ -89,6 +101,7 @@ export const CHANGELOG = [
   {
     v: "1.6",
     d: "2026-06-04",
+    minor: true,
     items: [
       "L'app ora si aggiorna da sola: vedi sempre l'ultima versione senza fare nulla."
     ]
@@ -96,6 +109,7 @@ export const CHANGELOG = [
   {
     v: "1.4",
     d: "2026-06-04",
+    minor: true,
     items: [
       "Risolta la ricerca online del Ricettario che restava a caricare all'infinito."
     ]
