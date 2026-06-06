@@ -36,10 +36,19 @@ export async function signIn(email, password) {
   return cred.user;
 }
 
-export async function signUp(email, password) {
+export async function signUp(email, password, nickname) {
   const auth = await ensureApp();
   const cred = await mod.createUserWithEmailAndPassword(auth, email, password);
+  if (nickname) { try { await mod.updateProfile(cred.user, { displayName: nickname }); } catch (e) { /* ignora */ } }
   return cred.user;
+}
+
+// Salva/aggiorna il nickname (displayName) sull'account corrente.
+export async function setDisplayName(nickname) {
+  const auth = await ensureApp();
+  if (auth.currentUser && nickname) {
+    try { await mod.updateProfile(auth.currentUser, { displayName: nickname }); } catch (e) { /* ignora */ }
+  }
 }
 
 export async function logout() {

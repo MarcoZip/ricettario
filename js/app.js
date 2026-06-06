@@ -6,6 +6,7 @@ import { isCloudConfigured } from "./config.js";
 import { applyTheme, applyAccent } from "./theme.js";
 import { runDailyReminders } from "./notify.js";
 import { isPushSubscribed, refreshReminders } from "./push.js";
+import { getNickname, setNickname } from "./profile.js";
 
 // Gestisce i promemoria lasciando il tempo ai dati (cloud) di arrivare. Se le
 // push "vere" sono attive, aggiorna i promemoria sul worker (le manda lui, anche
@@ -61,6 +62,7 @@ async function startLocal() {
   ui.navigate("strumenti");
   updateBadge();
   scheduleReminders();
+  ui.promptNicknameIfMissing();
 }
 
 async function startCloud() {
@@ -73,10 +75,10 @@ async function startCloud() {
       throw new Error(auth.authErrorMessage(e));
     }
   };
-  ui.handlers.onSignup = async (email, pass) => {
+  ui.handlers.onSignup = async (email, pass, nickname) => {
     try {
       sessionStorage.setItem("ricettario.seed", "1");
-      await auth.signUp(email, pass);
+      await auth.signUp(email, pass, nickname);
     } catch (e) {
       sessionStorage.removeItem("ricettario.seed");
       throw new Error(auth.authErrorMessage(e));
@@ -85,6 +87,8 @@ async function startCloud() {
   ui.handlers.onLogout = async () => {
     await auth.logout();
   };
+  // Salva il nickname anche sull'account (sincronizzato tra dispositivi).
+  ui.handlers.onSetNickname = async (nick) => { try { await auth.setDisplayName(nick); } catch (e) { /* ignora */ } };
 
   // Reagisce ai cambi di stato dell'accesso.
   await auth.observeAuth(async (user) => {
@@ -94,11 +98,14 @@ async function startCloud() {
       sessionStorage.removeItem("ricettario.seed");
       await store.initCloud(user.uid, { seedIfEmpty: seed });
       store.recordAccess(user.email).catch(() => {});
+      // Sincronizza il nickname dall'account (displayName) se non l'abbiamo qui.
+      if (!getNickname() && user.displayName) setNickname(user.displayName);
       ensureMounted();
       ui.setLoginMode(false);
       ui.navigate("strumenti");
       updateBadge();
       scheduleReminders();
+      ui.promptNicknameIfMissing();
     } else {
       accountEmail = null;
       ensureMounted();

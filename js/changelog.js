@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "2.8",
+    d: "2026-06-04",
+    minor: true,
+    items: [
+      "Ora l'app ti saluta per nome: scegli un nickname alla registrazione (o al primo accesso)."
+    ]
+  },
+  {
     v: "2.7",
     d: "2026-06-04",
     minor: true,

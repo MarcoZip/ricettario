@@ -12,6 +12,7 @@ import { translateRecipe } from "./translate.js";
 import { shareRecipeImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
 import { estimateCost } from "./cost.js";
+import { getNickname, setNickname } from "./profile.js";
 import { isImportConfigured, APP_VERSION } from "./config.js";
 import { CHANGELOG } from "./changelog.js";
 import { fileToDataUrl } from "./image.js";
@@ -208,6 +209,34 @@ function maybeShowWhatsNew() {
     };
     setTimeout(open, 400);
   } catch (e) { /* ignora */ }
+}
+
+// Chiede il nickname a chi non ce l'ha (al primo accesso), dopo splash/popup.
+export function promptNicknameIfMissing() {
+  if (getNickname()) return;
+  let tries = 0;
+  const go = () => {
+    if ((document.getElementById("splash") || document.querySelector(".modal-backdrop")) && tries++ < 60) {
+      setTimeout(go, 300); return;
+    }
+    if (!getNickname()) openNicknamePrompt();
+  };
+  setTimeout(go, 900);
+}
+function openNicknamePrompt() {
+  const m = openModal(`
+    <h3 class="modal__title">👋 Come ti chiami?</h3>
+    <p class="hint" style="margin-top:-6px">Lo usiamo solo per salutarti nell'app.</p>
+    <div class="field"><input type="text" id="nickInput" placeholder="Es. Paola" /></div>
+    <div class="modal__actions"><button class="btn" data-act="skip">Salta</button><button class="btn btn--primary" data-act="save">Salva</button></div>
+  `);
+  setTimeout(() => { const i = m.el.querySelector("#nickInput"); if (i) i.focus(); }, 50);
+  m.el.querySelector('[data-act="skip"]').onclick = m.close;
+  m.el.querySelector('[data-act="save"]').onclick = () => {
+    const n = (m.el.querySelector("#nickInput").value || "").trim();
+    m.close();
+    if (n) { setNickname(n); if (handlers.onSetNickname) handlers.onSetNickname(n); render(); }
+  };
 }
 
 function changelogHtml(entries) {
@@ -583,7 +612,7 @@ function renderStrumenti() {
     allTags.map((t) => `<button class="filter-chip ${homeFilter === t ? "is-on" : ""}" data-filter="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("");
 
   root.innerHTML = `
-    <h1 class="page-title">Strumenti di cottura</h1>
+    <h1 class="page-title">${getNickname() ? `Ciao ${escapeHtml(getNickname())}! 👋` : "Strumenti di cottura"}</h1>
     <div class="home-hero">
       <div>
         <div class="home-hero__num" id="heroNum">${total}</div>
@@ -1691,7 +1720,7 @@ function openGuide(firstRun = false) {
       <button class="cook__close" id="gClose">${iconHtml("x")}</button>
     </div>
     <div class="guide__body">
-      ${firstRun ? `<div class="guide__hero"><img class="brand-logo" src="icons/icon.svg" alt="" /><h2 style="margin:0 0 4px">Ti diamo il benvenuto! 👋</h2><p style="color:var(--text-soft);margin:0">Ecco tutto quello che puoi fare.</p></div>` : ""}
+      ${firstRun ? `<div class="guide__hero"><img class="brand-logo" src="icons/icon.svg" alt="" /><h2 style="margin:0 0 4px">Ti diamo il benvenuto${getNickname() ? ", " + escapeHtml(getNickname()) : ""}! 👋</h2><p style="color:var(--text-soft);margin:0">Ecco tutto quello che puoi fare.</p></div>` : ""}
       ${GUIDE_SECTIONS.map((s) => `<div class="guide-card"><span class="guide-card__ic">${iconHtml(s.icon)}</span><div><div class="guide-card__t">${escapeHtml(s.title)}</div><div class="guide-card__x">${escapeHtml(s.text)}</div></div></div>`).join("")}
     </div>
     <div class="guide__foot"><button class="btn btn--primary btn--block" id="gOk">${firstRun ? "Inizia a cucinare" : "Ho capito"}</button></div>
@@ -2711,6 +2740,10 @@ export function renderLogin() {
         <h1 class="page-title" style="text-align:center">Fornelli</h1>
         <p class="page-sub" style="text-align:center">${isRegister ? "Crea il tuo account per il backup nel cloud." : "Accedi per sincronizzare le tue ricette."}</p>
         <div class="setting-group" style="text-align:left;padding:16px">
+          ${isRegister ? `<div class="field">
+            <label>Come ti chiami? (per i saluti)</label>
+            <input type="text" id="loginNick" autocomplete="nickname" placeholder="Es. Paola" />
+          </div>` : ""}
           <div class="field">
             <label>Email</label>
             <input type="email" id="loginEmail" inputmode="email" autocomplete="username" placeholder="email@esempio.it" />
@@ -2733,8 +2766,11 @@ export function renderLogin() {
       const btn = root.querySelector("#loginSubmit");
       btn.disabled = true; btn.textContent = "Attendere...";
       try {
-        if (isRegister) await handlers.onSignup(email, pass);
-        else await handlers.onLogin(email, pass);
+        if (isRegister) {
+          const nick = (root.querySelector("#loginNick").value || "").trim();
+          if (nick) setNickname(nick);
+          await handlers.onSignup(email, pass, nick);
+        } else await handlers.onLogin(email, pass);
       } catch (e) {
         toast(e.message || "Errore di accesso", "error");
         btn.disabled = false; btn.textContent = isRegister ? "Crea account" : "Accedi";
