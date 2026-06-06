@@ -169,13 +169,19 @@ export async function createFirebaseAdapter(uid) {
       await batch.commit();
     },
 
-    // Registra un accesso dell'utente (per le statistiche admin).
+    // Registra un accesso dell'utente (per le statistiche admin), con i conteggi
+    // per giorno e per mese salvati nel documento dell'utente stesso.
     async recordAccess(email) {
       try {
+        const n = new Date();
+        const day = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+        const month = day.slice(0, 7);
         await setDoc(doc(db, "accessStats", uid), {
           email: email || "",
           lastAccess: serverTimestamp(),
-          count: increment(1)
+          count: increment(1),
+          days: { [day]: increment(1) },
+          months: { [month]: increment(1) }
         }, { merge: true });
       } catch (e) { /* permessi/offline: ignora */ }
     },

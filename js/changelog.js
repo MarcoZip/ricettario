@@ -4,6 +4,13 @@
 
 export const CHANGELOG = [
   {
+    v: "2.6",
+    d: "2026-06-04",
+    items: [
+      "Statistiche accessi (admin) più complete: per giorno, settimana e mese, con riepilogo e ordinamento per utente."
+    ]
+  },
+  {
     v: "2.5",
     d: "2026-06-04",
     items: [

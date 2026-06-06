@@ -247,7 +247,8 @@ function exportRecipesPdf() {
 
 const ADMIN_EMAIL = "marcozeta73@gmail.com";
 
-// Statistiche accessi degli utenti (solo amministratore).
+// Statistiche accessi degli utenti (solo amministratore): riepilogo per
+// giorno/settimana/mese, per utente, con ordinamento.
 async function openAccessStats() {
   const m = openModal(`
     <h3 class="modal__title">${iconHtml("cloud-check")} Accessi utenti</h3>
@@ -256,24 +257,59 @@ async function openAccessStats() {
   `);
   m.el.querySelector('[data-act="ok"]').onclick = m.close;
   const body = m.el.querySelector("#accBody");
-  try {
-    const stats = await store.getAccessStats();
-    if (!stats.length) { body.innerHTML = `<div class="hint">Nessun accesso registrato per ora.</div>`; return; }
-    const fmt = (ts) => {
-      try { const d = ts && ts.toDate ? ts.toDate() : (ts && ts.seconds ? new Date(ts.seconds * 1000) : null); return d ? d.toLocaleString("it-IT") : "—"; } catch (e) { return "—"; }
-    };
-    const totAccess = stats.reduce((s, u) => s + (u.count || 0), 0);
-    const rows = stats.sort((a, b) => (b.count || 0) - (a.count || 0)).map((u) => `
-      <div class="stat-row"><span>${escapeHtml(u.email || u.uid)}<br><small style="color:var(--text-soft)">ultimo: ${fmt(u.lastAccess)}</small></span><b>${u.count || 0}</b></div>`).join("");
-    body.innerHTML = `
-      <div class="stat-tiles">
-        <div class="stat-tile"><div class="stat-num">${stats.length}</div><div class="stat-lbl">utenti</div></div>
-        <div class="stat-tile"><div class="stat-num">${totAccess}</div><div class="stat-lbl">accessi totali</div></div>
-      </div>
-      <div class="stat-block"><div class="stat-block__t">Per utente (accessi)</div>${rows}</div>`;
-  } catch (e) {
-    body.innerHTML = `<div class="hint">Impossibile leggere le statistiche. Assicurati di aver pubblicato le regole Firestore aggiornate e di essere connesso.</div>`;
+  let stats;
+  try { stats = await store.getAccessStats(); }
+  catch (e) { body.innerHTML = `<div class="hint">Impossibile leggere le statistiche. Pubblica le regole Firestore aggiornate e riprova.</div>`; return; }
+  if (!stats.length) { body.innerHTML = `<div class="hint">Nessun accesso registrato per ora.</div>`; return; }
+
+  const pad = (x) => String(x).padStart(2, "0");
+  const today = (() => { const n = new Date(); return `${n.getFullYear()}-${pad(n.getMonth() + 1)}-${pad(n.getDate())}`; })();
+  const fmtTs = (ts) => { try { const d = ts && ts.toDate ? ts.toDate() : (ts && ts.seconds ? new Date(ts.seconds * 1000) : null); return d ? d.toLocaleString("it-IT") : "—"; } catch (e) { return "—"; } };
+  const weekStart = (s) => { const [y, mo, d] = s.split("-").map(Number); const dt = new Date(y, mo - 1, d); const dow = (dt.getDay() + 6) % 7; dt.setDate(dt.getDate() - dow); return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`; };
+  const MESI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
+  const fmtMonth = (ym) => { const [y, mo] = ym.split("-"); return `${MESI[+mo - 1]} ${y}`; };
+  const fmtDay = (s) => { const [, mo, d] = s.split("-"); return `${d}/${mo}`; };
+
+  const dayTot = {}, monthTot = {};
+  let totalAll = 0;
+  for (const u of stats) {
+    totalAll += u.count || 0;
+    for (const [d, c] of Object.entries(u.days || {})) dayTot[d] = (dayTot[d] || 0) + (c || 0);
+    for (const [mn, c] of Object.entries(u.months || {})) monthTot[mn] = (monthTot[mn] || 0) + (c || 0);
   }
+  const weekTot = {};
+  for (const [d, c] of Object.entries(dayTot)) { const w = weekStart(d); weekTot[w] = (weekTot[w] || 0) + c; }
+  const todayCount = dayTot[today] || 0;
+  const thisWeek = weekTot[weekStart(today)] || 0;
+  const thisMonth = monthTot[today.slice(0, 7)] || 0;
+
+  let view = "utenti", sort = "count";
+  const tile = (n, l) => `<div class="stat-tile"><div class="stat-num">${n}</div><div class="stat-lbl">${l}</div></div>`;
+  const periodRows = (obj, fmt) => Object.entries(obj).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 31).map(([k, c]) => `<div class="stat-row"><span>${fmt(k)}</span><b>${c}</b></div>`).join("") || `<div class="hint">Nessun dato.</div>`;
+  const usersRows = () => {
+    const arr = [...stats];
+    if (sort === "count") arr.sort((a, b) => (b.count || 0) - (a.count || 0));
+    else if (sort === "last") arr.sort((a, b) => (((b.lastAccess && b.lastAccess.seconds) || 0) - ((a.lastAccess && a.lastAccess.seconds) || 0)));
+    else arr.sort((a, b) => (a.email || a.uid).localeCompare(b.email || b.uid));
+    return arr.map((u) => `<div class="stat-row"><span>${escapeHtml(u.email || u.uid)}<br><small style="color:var(--text-soft)">ultimo: ${fmtTs(u.lastAccess)}</small></span><b>${u.count || 0}</b></div>`).join("");
+  };
+  const LABELS = { utenti: "Utenti", giorno: "Giorno", settimana: "Settimana", mese: "Mese" };
+  const draw = () => {
+    let list;
+    if (view === "utenti") list = `<div style="margin-bottom:8px"><select id="accSort" class="mini-select"><option value="count">Più accessi</option><option value="last">Ultimo accesso</option><option value="name">Nome</option></select></div>${usersRows()}`;
+    else if (view === "giorno") list = periodRows(dayTot, fmtDay);
+    else if (view === "settimana") list = periodRows(weekTot, (w) => "sett. " + fmtDay(w));
+    else list = periodRows(monthTot, fmtMonth);
+    body.innerHTML = `
+      <div class="stat-tiles">${tile(stats.length, "utenti")}${tile(totalAll, "accessi")}</div>
+      <div class="stat-tiles">${tile(todayCount, "oggi")}${tile(thisWeek, "settimana")}${tile(thisMonth, "mese")}</div>
+      <div class="seg">${Object.keys(LABELS).map((v) => `<button class="seg-btn ${view === v ? "is-on" : ""}" data-view="${v}">${LABELS[v]}</button>`).join("")}</div>
+      <div class="stat-block">${list}</div>`;
+    body.querySelectorAll(".seg-btn").forEach((b) => b.onclick = () => { view = b.dataset.view; draw(); });
+    const ss = body.querySelector("#accSort");
+    if (ss) { ss.value = sort; ss.onchange = () => { sort = ss.value; draw(); }; }
+  };
+  draw();
 }
 
 // Convertitore da cucina: quantità (tazze/cucchiai/ml/g) e temperatura.

@@ -755,6 +755,9 @@ a { color: var(--primary-2); }
 .stat-row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); font-size: 0.92rem; }
 .stat-row:last-child { border-bottom: none; }
 .stat-row b { color: var(--primary-2); flex-shrink: 0; }
+.seg { display: flex; gap: 6px; margin: 12px 0 6px; flex-wrap: wrap; }
+.seg-btn { flex: 1; min-width: 70px; padding: 7px 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text-soft); font-weight: 700; font-size: 0.82rem; }
+.seg-btn.is-on { background: var(--primary); color: #fff; border-color: var(--primary); }
 
 /* Allergeni */
 .allerg-chip.is-on { background: rgba(239, 77, 77, 0.16); border-color: rgba(239, 77, 77, 0.45); color: #ff9090; font-weight: 700; }
