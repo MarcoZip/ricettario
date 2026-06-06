@@ -4,6 +4,13 @@
 
 export const CHANGELOG = [
   {
+    v: "2.5",
+    d: "2026-06-04",
+    items: [
+      "La finestra delle Novità ora appare dopo l'animazione di avvio (prima a volte spariva subito)."
+    ]
+  },
+  {
     v: "2.4",
     d: "2026-06-04",
     items: [

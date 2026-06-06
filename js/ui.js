@@ -196,7 +196,15 @@ function maybeShowWhatsNew() {
     if (!seen || seen === APP_VERSION) return; // primo avvio o nessun cambio
     const idx = CHANGELOG.findIndex((c) => c.v === seen);
     const fresh = idx > 0 ? CHANGELOG.slice(0, idx) : (idx === 0 ? [] : [CHANGELOG[0]]);
-    if (fresh.length) setTimeout(() => openChangelog(fresh, { whatsNew: true }), 700);
+    if (!fresh.length) return;
+    // Aspetta che la splash di avvio sia sparita, così la finestra Novità non
+    // viene coperta e appare DOPO l'animazione.
+    let tries = 0;
+    const open = () => {
+      if (!document.getElementById("splash") || tries > 40) { openChangelog(fresh, { whatsNew: true }); return; }
+      tries++; setTimeout(open, 200);
+    };
+    setTimeout(open, 400);
   } catch (e) { /* ignora */ }
 }
 
