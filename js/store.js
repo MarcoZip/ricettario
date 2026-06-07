@@ -117,7 +117,7 @@ export async function deleteTool(id) {
   await adapter.deleteTool(id);
 }
 
-export async function addRecipe({ toolId, title, url, notes, ingredients, servings, steps, favorite, rating, photo, tags, time, allergens }) {
+export async function addRecipe({ toolId, title, url, notes, ingredients, servings, steps, favorite, rating, photo, tags, time, allergens, difficulty }) {
   await adapter.addRecipe({
     id: newId(),
     toolId,
@@ -127,6 +127,7 @@ export async function addRecipe({ toolId, title, url, notes, ingredients, servin
     ingredients: Array.isArray(ingredients) ? ingredients : [],
     servings: servings || null,
     time: time || null,
+    difficulty: difficulty || null,
     allergens: Array.isArray(allergens) ? allergens : [],
     steps: Array.isArray(steps) ? steps : [],
     favorite: Boolean(favorite),
@@ -170,7 +171,19 @@ export function getByTag(tag) {
 export async function markCooked(id) {
   const r = getRecipe(id);
   if (!r) return;
-  await adapter.updateRecipe(id, { cookCount: (r.cookCount || 0) + 1, lastCooked: now() });
+  const log = Array.isArray(r.cookLog) ? r.cookLog.slice(-99) : [];
+  log.push(now());
+  await adapter.updateRecipe(id, { cookCount: (r.cookCount || 0) + 1, lastCooked: now(), cookLog: log });
+}
+
+// Diario: tutte le volte che hai cucinato, con data, dalla più recente.
+export function getCookDiary(limit = 60) {
+  const events = [];
+  for (const r of state.recipes) {
+    for (const ts of (r.cookLog || [])) events.push({ recipeId: r.id, title: r.title, ts });
+  }
+  events.sort((a, b) => (b.ts || "").localeCompare(a.ts || ""));
+  return events.slice(0, limit);
 }
 export function getMostCooked() {
   return state.recipes.filter((r) => (r.cookCount || 0) > 0).sort((a, b) => (b.cookCount || 0) - (a.cookCount || 0));

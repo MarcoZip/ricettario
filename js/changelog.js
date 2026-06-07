@@ -6,6 +6,16 @@
 
 export const CHANGELOG = [
   {
+    v: "3.0",
+    d: "2026-06-04",
+    items: [
+      "Ricetta del giorno in home, con saluto che cambia (Buongiorno/Buonasera).",
+      "Difficoltà delle ricette (facile/media/difficile) con filtro dedicato.",
+      "Diario: lo storico di cosa hai cucinato, con le date, nel Diario di cucina.",
+      "Foto della ricetta più elegante, con il titolo in sovrimpressione."
+    ]
+  },
+  {
     v: "2.9",
     d: "2026-06-04",
     minor: true,

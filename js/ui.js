@@ -113,6 +113,17 @@ export const handlers = {
 // Colori di "bagliore" assegnati a rotazione agli strumenti.
 const ACCENTS = ["#ff5e7e", "#ff9a3d", "#5ea8ff", "#36d1b7", "#b06cff", "#ffd166", "#ff7a3d", "#4dd0a0"];
 
+// Saluto in base all'ora del giorno.
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Buongiorno";
+  if (h < 18) return "Buon pomeriggio";
+  return "Buonasera";
+}
+// Etichetta difficoltà (1 facile · 2 media · 3 difficile).
+const DIFF_LABELS = { 1: "Facile", 2: "Media", 3: "Difficile" };
+function diffLabel(d) { return DIFF_LABELS[d] || ""; }
+
 // ---------------- Utility ----------------
 function escapeHtml(str) {
   return String(str == null ? "" : str)
@@ -542,8 +553,12 @@ function openStats() {
   const listBlock = (title, items) => items.length
     ? `<div class="stat-block"><div class="stat-block__t">${title}</div>${items.join("")}</div>` : "";
 
+  const fmtD = (ts) => { try { const d = new Date(ts); return isNaN(d) ? "" : d.toLocaleDateString("it-IT", { day: "2-digit", month: "short" }); } catch (e) { return ""; } };
+  const diary = store.getCookDiary(40);
   const topHtml = listBlock(`${iconHtml("fire")} Piatti più cucinati`, top.map((r) => `<div class="stat-row"><span>${escapeHtml(r.title)}</span><b>${r.cookCount}×</b></div>`));
-  const recentHtml = listBlock(`${iconHtml("timer")} Cucinate di recente`, recent.map((r) => `<div class="stat-row"><span>${escapeHtml(r.title)}</span></div>`));
+  const recentHtml = diary.length
+    ? listBlock(`${iconHtml("calendar-dots")} Cosa hai cucinato`, diary.map((e) => `<div class="stat-row"><span>${escapeHtml(e.title)}</span><b>${fmtD(e.ts)}</b></div>`))
+    : listBlock(`${iconHtml("timer")} Cucinate di recente`, recent.map((r) => `<div class="stat-row"><span>${escapeHtml(r.title)}</span></div>`));
   const ingHtml = listBlock(`${iconHtml("list-bullets")} Ingredienti più usati`, topIng.map(([n, c]) => `<div class="stat-row"><span>${escapeHtml(n)}</span><b>${c}</b></div>`));
   const toolHtml = listBlock(`${iconHtml("cooking-pot")} Strumenti più usati`, toolStats.slice(0, 5).map((t) => `<div class="stat-row"><span>${iconHtml(t.icon)} ${escapeHtml(t.name)}</span><b>${t.cooked ? t.cooked + "×" : t.n + " ric."}</b></div>`));
 
@@ -651,6 +666,7 @@ function renderHomeBody() {
     else if (homeFilter === "recent") { results = store.getRecentCooked(); emptyIcon = "timer"; emptyMsg = "Niente cucinato di recente."; }
     else if (homeFilter === "t15") { results = store.getAllRecipes().filter((r) => r.time && r.time <= 15); emptyIcon = "timer"; emptyMsg = "Nessuna ricetta entro 15 minuti. Aggiungi il tempo nelle ricette (modifica)."; }
     else if (homeFilter === "t30") { results = store.getAllRecipes().filter((r) => r.time && r.time <= 30); emptyIcon = "timer"; emptyMsg = "Nessuna ricetta entro 30 minuti. Aggiungi il tempo nelle ricette (modifica)."; }
+    else if (homeFilter === "easy") { results = store.getAllRecipes().filter((r) => r.difficulty === 1); emptyIcon = "fire"; emptyMsg = "Nessuna ricetta facile. Segna la difficoltà nelle ricette (modifica)."; }
     else if (homeFilter === "ng") { results = store.getAllRecipes().filter((r) => !(r.allergens || []).includes("Glutine")); emptyIcon = "carrot"; emptyMsg = "Nessuna ricetta senza glutine. Segna gli allergeni nelle ricette (modifica)."; }
     else if (homeFilter === "nl") { results = store.getAllRecipes().filter((r) => !(r.allergens || []).includes("Lattosio")); emptyIcon = "carrot"; emptyMsg = "Nessuna ricetta senza lattosio. Segna gli allergeni nelle ricette (modifica)."; }
     else results = store.getByTag(homeFilter);
@@ -694,6 +710,20 @@ function renderStrumenti() {
   const allTags = store.getAllTags();
   const voiceOK = ("webkitSpeechRecognition" in window) || ("SpeechRecognition" in window);
 
+  // Ricetta del giorno: stabile nell'arco della giornata (cambia ogni giorno).
+  const allR = store.getAllRecipes();
+  let rotdCard = "";
+  if (allR.length) {
+    const n = new Date();
+    const seed = n.getFullYear() * 1000 + (n.getMonth() * 31 + n.getDate());
+    const rotd = allR[seed % allR.length];
+    rotdCard = `<button class="rotd" data-recipe="${rotd.id}">
+        ${rotd.photo ? `<img class="rotd__img" src="${escapeHtml(rotd.photo)}" alt="" />` : `<span class="rotd__ph">${iconHtml("fork-knife")}</span>`}
+        <span class="rotd__grad"></span>
+        <span class="rotd__body"><span class="rotd__lbl">${iconHtml("sparkle")} Ricetta del giorno</span><span class="rotd__title">${escapeHtml(rotd.title)}</span></span>
+      </button>`;
+  }
+
   // Oggi si mangia
   const today = store.getPlanByDate(todayStr()).filter((e) => store.getRecipe(e.recipeId));
   const todayCard = today.length
@@ -728,6 +758,7 @@ function renderStrumenti() {
     { k: "recent", label: "Di recente", icon: "timer" },
     { k: "t15", label: "≤15 min", icon: "timer" },
     { k: "t30", label: "≤30 min", icon: "timer" },
+    { k: "easy", label: "Facili", icon: "fire" },
     { k: "ng", label: "Senza glutine", icon: "carrot" },
     { k: "nl", label: "Senza lattosio", icon: "carrot" },
     { k: "menu", label: "Menu", icon: "book-bookmark" }
@@ -736,7 +767,8 @@ function renderStrumenti() {
     allTags.map((t) => `<button class="filter-chip ${homeFilter === t ? "is-on" : ""}" data-filter="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("");
 
   root.innerHTML = `
-    <h1 class="page-title">${getNickname() ? `Ciao ${escapeHtml(getNickname())}! 👋` : "Strumenti di cottura"}</h1>
+    <h1 class="page-title">${greeting()}${getNickname() ? " " + escapeHtml(getNickname()) : ""}! 👋</h1>
+    ${rotdCard}
     <div class="home-hero">
       <div>
         <div class="home-hero__num" id="heroNum">${total}</div>
@@ -761,6 +793,8 @@ function renderStrumenti() {
   const ea = root.querySelector("#expAlert");
   if (ea) ea.addEventListener("click", () => { shopTab = "dispensa"; navigate("spesa"); });
   root.querySelectorAll(".today__item").forEach((b) => b.addEventListener("click", () => openRecipe(b.dataset.recipe)));
+  const rotdEl = root.querySelector(".rotd");
+  if (rotdEl) rotdEl.addEventListener("click", () => openRecipe(rotdEl.dataset.recipe));
 
   const search = root.querySelector("#homeSearch");
   search.addEventListener("input", () => {
@@ -823,6 +857,7 @@ function renderToolDetail() {
           if (r.ingredients && r.ingredients.length) meta.push(`${iconHtml("list-bullets")} ${r.ingredients.length} ingr.`);
           if (r.servings) meta.push(`${iconHtml("fork-knife")} per ${r.servings}`);
           if (r.time) meta.push(`${iconHtml("timer")} ${r.time} min`);
+          if (r.difficulty) meta.push(`${iconHtml("fire")} ${diffLabel(r.difficulty)}`);
           if (safeUrl(r.url)) meta.push(iconHtml("link-simple"));
           if (r.notes) meta.push(iconHtml("note-pencil"));
           const metaHtml = meta.length
@@ -959,15 +994,15 @@ function renderRecipeDetail() {
   root.innerHTML = `
     <div class="toolbar">
       <button class="back-btn" id="back">${iconHtml("arrow-left")}</button>
-      <div class="toolbar__title" style="flex:1">${escapeHtml(r.title)}</div>
+      <div class="toolbar__title" style="flex:1">${r.photo ? "" : escapeHtml(r.title)}</div>
       <button class="back-btn fav-btn ${r.favorite ? "is-fav" : ""}" id="favBtn" title="Preferito">${iconHtml("heart")}</button>
     </div>
-    ${r.photo ? `<img class="recipe-photo" src="${escapeHtml(r.photo)}" alt="" />` : ""}
+    ${r.photo ? `<div class="recipe-hero"><img src="${escapeHtml(r.photo)}" alt="" /><div class="recipe-hero__grad"></div><h2 class="recipe-hero__title">${escapeHtml(r.title)}</h2></div>` : ""}
     <div class="detail-top">
       ${tool ? `<span class="recipe-tool-chip" style="margin:0">${iconHtml(tool.icon)} ${escapeHtml(tool.name)}</span>` : "<span></span>"}
       ${ratingRow}
     </div>
-    ${(tagsArr.length || r.time) ? `<div class="tag-row">${r.time ? `<span class="tagchip tagchip--ro">${iconHtml("timer")} ${r.time} min</span>` : ""}${tagsArr.map((t) => `<span class="tagchip tagchip--ro">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
+    ${(tagsArr.length || r.time || r.difficulty) ? `<div class="tag-row">${r.time ? `<span class="tagchip tagchip--ro">${iconHtml("timer")} ${r.time} min</span>` : ""}${r.difficulty ? `<span class="tagchip tagchip--ro">${iconHtml("fire")} ${diffLabel(r.difficulty)}</span>` : ""}${tagsArr.map((t) => `<span class="tagchip tagchip--ro">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
     ${Array.isArray(r.allergens) && r.allergens.length ? `<div class="tag-row">${r.allergens.map((a) => `<span class="tagchip tagchip--allerg">⚠ ${escapeHtml(a)}</span>`).join("")}</div>` : ""}
     ${url ? `<a class="btn btn--block" id="openLink" href="${escapeHtml(url)}" target="_blank" rel="noopener" style="margin-bottom:16px">${iconHtml("arrow-square-out")} Apri la ricetta</a>` : ""}
 
@@ -1494,6 +1529,7 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
   const notes = recipe ? recipe.notes : "";
   const servings = recipe ? (recipe.servings || "") : (prefill && prefill.servings ? prefill.servings : "");
   const time = recipe ? (recipe.time || "") : (prefill && prefill.time ? prefill.time : "");
+  const difficulty = recipe ? (recipe.difficulty || "") : "";
   const ingText = recipe
     ? (recipe.ingredients || []).map((i) => i.raw || ingredientText(i)).join("\n")
     : (prefill && prefill.ingredients ? prefill.ingredients.join("\n") : "");
@@ -1547,6 +1583,15 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
         <label>Tempo (minuti)</label>
         <input type="number" id="rTime" inputmode="numeric" min="1" placeholder="Es. 30" value="${escapeHtml(time)}" />
       </div>
+    </div>
+    <div class="field">
+      <label>Difficoltà</label>
+      <select id="rDiff">
+        <option value=""${!difficulty ? " selected" : ""}>—</option>
+        <option value="1"${difficulty == 1 ? " selected" : ""}>Facile</option>
+        <option value="2"${difficulty == 2 ? " selected" : ""}>Media</option>
+        <option value="3"${difficulty == 3 ? " selected" : ""}>Difficile</option>
+      </select>
     </div>
     <div class="field">
       <label>Ingredienti (uno per riga)</label>
@@ -1675,6 +1720,7 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       ingredients: parseList(m.el.querySelector("#rIngredients").value),
       servings: parseInt(m.el.querySelector("#rServings").value, 10) || null,
       time: parseInt(m.el.querySelector("#rTime").value, 10) || null,
+      difficulty: parseInt(m.el.querySelector("#rDiff").value, 10) || null,
       steps: m.el.querySelector("#rSteps").value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean),
       photo: photo,
       tags: tags,

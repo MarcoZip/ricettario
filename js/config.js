@@ -14,7 +14,7 @@
 // ============================================================
 
 // Versione dell'app (mostrata in Impostazioni). Da alzare a ogni release.
-export const APP_VERSION = "2.9";
+export const APP_VERSION = "3.0";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyDOpr2Q0KXamaMdyAXzLvP9dA_U3kQj14E",
