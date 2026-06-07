@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "3.2",
+    d: "2026-06-04",
+    minor: true,
+    items: [
+      "Il tasto Indietro del telefono ora torna alla schermata precedente invece di chiudere l'app."
+    ]
+  },
+  {
     v: "3.1",
     d: "2026-06-04",
     minor: true,

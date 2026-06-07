@@ -201,6 +201,36 @@ export function mount(rootEl) {
     }
   } catch {}
   maybeShowWhatsNew();
+  setupBackHandler();
+}
+
+// Tasto Indietro del telefono: torna alla schermata precedente DENTRO l'app
+// invece di chiuderla. Teniamo sempre uno "stato in più" nella cronologia: a
+// ogni Indietro lo consumiamo e, se abbiamo qualcosa da chiudere, ne rimettiamo
+// uno; quando siamo alla home l'app può chiudersi normalmente.
+let activeCookClose = null; // funzione di chiusura della Modalità cucina, se aperta
+function handleAppBack() {
+  const modals = document.querySelectorAll("#modalRoot .modal-backdrop");
+  if (modals.length) { modals[modals.length - 1].remove(); return true; }
+  if (activeCookClose) { try { activeCookClose(); } catch (e) {} return true; }
+  const guide = document.querySelector(".guide");
+  if (guide) { guide.remove(); return true; }
+  if (loginMode) return false;
+  if (currentRecipeId) { currentRecipeId = null; detailServings = null; withTransition(() => render()); return true; }
+  if (currentToolId) { currentToolId = null; withTransition(() => render()); return true; }
+  if (currentRoute && currentRoute !== "strumenti") { navigate("strumenti"); return true; }
+  return false;
+}
+function setupBackHandler() {
+  try {
+    history.replaceState({ app: true }, "");
+    history.pushState({ app: true }, "");
+  } catch (e) { return; }
+  window.addEventListener("popstate", () => {
+    const acted = handleAppBack();
+    if (acted) { try { history.pushState({ app: true }, ""); } catch (e) {} }
+    else { try { history.back(); } catch (e) {} }
+  });
 }
 
 // Mostra le novità quando la versione è cambiata dall'ultima volta (non al primo
@@ -1468,7 +1498,9 @@ function openCookingMode(recipe) {
     stopVoice();
     document.removeEventListener("visibilitychange", onVis);
     el.remove();
+    activeCookClose = null;
   }
+  activeCookClose = close;
 
   draw();
 }
