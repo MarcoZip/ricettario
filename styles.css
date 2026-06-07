@@ -190,9 +190,17 @@ a { color: var(--primary-2); }
   padding: 6px 2px;
 }
 .bottom-nav__label { white-space: nowrap; }
-.bottom-nav__icon { font-size: 1.35rem; opacity: 0.75; transition: 0.2s; }
+.bottom-nav__icon { font-size: 1.35rem; opacity: 0.75; transition: transform 0.25s cubic-bezier(0.2, 1.5, 0.4, 1), opacity 0.2s; }
+.bottom-nav__btn { position: relative; }
 .bottom-nav__btn.is-active { color: var(--primary-2); }
-.bottom-nav__btn.is-active .bottom-nav__icon { opacity: 1; transform: translateY(-1px); }
+.bottom-nav__btn.is-active .bottom-nav__icon { opacity: 1; transform: translateY(-2px) scale(1.18); }
+.bottom-nav__btn.is-active::after { content: ""; position: absolute; bottom: 2px; left: 50%; width: 16px; height: 3px; border-radius: 3px; background: var(--primary); transform: translateX(-50%); }
+@media (prefers-reduced-motion: no-preference) {
+  .bottom-nav__btn.is-active .bottom-nav__icon { animation: navPop 0.4s cubic-bezier(0.2, 1.5, 0.4, 1); }
+  .bottom-nav__btn.is-active::after { animation: navBar 0.3s ease; }
+}
+@keyframes navPop { 0% { transform: translateY(-2px) scale(0.8); } 55% { transform: translateY(-2px) scale(1.32); } 100% { transform: translateY(-2px) scale(1.18); } }
+@keyframes navBar { from { width: 0; opacity: 0; } to { width: 16px; opacity: 1; } }
 
 /* ---------- Tool grid ---------- */
 .tool-grid {
@@ -579,8 +587,10 @@ a { color: var(--primary-2); }
   ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.3s; }
 }
 @keyframes cardIn { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
-.tool-card { transition: transform 0.12s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.2s; }
-.tool-card:active { transform: scale(0.96); }
+.tool-card { transition: transform 0.14s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.2s; }
+.tool-card:active { transform: perspective(700px) rotateX(8deg) scale(0.96); box-shadow: 0 10px 22px -12px rgba(0, 0, 0, 0.6); }
+.rotd { transition: transform 0.16s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.2s; }
+.rotd:active { transform: perspective(800px) rotateX(6deg) scale(0.985); }
 
 /* ---------- Skeleton caricamento ---------- */
 .meal-card--skeleton { pointer-events: none; }
@@ -796,6 +806,12 @@ a { color: var(--primary-2); }
 .shop-row { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 11px 12px; margin-bottom: 8px; }
 .shop-row .check { width: 27px; height: 27px; flex-shrink: 0; border-radius: 50%; border: 2px solid var(--surface-3); background: transparent; display: flex; align-items: center; justify-content: center; color: #06231d; font-size: 0.9rem; transition: 0.15s; }
 .shop-row.is-checked .check { background: var(--accent); border-color: var(--accent); }
+@media (prefers-reduced-motion: no-preference) {
+  .shop-row.just-checked .check { animation: checkPop 0.42s cubic-bezier(0.2, 1.5, 0.4, 1); }
+  .shop-row.just-checked { animation: rowFlash 0.6s ease; }
+}
+@keyframes checkPop { 0% { transform: scale(0.2); } 55% { transform: scale(1.35); } 100% { transform: scale(1); } }
+@keyframes rowFlash { 0% { background: rgba(54, 209, 183, 0.22); } 100% { background: var(--surface); } }
 .shop-row__name { flex: 1; font-weight: 600; cursor: pointer; }
 .shop-row__amt { color: var(--text-soft); font-weight: 700; font-size: 0.85rem; background: var(--input-bg); border: 1px solid var(--border); border-radius: 9px; padding: 4px 9px; min-width: 34px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .shop-row__amt:active { transform: scale(0.95); }
@@ -883,7 +899,6 @@ a { color: var(--primary-2); }
 .rotd__body { position: absolute; left: 14px; right: 14px; bottom: 12px; display: flex; flex-direction: column; gap: 3px; text-align: left; }
 .rotd__lbl { font-size: 0.74rem; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase; color: #ffd9a8; }
 .rotd__title { font-size: 1.2rem; font-weight: 800; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
-@media (prefers-reduced-motion: no-preference) { .rotd:active { transform: scale(0.985); } }
 .recipe-item.has-thumb { display: flex; gap: 12px; align-items: center; }
 .recipe-item__main { flex: 1; min-width: 0; }
 .recipe-thumb { width: 60px; height: 60px; border-radius: 12px; object-fit: cover; flex-shrink: 0; }

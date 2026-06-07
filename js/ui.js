@@ -88,6 +88,7 @@ let planMonth = null; // mese (0-11) mostrato nel calendario
 let homeQuery = ""; // ricerca nella home
 let homeFilter = ""; // "" | "fav" | "cooked" | "recent" | "menu" | <nome tag>
 let shopTab = "lista"; // scheda Spesa: "lista" | "dispensa"
+let lastShopToggled = null; // id dell'ultimo articolo spuntato (per l'animazione)
 let planView = "month"; // "month" | "week"
 let weekAnchor = null; // data di riferimento per la vista settimana
 
@@ -1044,6 +1045,18 @@ function renderRecipeDetail() {
   `;
 
   root.querySelector("#back").addEventListener("click", () => { currentRecipeId = null; detailServings = null; withTransition(() => render()); });
+
+  // Parallax/zoom della foto hero mentre si scorre (si auto-rimuove uscendo).
+  const heroEl = root.querySelector(".recipe-hero");
+  if (heroEl && !reduceMotion) {
+    const heroImg = heroEl.querySelector("img");
+    const onHeroScroll = () => {
+      if (!document.body.contains(heroEl)) { window.removeEventListener("scroll", onHeroScroll); return; }
+      const y = Math.max(0, window.scrollY || window.pageYOffset || 0);
+      heroImg.style.transform = `scale(${1 + Math.min(y, 320) * 0.0007}) translateY(${Math.min(y, 320) * 0.08}px)`;
+    };
+    window.addEventListener("scroll", onHeroScroll, { passive: true });
+  }
   const pMinus = root.querySelector("#pMinus");
   const pPlus = root.querySelector("#pPlus");
   if (pMinus) pMinus.addEventListener("click", () => { detailServings = Math.max(1, (detailServings || base || 1) - 1); render(); });
@@ -1906,7 +1919,7 @@ function shopRow(it) {
   const qty = it.qty != null ? formatQty(it.qty) : "";
   const amount = [qty, it.unit && it.unit !== "q.b." ? it.unit : (it.unit === "q.b." ? "q.b." : "")].filter(Boolean).join(" ");
   return `
-    <div class="shop-row ${it.checked ? "is-checked" : ""}" data-id="${it.id}">
+    <div class="shop-row ${it.checked ? "is-checked" : ""}${it.checked && it.id === lastShopToggled ? " just-checked" : ""}" data-id="${it.id}">
       <button class="check" data-act="check">${it.checked ? iconHtml("check") : ""}</button>
       <span class="shop-row__name" data-act="toggle">${escapeHtml(it.name)}</span>
       <button class="shop-row__amt" data-act="qty" title="Modifica quantità">${amount ? escapeHtml(amount) : iconHtml("pencil-simple")}</button>
@@ -2013,7 +2026,9 @@ function renderShoppingList() {
     const id = rowEl.dataset.id;
     const toggle = () => {
       const it = store.getShopping().find((s) => s.id === id);
-      store.toggleShoppingItem(id, !(it && it.checked));
+      const willCheck = !(it && it.checked);
+      lastShopToggled = willCheck ? id : null; // anima solo quando si spunta
+      store.toggleShoppingItem(id, willCheck);
     };
     rowEl.querySelector('[data-act="check"]').addEventListener("click", toggle);
     const nameEl = rowEl.querySelector('[data-act="toggle"]');
@@ -2038,6 +2053,7 @@ function renderShoppingList() {
   });
   const ab = wrap.querySelector("#aisleBtn");
   if (ab) ab.addEventListener("click", openAisleOrder);
+  lastShopToggled = null; // consuma l'animazione: i prossimi render non ri-animano
 }
 
 // Ordine dei reparti nella lista della spesa (personalizzabile per corsia).

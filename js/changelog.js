@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "3.1",
+    d: "2026-06-04",
+    minor: true,
+    items: [
+      "Tocchi grafici: barra di navigazione animata, card in 3D al tocco, spunta animata nella spesa e foto della ricetta con effetto parallax."
+    ]
+  },
+  {
     v: "3.0",
     d: "2026-06-04",
     items: [
