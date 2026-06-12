@@ -13,6 +13,16 @@ export async function searchGz(query) {
   return Array.isArray(d.results) ? d.results : [];
 }
 
+// Abbinamento vino consigliato per un piatto (via Spoonacular).
+export async function winePairing(food) {
+  if (!WORKER_URL || !food) return null;
+  const res = await fetch(`${WORKER_URL}/wine?food=${encodeURIComponent(food)}`);
+  if (!res.ok) return null;
+  const d = await res.json().catch(() => null);
+  if (!d || d.error) return null;
+  return d;
+}
+
 // Dettagli completi (con i passi) di una ricetta Spoonacular, al salvataggio.
 export async function spoonInfo(id) {
   if (!WORKER_URL || !id) return null;

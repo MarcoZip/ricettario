@@ -7,8 +7,8 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchSpoon, spoonInfo } from "./import-recipe.js";
-import { translateRecipe, translateList, translateToEnglish } from "./translate.js";
+import { importFromUrl, searchGz, searchSpoon, spoonInfo, winePairing } from "./import-recipe.js";
+import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
 import { estimateCost } from "./cost.js";
@@ -596,6 +596,10 @@ function openStats() {
 
   const m = openModal(`
     <h3 class="modal__title">${iconHtml("fire")} Diario di cucina</h3>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn btn--ghost" id="achBtn" style="flex:1">🏆 Traguardi</button>
+      <button class="btn btn--ghost" id="calBtn" style="flex:1">📅 Calendario</button>
+    </div>
     <div class="cl-scroll">
       <div class="stat-tiles">
         ${stat(recipes.length, recipes.length === 1 ? "ricetta" : "ricette")}
@@ -608,6 +612,97 @@ function openStats() {
     <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
   `);
   m.el.querySelector('[data-act="ok"]').onclick = m.close;
+  m.el.querySelector("#achBtn").onclick = openAchievements;
+  m.el.querySelector("#calBtn").onclick = openCookCalendar;
+}
+
+// Traguardi di cucina (badge sbloccati in base ai dati raccolti).
+function computeCookStats() {
+  const recipes = store.getAllRecipes();
+  const tags = new Set();
+  recipes.forEach((r) => (r.tags || []).forEach((t) => tags.add((t || "").toLowerCase())));
+  const days = new Set();
+  recipes.forEach((r) => (r.cookLog || []).forEach((ts) => { const d = String(ts).slice(0, 10); if (d) days.add(d); }));
+  const sorted = [...days].sort();
+  let streak = 0, max = 0, prev = null;
+  for (const d of sorted) {
+    if (prev && (new Date(d) - new Date(prev)) === 86400000) streak++; else streak = 1;
+    prev = d; if (streak > max) max = streak;
+  }
+  return {
+    totalRecipes: recipes.length,
+    totalCooked: recipes.reduce((s, r) => s + (r.cookCount || 0), 0),
+    favs: recipes.filter((r) => r.favorite).length,
+    toolsUsed: new Set(recipes.map((r) => r.toolId)).size,
+    distinctTags: tags.size,
+    cookDays: days.size,
+    maxStreak: max
+  };
+}
+const ACHIEVEMENTS = [
+  { e: "🍳", t: "Primi passi", d: "Salva la prima ricetta", test: (s) => s.totalRecipes >= 1 },
+  { e: "📚", t: "Collezionista", d: "10 ricette salvate", test: (s) => s.totalRecipes >= 10 },
+  { e: "🏆", t: "Gran ricettario", d: "25 ricette salvate", test: (s) => s.totalRecipes >= 25 },
+  { e: "🔥", t: "Ai fornelli", d: "Cucina una ricetta", test: (s) => s.totalCooked >= 1 },
+  { e: "👨‍🍳", t: "Cuoco esperto", d: "Cucina 10 volte", test: (s) => s.totalCooked >= 10 },
+  { e: "⭐", t: "Maestro", d: "Cucina 50 volte", test: (s) => s.totalCooked >= 50 },
+  { e: "❤️", t: "Affezionato", d: "5 ricette preferite", test: (s) => s.favs >= 5 },
+  { e: "🧰", t: "Esploratore", d: "Usa 3 strumenti diversi", test: (s) => s.toolsUsed >= 3 },
+  { e: "📅", t: "Costanza", d: "Cucina in 5 giorni", test: (s) => s.cookDays >= 5 },
+  { e: "⚡", t: "Serie", d: "3 giorni di fila", test: (s) => s.maxStreak >= 3 },
+  { e: "🌈", t: "Buongustaio", d: "5 categorie diverse", test: (s) => s.distinctTags >= 5 }
+];
+function openAchievements() {
+  const s = computeCookStats();
+  const items = ACHIEVEMENTS.map((a) => ({ a, ok: a.test(s) }));
+  const unlocked = items.filter((x) => x.ok).length;
+  const grid = items.map((x) => `<div class="ach ${x.ok ? "is-on" : ""}"><span class="ach__e">${x.a.e}</span><span class="ach__t">${escapeHtml(x.a.t)}</span><span class="ach__d">${escapeHtml(x.a.d)}</span>${x.ok ? "" : `<span class="ach__lock">🔒</span>`}</div>`).join("");
+  const m = openModal(`
+    <h3 class="modal__title">🏆 Traguardi</h3>
+    <p class="hint" style="margin-top:-6px">${unlocked} di ${items.length} sbloccati</p>
+    <div class="cl-scroll"><div class="ach-grid">${grid}</div></div>
+    <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
+  `);
+  m.el.querySelector('[data-act="ok"]').onclick = m.close;
+}
+
+// Calendario del diario: i giorni in cui hai cucinato, con cosa.
+function openCookCalendar() {
+  const map = {};
+  store.getAllRecipes().forEach((r) => (r.cookLog || []).forEach((ts) => { const d = String(ts).slice(0, 10); if (d) (map[d] = map[d] || []).push(r.title); }));
+  const cur = new Date(); cur.setDate(1);
+  const pad = (x) => String(x).padStart(2, "0");
+  const MESI = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+  const m = openModal(`
+    <h3 class="modal__title">📅 Calendario cucina</h3>
+    <div id="calBody"></div>
+    <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
+  `);
+  m.el.querySelector('[data-act="ok"]').onclick = m.close;
+  const body = m.el.querySelector("#calBody");
+  const draw = () => {
+    const y = cur.getFullYear(), mo = cur.getMonth();
+    const startDow = (new Date(y, mo, 1).getDay() + 6) % 7;
+    const ndays = new Date(y, mo + 1, 0).getDate();
+    let cells = "";
+    for (let i = 0; i < startDow; i++) cells += `<div class="cal-cell cal-cell--empty"></div>`;
+    for (let d = 1; d <= ndays; d++) {
+      const ds = `${y}-${pad(mo + 1)}-${pad(d)}`;
+      const has = map[ds];
+      cells += `<div class="cal-cell ${has ? "is-cooked" : ""}" ${has ? `data-day="${ds}"` : ""}>${d}${has ? `<span class="cal-dot"></span>` : ""}</div>`;
+    }
+    body.innerHTML = `
+      <div class="cal-nav"><button class="aisle-btn" data-nav="-1">‹</button><span class="cal-title">${MESI[mo]} ${y}</span><button class="aisle-btn" data-nav="1">›</button></div>
+      <div class="cal-dow">${["L", "M", "M", "G", "V", "S", "D"].map((x) => `<span>${x}</span>`).join("")}</div>
+      <div class="cal-grid">${cells}</div>
+      <div id="calDetail" class="hint" style="margin-top:8px;min-height:18px"></div>`;
+    body.querySelectorAll("[data-nav]").forEach((b) => b.onclick = () => { cur.setMonth(cur.getMonth() + parseInt(b.dataset.nav, 10)); draw(); });
+    body.querySelectorAll(".cal-cell.is-cooked").forEach((c) => c.onclick = () => {
+      const dd = c.dataset.day.split("-");
+      body.querySelector("#calDetail").textContent = `${dd[2]}/${dd[1]}: ${map[c.dataset.day].join(", ")}`;
+    });
+  };
+  draw();
 }
 
 function openChangelog(entries, opts = {}) {
@@ -1022,6 +1117,10 @@ function renderRecipeDetail() {
       <h3 class="section-title">${iconHtml("shuffle")} Sostituzioni</h3>
       <div class="subs-list">${subs.map((s) => `<div class="subs-row"><b>${escapeHtml(s.name)}</b> → ${escapeHtml(s.sub)}</div>`).join("")}</div>
     </div>` : "";
+  const wineCard = SPOONACULAR_ENABLED ? `<div class="section-card" id="wineCard">
+      <h3 class="section-title">🍷 Vino consigliato</h3>
+      <div id="wineBody"><button class="btn btn--ghost btn--block" id="wineBtn">Suggerisci un vino</button></div>
+    </div>` : "";
 
   root.innerHTML = `
     <div class="toolbar">
@@ -1048,6 +1147,7 @@ function renderRecipeDetail() {
 
     ${costCard}
     ${subsCard}
+    ${wineCard}
 
     ${steps.length ? `<div class="section-card">
       <h3 class="section-title">${iconHtml("fork-knife")} Preparazione</h3>
@@ -1172,6 +1272,18 @@ function renderRecipeDetail() {
       if (res === "downloaded") toast("Immagine salvata", "success");
     } catch (e) { toast("Impossibile creare l'immagine", "error"); }
     shareImgBtn.disabled = false; shareImgBtn.innerHTML = old;
+  });
+
+  const wineBtn = root.querySelector("#wineBtn");
+  if (wineBtn) wineBtn.addEventListener("click", async () => {
+    const wb = root.querySelector("#wineBody");
+    wb.innerHTML = `<div class="hint" style="margin:0">Cerco l'abbinamento…</div>`;
+    try {
+      const w = await winePairing(await translateToEnglish(r.title));
+      if (!w || (!w.text && !(w.wines || []).length)) { wb.innerHTML = `<div class="hint" style="margin:0">Nessun abbinamento trovato per questo piatto.</div>`; return; }
+      const text = w.text ? await translateText(w.text) : "";
+      wb.innerHTML = `${(w.wines && w.wines.length) ? `<div class="tag-row" style="margin-bottom:6px">${w.wines.slice(0, 5).map((x) => `<span class="tagchip tagchip--ro">🍷 ${escapeHtml(x)}</span>`).join("")}</div>` : ""}${text ? `<div class="hint" style="margin:0">${escapeHtml(text)}</div>` : ""}`;
+    } catch (e) { wb.innerHTML = `<div class="hint" style="margin:0">Servizio non disponibile.</div>`; }
   });
 
   root.querySelector("#editRecipe").addEventListener("click", () => openRecipeForm({ recipe: r }));
@@ -2263,6 +2375,7 @@ function renderPantry() {
         <input type="date" id="panExp" title="Scadenza (facoltativa)" />
         <button class="btn btn--primary" id="panAddBtn">${iconHtml("plus")} Aggiungi</button>
       </div>
+      ${("BarcodeDetector" in window) ? `<button class="btn btn--ghost btn--block" id="panScan" style="margin-top:8px">📷 Scansiona codice a barre</button>` : ""}
     </div>
     <div>${list}</div>
   `;
@@ -2279,9 +2392,55 @@ function renderPantry() {
   wrap.querySelector("#panAddBtn").addEventListener("click", doAdd);
   addInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdd(); });
   wrap.querySelector("#cookSuggest").addEventListener("click", openCookSuggestions);
+  const scanBtn = wrap.querySelector("#panScan");
+  if (scanBtn) scanBtn.addEventListener("click", openBarcodeScanner);
   wrap.querySelectorAll(".shop-row").forEach((rowEl) => {
     rowEl.querySelector('[data-act="del"]').addEventListener("click", () => store.deletePantryItem(rowEl.dataset.id));
   });
+}
+
+// Scanner del codice a barre → aggiunge in dispensa (nome da Open Food Facts).
+async function addFromBarcode(code) {
+  try {
+    const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(code)}.json`);
+    const d = await res.json();
+    const p = d && d.product;
+    const name = (p && (p.product_name_it || p.product_name || p.generic_name_it || p.generic_name) || "").trim();
+    if (name) { await store.addPantryItem(name, null); toast(`Aggiunto: ${name}`, "success"); }
+    else { toast(`Prodotto non trovato (codice ${code})`, "error"); }
+  } catch (e) { toast("Ricerca prodotto non riuscita", "error"); }
+}
+async function openBarcodeScanner() {
+  if (!("BarcodeDetector" in window)) { toast("Scanner non supportato su questo telefono", "error"); return; }
+  let stream = null, raf = null, stopped = false;
+  const el = document.createElement("div");
+  el.className = "scan";
+  el.innerHTML = `<video class="scan__video" playsinline muted></video><div class="scan__frame"></div><div class="scan__hint">Inquadra il codice a barre del prodotto</div><button class="scan__close" title="Chiudi">${iconHtml("x")}</button>`;
+  document.getElementById("modalRoot").appendChild(el);
+  const video = el.querySelector("video");
+  const cleanup = () => { stopped = true; if (raf) cancelAnimationFrame(raf); if (stream) stream.getTracks().forEach((t) => t.stop()); el.remove(); };
+  el.querySelector(".scan__close").onclick = cleanup;
+  let detector;
+  try {
+    detector = new window.BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e"] });
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    video.srcObject = stream;
+    await video.play();
+  } catch (e) { toast("Impossibile accedere alla fotocamera", "error"); cleanup(); return; }
+  const scan = async () => {
+    if (stopped) return;
+    try {
+      const codes = await detector.detect(video);
+      if (codes && codes.length && codes[0].rawValue) {
+        const code = codes[0].rawValue;
+        cleanup();
+        await addFromBarcode(code);
+        return;
+      }
+    } catch (e) { /* frame non leggibile */ }
+    raf = requestAnimationFrame(scan);
+  };
+  raf = requestAnimationFrame(scan);
 }
 
 function openCookSuggestions() {

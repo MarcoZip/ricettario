@@ -6,6 +6,16 @@
 
 export const CHANGELOG = [
   {
+    v: "3.8",
+    d: "2026-06-04",
+    items: [
+      "Traguardi di cucina: sblocca badge mentre usi l'app (nel Diario di cucina).",
+      "Calendario del diario: vedi i giorni in cui hai cucinato e cosa.",
+      "Scansiona il codice a barre di un prodotto per aggiungerlo in dispensa.",
+      "Abbinamento vino consigliato nel dettaglio di una ricetta."
+    ]
+  },
+  {
     v: "3.7",
     d: "2026-06-04",
     minor: true,

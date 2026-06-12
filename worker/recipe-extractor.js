@@ -98,6 +98,19 @@ async function handleSpoonInfo(id, env) {
   } catch (e) { return json({ error: "spoonerr" }, 200); }
 }
 
+// Abbinamento vino (Spoonacular) per un piatto/ingrediente.
+async function handleWine(food, env) {
+  if (!env || !env.SPOON_KEY) return json({ error: "nokey" }, 200);
+  if (!food || !food.trim()) return json({ error: "missing" }, 400);
+  try {
+    const u = "https://api.spoonacular.com/food/wine/pairing?food=" + encodeURIComponent(food.trim()) + "&apiKey=" + env.SPOON_KEY;
+    const res = await fetch(u);
+    if (!res.ok) return json({ error: "spoonerr" }, 200);
+    const r = await res.json();
+    return json({ wines: r.pairedWines || [], text: r.pairingText || "" }, 200);
+  } catch (e) { return json({ error: "spoonerr" }, 200); }
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
@@ -106,6 +119,7 @@ export default {
     if (url.pathname === "/searchgz") return handleSearchGz(url.searchParams.get("q"));
     if (url.pathname === "/spoon") return handleSpoon(url.searchParams.get("q"), env);
     if (url.pathname === "/spoon-info") return handleSpoonInfo(url.searchParams.get("id"), env);
+    if (url.pathname === "/wine") return handleWine(url.searchParams.get("food"), env);
 
     const target = url.searchParams.get("url");
     if (!target) return json({ error: "missing", message: "Parametro 'url' mancante" }, 400);
