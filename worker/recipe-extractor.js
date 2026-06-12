@@ -58,6 +58,7 @@ async function handleSpoon(q, env) {
     const results = (data.results || []).map((r) => {
       const steps = ((r.analyzedInstructions || [])[0] || {}).steps || [];
       return {
+        id: r.id || null,
         title: r.title || "",
         image: r.image || "",
         link: r.sourceUrl || ("https://spoonacular.com/recipes/" + (r.id || "")),
@@ -71,6 +72,32 @@ async function handleSpoon(q, env) {
   } catch (e) { return json({ error: "spoonerr", results: [] }, 200); }
 }
 
+// Dettagli completi di una ricetta Spoonacular (con i passi), al salvataggio.
+async function handleSpoonInfo(id, env) {
+  if (!env || !env.SPOON_KEY) return json({ error: "nokey" }, 200);
+  if (!id) return json({ error: "missing" }, 400);
+  try {
+    const u = "https://api.spoonacular.com/recipes/" + encodeURIComponent(id) + "/information?includeNutrition=false&apiKey=" + env.SPOON_KEY;
+    const res = await fetch(u);
+    if (!res.ok) return json({ error: "spoonerr" }, 200);
+    const r = await res.json();
+    let steps = (((r.analyzedInstructions || [])[0] || {}).steps || []).map((s) => clean(s.step || "")).filter(Boolean);
+    if (!steps.length && r.instructions) {
+      const li = [...String(r.instructions).matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)].map((m) => clean(m[1])).filter(Boolean);
+      steps = li.length ? li : clean(r.instructions).split(/(?<=[.!?])\s+(?=[A-Z0-9])/).map((s) => s.trim()).filter(Boolean);
+    }
+    return json({
+      title: r.title || "",
+      image: r.image || "",
+      link: r.sourceUrl || "",
+      ingredients: (r.extendedIngredients || []).map((i) => clean(i.original || i.name || "")).filter(Boolean),
+      steps,
+      servings: r.servings || null,
+      time: r.readyInMinutes || null
+    }, 200);
+  } catch (e) { return json({ error: "spoonerr" }, 200); }
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
@@ -78,6 +105,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/searchgz") return handleSearchGz(url.searchParams.get("q"));
     if (url.pathname === "/spoon") return handleSpoon(url.searchParams.get("q"), env);
+    if (url.pathname === "/spoon-info") return handleSpoonInfo(url.searchParams.get("id"), env);
 
     const target = url.searchParams.get("url");
     if (!target) return json({ error: "missing", message: "Parametro 'url' mancante" }, 400);

@@ -7,7 +7,7 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchSpoon } from "./import-recipe.js";
+import { importFromUrl, searchGz, searchSpoon, spoonInfo } from "./import-recipe.js";
 import { translateRecipe, translateList, translateToEnglish } from "./translate.js";
 import { shareRecipeImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
@@ -1825,7 +1825,7 @@ async function runMealSearch(q) {
   }
   if (mealSource === "spoon") {
     const rs = await searchSpoon(await translateToEnglish(q));
-    const out = rs.map((r) => ({ source: "spoon", title: r.title, image: r.image || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], servings: r.servings || null, time: r.time || null, meta: [r.time ? r.time + " min" : "", r.servings ? "per " + r.servings : ""].filter(Boolean).join(" · ") }));
+    const out = rs.map((r) => ({ source: "spoon", id: r.id || null, title: r.title, image: r.image || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], servings: r.servings || null, time: r.time || null, meta: [r.time ? r.time + " min" : "", r.servings ? "per " + r.servings : ""].filter(Boolean).join(" · ") }));
     await translateMealTitles(out);
     return out;
   }
@@ -1908,10 +1908,27 @@ function renderOnlineTab() {
         } catch (e) { toast(e.message || "Import non riuscito", "error"); }
       } else {
         // TheMealDB / Spoonacular: in inglese → traduco al salvataggio.
+        let src = { title: data.title, link: data.link, image: data.image || "", servings: data.servings || null, time: data.time || null, ingredients: data.ingredients || [], steps: data.steps || [] };
+        // Spoonacular: recupero i dettagli completi (con i passi) prima di tradurre.
+        if (data.source === "spoon" && data.id) {
+          saveBtn.innerHTML = `${iconHtml("download-simple")} Recupero...`;
+          try {
+            const info = await spoonInfo(data.id);
+            if (info) src = {
+              title: info.title || src.title,
+              link: info.link || src.link,
+              image: info.image || src.image,
+              servings: info.servings || src.servings,
+              time: info.time || src.time,
+              ingredients: (info.ingredients && info.ingredients.length) ? info.ingredients : src.ingredients,
+              steps: (info.steps && info.steps.length) ? info.steps : src.steps
+            };
+          } catch (e) { /* uso i dati della ricerca */ }
+        }
         saveBtn.innerHTML = `${iconHtml("download-simple")} Traduco...`;
-        let prefill = { title: data.title, url: data.link, image: data.image || "", servings: data.servings || null, time: data.time || null, ingredients: data.ingredients || [], steps: data.steps || [] };
+        let prefill = { title: src.title, url: src.link, image: src.image, servings: src.servings, time: src.time, ingredients: src.ingredients, steps: src.steps };
         try {
-          const tr = await translateRecipe({ title: data.title, ingredients: prefill.ingredients, steps: prefill.steps });
+          const tr = await translateRecipe({ title: src.title, ingredients: prefill.ingredients, steps: prefill.steps });
           prefill = { ...prefill, title: tr.title, ingredients: tr.ingredients, steps: tr.steps };
         } catch (e) { /* tengo l'inglese */ }
         openRecipeForm({ prefill });

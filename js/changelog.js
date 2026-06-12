@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "3.7",
+    d: "2026-06-04",
+    minor: true,
+    items: [
+      "Salvando una ricetta da Spoonacular ora vengono recuperati anche i passaggi di preparazione."
+    ]
+  },
+  {
     v: "3.6",
     d: "2026-06-04",
     items: [

@@ -13,6 +13,16 @@ export async function searchGz(query) {
   return Array.isArray(d.results) ? d.results : [];
 }
 
+// Dettagli completi (con i passi) di una ricetta Spoonacular, al salvataggio.
+export async function spoonInfo(id) {
+  if (!WORKER_URL || !id) return null;
+  const res = await fetch(`${WORKER_URL}/spoon-info?id=${encodeURIComponent(id)}`);
+  if (!res.ok) return null;
+  const d = await res.json().catch(() => null);
+  if (!d || d.error) return null;
+  return d;
+}
+
 // Ricerca su Spoonacular (inglese, richiede la chiave sul worker).
 export async function searchSpoon(query) {
   if (!WORKER_URL || !query.trim()) return [];
