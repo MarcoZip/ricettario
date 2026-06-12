@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "3.6",
+    d: "2026-06-04",
+    items: [
+      "Nuova fonte nel Ricettario: Spoonacular, un database enorme di ricette (in inglese, tradotte)."
+    ]
+  },
+  {
     v: "3.5",
     d: "2026-06-04",
     minor: true,

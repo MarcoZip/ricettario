@@ -14,7 +14,7 @@
 // ============================================================
 
 // Versione dell'app (mostrata in Impostazioni). Da alzare a ogni release.
-export const APP_VERSION = "3.5";
+export const APP_VERSION = "3.6";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyDOpr2Q0KXamaMdyAXzLvP9dA_U3kQj14E",
@@ -64,4 +64,4 @@ export function isPushConfigured() {
 // Ricerca online su Spoonacular (database enorme in inglese). Per attivarla:
 // aggiungi il secret SPOON_KEY al worker import (chiave gratuita di Spoonacular),
 // ripubblica il worker e metti true qui sotto. Guida in README.
-export const SPOONACULAR_ENABLED = false;
+export const SPOONACULAR_ENABLED = true;
