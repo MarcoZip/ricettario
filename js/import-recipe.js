@@ -4,6 +4,25 @@
 
 import { WORKER_URL } from "./config.js";
 
+// Ricerca diretta su GialloZafferano (italiano): ritorna [{ title, url }].
+export async function searchGz(query) {
+  if (!WORKER_URL || !query.trim()) return [];
+  const res = await fetch(`${WORKER_URL}/searchgz?q=${encodeURIComponent(query.trim())}`);
+  if (!res.ok) throw new Error("Servizio non raggiungibile.");
+  const d = await res.json().catch(() => ({}));
+  return Array.isArray(d.results) ? d.results : [];
+}
+
+// Ricerca su Spoonacular (inglese, richiede la chiave sul worker).
+export async function searchSpoon(query) {
+  if (!WORKER_URL || !query.trim()) return [];
+  const res = await fetch(`${WORKER_URL}/spoon?q=${encodeURIComponent(query.trim())}`);
+  if (!res.ok) throw new Error("Servizio non raggiungibile.");
+  const d = await res.json().catch(() => ({}));
+  if (d.error === "nokey") { const e = new Error("Spoonacular non è configurato sul worker."); e.code = "nokey"; throw e; }
+  return Array.isArray(d.results) ? d.results : [];
+}
+
 export async function importFromUrl(url) {
   if (!WORKER_URL) throw new Error("Import da link non configurato.");
   const endpoint = `${WORKER_URL}${WORKER_URL.includes("?") ? "&" : "?"}url=${encodeURIComponent(url)}`;
@@ -27,6 +46,7 @@ export async function importFromUrl(url) {
     servings: typeof data.servings === "number" ? data.servings : (parseInt(data.servings, 10) || null),
     time: typeof data.time === "number" ? data.time : (parseInt(data.time, 10) || null),
     ingredients: Array.isArray(data.ingredients) ? data.ingredients : [],
-    steps: Array.isArray(data.steps) ? data.steps : []
+    steps: Array.isArray(data.steps) ? data.steps : [],
+    tags: Array.isArray(data.tags) ? data.tags : []
   };
 }

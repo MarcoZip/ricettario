@@ -14,7 +14,7 @@
 // ============================================================
 
 // Versione dell'app (mostrata in Impostazioni). Da alzare a ogni release.
-export const APP_VERSION = "3.3";
+export const APP_VERSION = "3.4";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyDOpr2Q0KXamaMdyAXzLvP9dA_U3kQj14E",
@@ -60,3 +60,8 @@ export const PUSH_WORKER_URL = "https://fornelli-push.marcozeta73.workers.dev";
 export function isPushConfigured() {
   return Boolean(VAPID_PUBLIC_KEY && PUSH_WORKER_URL);
 }
+
+// Ricerca online su Spoonacular (database enorme in inglese). Per attivarla:
+// aggiungi il secret SPOON_KEY al worker import (chiave gratuita di Spoonacular),
+// ripubblica il worker e metti true qui sotto. Guida in README.
+export const SPOONACULAR_ENABLED = false;

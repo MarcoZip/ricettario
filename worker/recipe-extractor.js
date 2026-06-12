@@ -19,11 +19,67 @@ const CORS = {
   "Access-Control-Allow-Headers": "*"
 };
 
+const BROWSER_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Accept-Language": "it-IT,it;q=0.9,en;q=0.8"
+};
+
+// Ricerca diretta su GialloZafferano (in italiano): ritorna titolo + link.
+async function handleSearchGz(q) {
+  if (!q || !q.trim()) return json({ results: [] }, 200);
+  try {
+    const u = "https://www.giallozafferano.it/ricerca-ricette/" + encodeURIComponent(q.trim()) + "/";
+    const res = await fetch(u, { headers: BROWSER_HEADERS, cf: { cacheTtl: 1800, cacheEverything: true } });
+    if (!res.ok) return json({ error: "unreachable", results: [] }, 200);
+    const html = await res.text();
+    const results = [];
+    const seen = new Set();
+    const re = /class="gz-title"[^>]*>\s*<a href="([^"]+)"[^>]*>([^<]+)<\/a>/g;
+    let m;
+    while ((m = re.exec(html)) && results.length < 20) {
+      const link = m[1], title = clean(m[2]);
+      if (link && title && !seen.has(link)) { seen.add(link); results.push({ title, url: link }); }
+    }
+    return json({ results }, 200);
+  } catch (e) { return json({ error: "unreachable", results: [] }, 200); }
+}
+
+// Ricerca su Spoonacular (database enorme in inglese): serve env.SPOON_KEY.
+async function handleSpoon(q, env) {
+  if (!env || !env.SPOON_KEY) return json({ error: "nokey", results: [] }, 200);
+  if (!q || !q.trim()) return json({ results: [] }, 200);
+  try {
+    const u = "https://api.spoonacular.com/recipes/complexSearch?apiKey=" + env.SPOON_KEY +
+      "&number=10&addRecipeInformation=true&fillIngredients=true&query=" + encodeURIComponent(q.trim());
+    const res = await fetch(u);
+    if (!res.ok) return json({ error: "spoonerr", results: [] }, 200);
+    const data = await res.json();
+    const results = (data.results || []).map((r) => {
+      const steps = ((r.analyzedInstructions || [])[0] || {}).steps || [];
+      return {
+        title: r.title || "",
+        image: r.image || "",
+        link: r.sourceUrl || ("https://spoonacular.com/recipes/" + (r.id || "")),
+        ingredients: (r.extendedIngredients || []).map((i) => clean(i.original || i.name || "")).filter(Boolean),
+        steps: steps.map((s) => clean(s.step || "")).filter(Boolean),
+        servings: r.servings || null,
+        time: r.readyInMinutes || null
+      };
+    });
+    return json({ results }, 200);
+  } catch (e) { return json({ error: "spoonerr", results: [] }, 200); }
+}
+
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
 
-    const target = new URL(request.url).searchParams.get("url");
+    const url = new URL(request.url);
+    if (url.pathname === "/searchgz") return handleSearchGz(url.searchParams.get("q"));
+    if (url.pathname === "/spoon") return handleSpoon(url.searchParams.get("q"), env);
+
+    const target = url.searchParams.get("url");
     if (!target) return json({ error: "missing", message: "Parametro 'url' mancante" }, 400);
 
     let res, html;
@@ -173,7 +229,14 @@ function normalize(n) {
     if (p || c) time = (p || 0) + (c || 0);
   }
 
-  return { title: clean(n.name) || "", image: image || "", servings, time: time || null, ingredients, steps };
+  // Categorie/cucina/parole chiave → tag (per arricchire la ricetta importata).
+  const tags = [];
+  const pushTag = (v) => { const t = clean(v); if (t && t.length <= 22 && !tags.some((x) => x.toLowerCase() === t.toLowerCase())) tags.push(t); };
+  [].concat(n.recipeCategory || []).forEach(pushTag);
+  [].concat(n.recipeCuisine || []).forEach(pushTag);
+  if (n.keywords) String(Array.isArray(n.keywords) ? n.keywords.join(",") : n.keywords).split(",").slice(0, 4).forEach(pushTag);
+
+  return { title: clean(n.name) || "", image: image || "", servings, time: time || null, ingredients, steps, tags: tags.slice(0, 6) };
 }
 
 // Converte una durata ISO 8601 (es. "PT1H30M", "PT45M") in minuti.

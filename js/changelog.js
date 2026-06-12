@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "3.4",
+    d: "2026-06-04",
+    items: [
+      "Nel Ricettario puoi scegliere la fonte: cerca direttamente su GialloZafferano (in italiano) oltre a TheMealDB.",
+      "Più siti italiani tra cui sfogliare, e l'import porta anche le categorie come tag."
+    ]
+  },
+  {
     v: "3.3",
     d: "2026-06-04",
     items: [

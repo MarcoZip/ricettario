@@ -10,5 +10,8 @@ export const ITALIAN_SITES = [
   { name: "Buttalapasta", emoji: "🍝", url: "https://www.buttalapasta.it/" },
   { name: "La Cucina Italiana", emoji: "📗", url: "https://www.lacucinaitaliana.it/ricette/" },
   { name: "Sale&Pepe", emoji: "🧂", url: "https://www.salepepe.it/ricette/" },
+  { name: "Cookist", emoji: "👨‍🍳", url: "https://www.cookist.it/" },
+  { name: "Cucchiaio d'Argento", emoji: "🥄", url: "https://www.cucchiaio.it/" },
+  { name: "Tavolartegusto", emoji: "🍽️", url: "https://www.tavolartegusto.it/" },
   { name: "Friggitrice ad aria — ricette", emoji: "🍟", url: "https://www.giallozafferano.it/ricette-cat/Ricette-con-friggitrice-ad-aria/" }
 ];

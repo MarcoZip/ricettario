@@ -144,6 +144,21 @@ con un *Cron Trigger*. È gratuito.
 
 ---
 
+## Ricerca online: GialloZafferano e Spoonacular
+
+La scheda "Cerca online" può cercare su più fonti. Per **GialloZafferano** (in
+italiano) e **Spoonacular** serve ripubblicare il worker `ricette-import` con il
+codice aggiornato di `worker/recipe-extractor.js` (ha i nuovi endpoint
+`/searchgz` e `/spoon`). GialloZafferano funziona subito; Spoonacular è opzionale.
+
+**Spoonacular (facoltativo, database enorme in inglese):**
+1. Crea una chiave gratuita su [spoonacular.com/food-api](https://spoonacular.com/food-api).
+2. Worker `ricette-import` → **Settings → Variables and Secrets** → **Add** →
+   tipo **Secret**, nome **`SPOON_KEY`**, valore = la tua chiave. Ripubblica il worker.
+3. In `js/config.js` metti `SPOONACULAR_ENABLED = true` e ripubblica l'app.
+
+---
+
 ## (Admin) Avvisare tutti di una novità (notifica push)
 
 L'amministratore può inviare una notifica push a **tutti** gli utenti iscritti
