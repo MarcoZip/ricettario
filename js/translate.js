@@ -2,11 +2,11 @@
 // senza chiave). Usato per le ricette di TheMealDB (in inglese) al salvataggio.
 // Se la traduzione non riesce (rete/limiti), si tiene il testo originale.
 
-async function gtx(text, timeoutMs = 8000) {
+async function gtx(text, timeoutMs = 8000, sl = "en", tl = "it") {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=it&dt=t&q=" + encodeURIComponent(text);
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=` + encodeURIComponent(text);
     const res = await fetch(url, { signal: ctrl.signal });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
@@ -15,6 +15,13 @@ async function gtx(text, timeoutMs = 8000) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Traduce dall'italiano all'inglese (per cercare su database in inglese).
+export async function translateToEnglish(text) {
+  const t = (text || "").trim();
+  if (!t) return text || "";
+  try { return (await gtx(t, 8000, "it", "en")).trim(); } catch (e) { return text; }
 }
 
 export async function translateText(text) {

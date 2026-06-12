@@ -8,7 +8,7 @@ import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
 import { importFromUrl } from "./import-recipe.js";
-import { translateRecipe } from "./translate.js";
+import { translateRecipe, translateList, translateToEnglish } from "./translate.js";
 import { shareRecipeImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
 import { estimateCost } from "./cost.js";
@@ -1819,16 +1819,16 @@ function renderOnlineTab() {
   } else if (mealError) {
     resultsHtml = `<div class="empty"><span class="empty__emoji">${iconHtml("cloud-check")}</span>${escapeHtml(mealError)}</div>`;
   } else if (mealResults && mealResults.length === 0) {
-    resultsHtml = `<div class="empty"><span class="empty__emoji">${iconHtml("magnifying-glass")}</span>Nessun risultato. Prova un altro termine (in inglese funziona meglio, es. "chicken").</div>`;
+    resultsHtml = `<div class="empty"><span class="empty__emoji">${iconHtml("magnifying-glass")}</span>Nessun risultato. Prova un altro termine (es. "pasta", "torta", "zuppa").</div>`;
   } else if (mealResults) {
     resultsHtml = mealResults.map(mealCardHtml).join("");
   } else {
-    resultsHtml = `<div class="empty"><span class="empty__emoji">${iconHtml("fork-knife")}</span>Cerca una ricetta oppure tocca <b>Ispirami</b>.<br><small>Fonte: TheMealDB (in inglese)</small></div>`;
+    resultsHtml = `<div class="empty"><span class="empty__emoji">${iconHtml("fork-knife")}</span>Cerca una ricetta in italiano oppure tocca <b>Ispirami</b>.<br><small>Ricette tradotte automaticamente in italiano.</small></div>`;
   }
 
   body.innerHTML = `
     <div class="search-bar">
-      <input type="search" id="mealSearch" placeholder="Cerca (es. pasta, chicken...)" value="${escapeHtml(mealQuery)}" />
+      <input type="search" id="mealSearch" placeholder="Cerca in italiano (es. pollo, torta...)" value="${escapeHtml(mealQuery)}" />
       <button class="btn btn--primary" id="mealSearchBtn">Cerca</button>
     </div>
     <div style="margin-bottom:16px"><button class="btn btn--ghost" id="mealRandom">${iconHtml("shuffle")} Ispirami</button></div>
@@ -1841,7 +1841,10 @@ function renderOnlineTab() {
     if (!q) return;
     mealQuery = q; mealLoading = true; mealError = ""; renderOnlineTab();
     try {
-      mealResults = await mealdb.searchMeals(q);
+      const en = await translateToEnglish(q); // l'utente scrive in italiano
+      const results = await mealdb.searchMeals(en);
+      await translateMealTitles(results);
+      mealResults = results;
     } catch (e) {
       mealError = "Servizio non raggiungibile o troppo lento. Controlla la connessione e tocca di nuovo Cerca.";
       mealResults = null;
@@ -1852,7 +1855,11 @@ function renderOnlineTab() {
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(); });
   body.querySelector("#mealRandom").addEventListener("click", async () => {
     mealLoading = true; mealError = ""; mealQuery = ""; renderOnlineTab();
-    try { mealResults = await mealdb.randomMeals(6); }
+    try {
+      const results = await mealdb.randomMeals(6);
+      await translateMealTitles(results);
+      mealResults = results;
+    }
     catch (e) { mealError = "Servizio non raggiungibile o troppo lento. Controlla la connessione e riprova."; mealResults = null; }
     mealLoading = false; renderOnlineTab();
   });
@@ -1877,13 +1884,22 @@ function renderOnlineTab() {
   });
 }
 
+// Traduce in italiano i titoli dei risultati (per la sola visualizzazione).
+async function translateMealTitles(results) {
+  if (!results || !results.length) return;
+  try {
+    const its = await translateList(results.map((r) => r.title));
+    results.forEach((r, i) => { r.title_it = (its[i] || r.title); });
+  } catch (e) { /* in caso d'errore restano in inglese */ }
+}
+
 function mealCardHtml(m) {
   const meta = [m.category, m.area].filter(Boolean).join(" · ");
   return `
     <div class="meal-card" data-meal='${escapeHtml(JSON.stringify(m))}'>
       <img src="${escapeHtml(m.thumb)}" alt="" loading="lazy" />
       <div class="meal-card__body">
-        <h3 class="meal-card__title">${escapeHtml(m.title)}</h3>
+        <h3 class="meal-card__title">${escapeHtml(m.title_it || m.title)}</h3>
         <div class="meal-card__meta">${escapeHtml(meta)}</div>
         <div class="meal-card__actions">
           <a class="chip" href="${escapeHtml(safeUrl(m.link))}" target="_blank" rel="noopener">${iconHtml("arrow-square-out")} Apri</a>

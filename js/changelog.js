@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "3.3",
+    d: "2026-06-04",
+    items: [
+      "Ricettario online finalmente in italiano: cerca \"pollo\", \"torta\", \"zuppa\" e i titoli dei risultati appaiono tradotti."
+    ]
+  },
+  {
     v: "3.2",
     d: "2026-06-04",
     minor: true,
