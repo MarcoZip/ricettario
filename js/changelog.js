@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "3.5",
+    d: "2026-06-04",
+    minor: true,
+    items: [
+      "I tag presi dall'import sono ora più puliti (niente parole generiche dei siti)."
+    ]
+  },
+  {
     v: "3.4",
     d: "2026-06-04",
     items: [

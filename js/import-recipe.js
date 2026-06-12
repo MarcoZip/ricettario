@@ -23,6 +23,24 @@ export async function searchSpoon(query) {
   return Array.isArray(d.results) ? d.results : [];
 }
 
+// Ripulisce i tag importati dalle parole generiche/SEO (es. GialloZafferano).
+const TAG_NOISE = new Set([
+  "ricetta", "ricette", "cucina", "cucinare", "come fare", "come si fa", "video",
+  "video ricetta", "ricette facili", "ricetta facile", "giallozafferano", "food",
+  "cibo", "italiana", "italiano", "italia", "primo", "secondo"
+]);
+function cleanTags(tags) {
+  if (!Array.isArray(tags)) return [];
+  const out = [];
+  for (const t of tags) {
+    const v = String(t || "").trim();
+    if (!v || v.length > 22) continue;
+    if (TAG_NOISE.has(v.toLowerCase())) continue;
+    if (!out.some((x) => x.toLowerCase() === v.toLowerCase())) out.push(v);
+  }
+  return out.slice(0, 5);
+}
+
 export async function importFromUrl(url) {
   if (!WORKER_URL) throw new Error("Import da link non configurato.");
   const endpoint = `${WORKER_URL}${WORKER_URL.includes("?") ? "&" : "?"}url=${encodeURIComponent(url)}`;
@@ -47,6 +65,6 @@ export async function importFromUrl(url) {
     time: typeof data.time === "number" ? data.time : (parseInt(data.time, 10) || null),
     ingredients: Array.isArray(data.ingredients) ? data.ingredients : [],
     steps: Array.isArray(data.steps) ? data.steps : [],
-    tags: Array.isArray(data.tags) ? data.tags : []
+    tags: cleanTags(data.tags)
   };
 }
