@@ -9,7 +9,7 @@ import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNo
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
 import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchEdamam, searchSpoon, spoonInfo, winePairing } from "./import-recipe.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
-import { shareRecipeImage } from "./share-image.js";
+import { shareRecipeImage, shareMenuImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
 import { estimateCost } from "./cost.js";
 import { seasonalProduce, recipeSeasonalMatches, monthName, currentMonth } from "./seasonal.js";
@@ -3099,6 +3099,7 @@ function renderPlanWeek() {
       <button class="btn btn--primary" id="genWeek">${iconHtml("sparkle")} Menù settimana</button>
       <button class="btn btn--ghost" id="fillWeek">${iconHtml("sparkle")} Riempi le cene</button>
       <button class="btn btn--ghost" id="weekShop">${iconHtml("shopping-cart-simple")} Spesa settimana</button>
+      <button class="btn btn--ghost" id="weekShare">${iconHtml("image")} Condividi il menù</button>
     </div>
   `;
 
@@ -3131,6 +3132,19 @@ function renderPlanWeek() {
     if (!entries.length) { toast("Nessuna ricetta pianificata questa settimana", "error"); return; }
     const res = await store.addShoppingItems(collectIngredients(entries));
     toast(shoppingToast(res), "success");
+  });
+
+  root.querySelector("#weekShare").addEventListener("click", async () => {
+    const data = days.map((d, i) => {
+      const ds = ymd(d.getFullYear(), d.getMonth(), d.getDate());
+      const meals = store.getPlanByDate(ds)
+        .map((e) => { const rr = store.getRecipe(e.recipeId); return rr ? rr.title : null; })
+        .filter(Boolean);
+      return { day: `${WEEKDAYS_IT[i]} ${d.getDate()}`, meals };
+    });
+    if (!data.some((d) => d.meals.length)) { toast("Pianifica qualche pasto prima di condividere", "error"); return; }
+    try { const res = await shareMenuImage(range, data); if (res === "downloaded") toast("Immagine del menù salvata", "success"); }
+    catch (e) { toast("Impossibile creare l'immagine", "error"); }
   });
 
   // Menù settimana smart: riempie le cene vuote pescando dai preferiti (poi da

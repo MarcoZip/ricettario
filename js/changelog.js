@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "5.3",
+    d: "2026-06-13",
+    items: [
+      "Condividi il menù della settimana come bella immagine (dal Piano), da inviare su WhatsApp."
+    ]
+  },
+  {
     v: "5.2",
     d: "2026-06-13",
     items: [

@@ -147,6 +147,75 @@ export async function buildRecipeCard(recipe, toolName, ingredientLines) {
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
 }
 
+// Cartolina del menù della settimana. days = [{ day:"Lun 9", meals:["Pasta", ...] }].
+export async function buildMenuCard(weekLabel, days) {
+  const probe = document.createElement("canvas").getContext("2d");
+  const headerH = 168;
+  const blocks = (days || []).map((d) => ({ day: d.day, meals: (d.meals && d.meals.length) ? d.meals : ["—"] }));
+  let bodyH = 28;
+  for (const b of blocks) bodyH += 40 + b.meals.length * 34 + 12;
+  const footerH = 84;
+  const H = headerH + bodyH + footerH;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#15161b"; ctx.fillRect(0, 0, W, H);
+
+  // header
+  const grad = ctx.createLinearGradient(0, 0, W, headerH);
+  grad.addColorStop(0, "#ffa64d"); grad.addColorStop(1, "#df5117");
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, W, headerH);
+  drawHat(ctx, M + 38, headerH / 2, 1.05);
+  ctx.fillStyle = "#fff"; ctx.textBaseline = "middle";
+  ctx.font = "800 40px -apple-system, Segoe UI, Roboto, sans-serif";
+  ctx.fillText("Menù della settimana", M + 92, headerH / 2 - 16);
+  if (weekLabel) {
+    ctx.font = "600 26px -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.fillText(weekLabel, M + 92, headerH / 2 + 22);
+  }
+
+  let y = headerH + 28;
+  ctx.textBaseline = "alphabetic";
+  for (const b of blocks) {
+    ctx.fillStyle = "#ff9a52";
+    ctx.font = "800 28px -apple-system, Segoe UI, Roboto, sans-serif";
+    ctx.fillText(b.day, M, y + 24);
+    y += 40;
+    ctx.font = "400 27px -apple-system, Segoe UI, Roboto, sans-serif";
+    for (const meal of b.meals) {
+      ctx.fillStyle = "#ff7a3d";
+      ctx.beginPath(); ctx.arc(M + 8, y + 10, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#e9e6e0";
+      const line = wrapText(ctx, meal, W - 2 * M - 30)[0] || meal;
+      ctx.fillText(line, M + 28, y + 19); y += 34;
+    }
+    y += 12;
+  }
+
+  ctx.fillStyle = "#7a766e";
+  ctx.font = "600 26px -apple-system, Segoe UI, Roboto, sans-serif";
+  ctx.fillText("Creato con Fornelli", M, H - 40);
+
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
+}
+
+export async function shareMenuImage(weekLabel, days) {
+  const blob = await buildMenuCard(weekLabel, days);
+  if (!blob) throw new Error("Impossibile creare l'immagine");
+  const file = new File([blob], "menu-settimana.png", { type: "image/png" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: "Menù della settimana" }); return "shared"; }
+    catch (e) { if (e && e.name === "AbortError") return "cancelled"; }
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "menu-settimana.png";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  return "downloaded";
+}
+
 // Condivide la cartolina (Web Share con file) o, se non supportato, la scarica.
 export async function shareRecipeImage(recipe, toolName, ingredientLines) {
   const blob = await buildRecipeCard(recipe, toolName, ingredientLines);
