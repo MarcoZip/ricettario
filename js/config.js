@@ -14,7 +14,7 @@
 // ============================================================
 
 // Versione dell'app (mostrata in Impostazioni). Da alzare a ogni release.
-export const APP_VERSION = "4.2";
+export const APP_VERSION = "4.3";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyDOpr2Q0KXamaMdyAXzLvP9dA_U3kQj14E",
@@ -65,3 +65,9 @@ export function isPushConfigured() {
 // aggiungi il secret SPOON_KEY al worker import (chiave gratuita di Spoonacular),
 // ripubblica il worker e metti true qui sotto. Guida in README.
 export const SPOONACULAR_ENABLED = true;
+
+// Ricerca online su Edamam (altro grande database in inglese). Per attivarla:
+// crea un'app gratuita su https://developer.edamam.com (piano "Recipe Search API"),
+// aggiungi al worker import i secret EDAMAM_ID e EDAMAM_KEY (e, se richiesto,
+// EDAMAM_USER = il tuo username Edamam), ripubblica il worker e metti true qui.
+export const EDAMAM_ENABLED = false;

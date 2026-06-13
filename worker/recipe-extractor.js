@@ -159,6 +159,65 @@ async function handleWine(food, env) {
   } catch (e) { return json({ error: "spoonerr" }, 200); }
 }
 
+// Ricerca diretta su Cookist (in italiano): ritorna titolo + link + foto.
+async function handleSearchCookist(q) {
+  if (!q || !q.trim()) return json({ results: [] }, 200);
+  try {
+    const u = "https://www.cookist.it/?s=" + encodeURIComponent(q.trim());
+    const res = await fetch(u, { headers: BROWSER_HEADERS, cf: { cacheTtl: 1800, cacheEverything: true } });
+    if (!res.ok) return json({ error: "unreachable", results: [] }, 200);
+    const html = await res.text();
+    // Mappa immagine per ricetta: <a href="URL" class="ac__image"> … srcset="IMG …"
+    const imgMap = {};
+    const imgRe = /<a[^>]+href="(https:\/\/www\.cookist\.it\/[^"]+)"[^>]*class="ac__image"[\s\S]{0,600}?srcset="([^" ]+)/gi;
+    let im;
+    while ((im = imgRe.exec(html))) { if (!imgMap[im[1]]) imgMap[im[1]] = im[2]; }
+    const results = [];
+    const seen = new Set();
+    // Card Cookist: <a href="URL" class="ac__title">Titolo</a>
+    const re = /<a[^>]+href="(https:\/\/www\.cookist\.it\/[^"]+)"[^>]*class="ac__title"[^>]*>([^<]+)<\/a>/gi;
+    let m;
+    while ((m = re.exec(html)) && results.length < 20) {
+      const link = m[1];
+      if (seen.has(link)) continue;
+      if (/\/(ricette|news|show|category|tag|author|cookie-policy|privacy-policy|redazione)\//.test(link)) continue;
+      seen.add(link);
+      const title = clean(m[2]);
+      if (!title) continue;
+      results.push({ title, url: link, image: imgMap[link] || "" });
+    }
+    return json({ results }, 200);
+  } catch (e) { return json({ error: "unreachable", results: [] }, 200); }
+}
+
+// Ricerca su Edamam (database in inglese): servono env.EDAMAM_ID + EDAMAM_KEY.
+async function handleEdamam(q, env) {
+  if (!env || !env.EDAMAM_ID || !env.EDAMAM_KEY) return json({ error: "nokey", results: [] }, 200);
+  if (!q || !q.trim()) return json({ results: [] }, 200);
+  try {
+    const u = "https://api.edamam.com/api/recipes/v2?type=public" +
+      "&field=label&field=image&field=url&field=ingredientLines&field=yield&field=totalTime" +
+      "&q=" + encodeURIComponent(q.trim()) +
+      "&app_id=" + encodeURIComponent(env.EDAMAM_ID) + "&app_key=" + encodeURIComponent(env.EDAMAM_KEY);
+    const res = await fetch(u, { headers: { "Edamam-Account-User": env.EDAMAM_USER || env.EDAMAM_ID } });
+    if (!res.ok) return json({ error: "edamamerr", results: [] }, 200);
+    const data = await res.json();
+    const results = (data.hits || []).slice(0, 12).map((h) => {
+      const r = h.recipe || {};
+      return {
+        title: r.label || "",
+        image: r.image || "",
+        link: r.url || "",
+        ingredients: (r.ingredientLines || []).map((s) => clean(s)).filter(Boolean),
+        steps: [],
+        servings: r.yield ? Math.round(r.yield) : null,
+        time: r.totalTime || null
+      };
+    });
+    return json({ results }, 200);
+  } catch (e) { return json({ error: "edamamerr", results: [] }, 200); }
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
@@ -166,6 +225,8 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/searchgz") return handleSearchGz(url.searchParams.get("q"));
     if (url.pathname === "/searchmisya") return handleSearchMisya(url.searchParams.get("q"));
+    if (url.pathname === "/searchcookist") return handleSearchCookist(url.searchParams.get("q"));
+    if (url.pathname === "/edamam") return handleEdamam(url.searchParams.get("q"), env);
     if (url.pathname === "/spoon") return handleSpoon(url.searchParams.get("q"), env);
     if (url.pathname === "/spoon-info") return handleSpoonInfo(url.searchParams.get("id"), env);
     if (url.pathname === "/wine") return handleWine(url.searchParams.get("food"), env);

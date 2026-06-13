@@ -7,13 +7,13 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchMisya, searchSpoon, spoonInfo, winePairing } from "./import-recipe.js";
+import { importFromUrl, searchGz, searchMisya, searchCookist, searchEdamam, searchSpoon, spoonInfo, winePairing } from "./import-recipe.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
 import { estimateCost } from "./cost.js";
 import { getNickname, setNickname } from "./profile.js";
-import { isImportConfigured, APP_VERSION, PUSH_WORKER_URL, SPOONACULAR_ENABLED } from "./config.js";
+import { isImportConfigured, APP_VERSION, PUSH_WORKER_URL, SPOONACULAR_ENABLED, EDAMAM_ENABLED } from "./config.js";
 import { CHANGELOG } from "./changelog.js";
 import { fileToDataUrl } from "./image.js";
 import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS } from "./theme.js";
@@ -1135,7 +1135,8 @@ function renderRecipeDetail() {
         })
         .join("")}</div>
        <button class="btn btn--primary btn--block" id="addToCart" style="margin-top:14px">${iconHtml("shopping-cart-simple")} Aggiungi alla lista della spesa</button>
-       ${missingCount ? `<button class="btn btn--block" id="addMissing" style="margin-top:8px">${iconHtml("basket")} Aggiungi solo i ${missingCount} mancanti</button>` : ""}`
+       ${missingCount ? `<button class="btn btn--block" id="addMissing" style="margin-top:8px">${iconHtml("basket")} Aggiungi solo i ${missingCount} mancanti</button>` : ""}
+       <button class="btn btn--block" id="guestMode" style="margin-top:8px">${iconHtml("users-three")} Modalità ospiti</button>`
     : `<div class="hint">Nessun ingrediente salvato. Aggiungili con <b>Modifica</b>.</div>`;
 
   const ratingRow = `<div class="rating" id="rating">${[1, 2, 3, 4, 5]
@@ -1264,6 +1265,9 @@ function renderRecipeDetail() {
     const res = await store.addShoppingItems(items);
     toast(shoppingToast(res), "success");
   });
+
+  const guestModeBtn = root.querySelector("#guestMode");
+  if (guestModeBtn) guestModeBtn.addEventListener("click", () => openGuestMode(r, base, ingredients));
 
   const cookBtn = root.querySelector("#cookBtn");
   if (cookBtn) cookBtn.addEventListener("click", () => openCookingMode(r));
@@ -1462,6 +1466,52 @@ function openQr(r) {
     <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
   `);
   m.el.querySelector('[data-act="ok"]').addEventListener("click", m.close);
+}
+
+// Modalità ospiti: scegli per quante persone cucini, adatta le dosi e
+// (opzionale) aggiungi alla spesa le quantità già moltiplicate.
+function openGuestMode(r, base, ingredients) {
+  let n = detailServings || base || 4;
+  const m = openModal(`
+    <h3 class="modal__title">${iconHtml("users-three")} Modalità ospiti</h3>
+    <p class="hint" style="margin-top:-8px;margin-bottom:14px">Per quante persone cucini "${escapeHtml(r.title)}"? Le dosi si adattano da sole.</p>
+    <div class="portions" style="justify-content:center;margin-bottom:10px">
+      <div class="stepper">
+        <button class="stepper__btn" data-act="minus">−</button>
+        <span class="stepper__val" id="gVal">${n}</span>
+        <button class="stepper__btn" data-act="plus">+</button>
+      </div>
+    </div>
+    <div class="hint" id="gInfo" style="text-align:center;min-height:1.2em"></div>
+    <div class="modal__actions" style="flex-direction:column;gap:8px">
+      <button class="btn btn--primary btn--block" data-act="apply">${iconHtml("fork-knife")} Adatta le dosi</button>
+      <button class="btn btn--block" data-act="cart">${iconHtml("shopping-cart-simple")} Adatta e aggiungi alla spesa</button>
+    </div>
+  `);
+  const valEl = m.el.querySelector("#gVal");
+  const info = m.el.querySelector("#gInfo");
+  const refresh = () => {
+    valEl.textContent = n;
+    if (base && ingredients.length) {
+      const c = estimateCost(ingredients);
+      const txt = c.counted ? ` · spesa stimata € ${(c.total / base * n).toFixed(2)}` : "";
+      info.innerHTML = `Dosi da ${base} a <b>${n}</b> persone${txt}.`;
+    } else {
+      info.textContent = base ? "" : "Senza porzioni le dosi non si scalano, ma puoi aggiungere la spesa.";
+    }
+  };
+  refresh();
+  m.el.querySelector('[data-act="minus"]').addEventListener("click", () => { n = Math.max(1, n - 1); refresh(); });
+  m.el.querySelector('[data-act="plus"]').addEventListener("click", () => { n = n + 1; refresh(); });
+  m.el.querySelector('[data-act="apply"]').addEventListener("click", () => { detailServings = n; m.close(); render(); });
+  m.el.querySelector('[data-act="cart"]').addEventListener("click", async () => {
+    const factor = base ? n / base : 1;
+    const items = ingredients.map((it) => ({ name: it.name, unit: it.unit || "", qty: it.qty != null ? it.qty * factor : null, category: categorize(it.name) }));
+    detailServings = n;
+    m.close();
+    if (items.length) { const res = await store.addShoppingItems(items); toast(shoppingToast(res), "success"); }
+    render();
+  });
 }
 
 // Finestra per scegliere dove inserire il testo riconosciuto via OCR.
@@ -1995,21 +2045,25 @@ function renderRicettario() {
   else renderSitiTab();
 }
 
-const SOURCE_LABEL = { mealdb: "TheMealDB", gz: "GialloZafferano", misya: "Misya", spoon: "Spoonacular" };
+const SOURCE_LABEL = { mealdb: "TheMealDB", gz: "GialloZafferano", misya: "Misya", cookist: "Cookist", spoon: "Spoonacular", edamam: "Edamam" };
 function onlineSources() {
   const list = [
     { k: "all", label: "Tutte le fonti" },
     { k: "gz", label: "GialloZafferano (IT)" },
     { k: "misya", label: "Misya (IT)" },
+    { k: "cookist", label: "Cookist (IT)" },
     { k: "mealdb", label: "TheMealDB (tradotto)" }
   ];
   if (SPOONACULAR_ENABLED) list.push({ k: "spoon", label: "Spoonacular (tradotto)" });
+  if (EDAMAM_ENABLED) list.push({ k: "edamam", label: "Edamam (tradotto)" });
   return list;
 }
 
 const mapMealdb = (r) => ({ source: "mealdb", title: r.title, image: r.thumb || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], meta: [r.category, r.area].filter(Boolean).join(" · ") });
 const mapGz = (r) => ({ source: "gz", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "GialloZafferano" });
 const mapMisya = (r) => ({ source: "misya", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "Misya" });
+const mapCookist = (r) => ({ source: "cookist", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "Cookist" });
+const mapEdamam = (r) => ({ source: "edamam", title: r.title, image: r.image || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], servings: r.servings || null, time: r.time || null, meta: [r.time ? r.time + " min" : "", r.servings ? "per " + r.servings : ""].filter(Boolean).join(" · ") });
 const mapSpoon = (r) => ({ source: "spoon", id: r.id || null, title: r.title, image: r.image || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], servings: r.servings || null, time: r.time || null, meta: [r.time ? r.time + " min" : "", r.servings ? "per " + r.servings : ""].filter(Boolean).join(" · ") });
 
 // Alterna i risultati delle varie fonti per non mostrarli tutti raggruppati.
@@ -2024,19 +2078,27 @@ function interleave(arrays) {
 async function runMealSearch(q) {
   if (mealSource === "gz") { const out = (await searchGz(q)).map(mapGz); return out; }
   if (mealSource === "misya") { const out = (await searchMisya(q)).map(mapMisya); return out; }
+  if (mealSource === "cookist") { const out = (await searchCookist(q)).map(mapCookist); return out; }
   if (mealSource === "spoon") {
     const out = (await searchSpoon(await translateToEnglish(q))).map(mapSpoon);
+    await translateMealTitles(out);
+    return out;
+  }
+  if (mealSource === "edamam") {
+    const out = (await searchEdamam(await translateToEnglish(q))).map(mapEdamam);
     await translateMealTitles(out);
     return out;
   }
   if (mealSource === "all") {
     const en = await translateToEnglish(q);
     const tasks = [
-      searchGz(q).then((rs) => rs.slice(0, 6).map(mapGz)).catch(() => []),
-      searchMisya(q).then((rs) => rs.slice(0, 6).map(mapMisya)).catch(() => []),
-      mealdb.searchMeals(en).then((rs) => rs.slice(0, 6).map(mapMealdb)).catch(() => [])
+      searchGz(q).then((rs) => rs.slice(0, 5).map(mapGz)).catch(() => []),
+      searchMisya(q).then((rs) => rs.slice(0, 5).map(mapMisya)).catch(() => []),
+      searchCookist(q).then((rs) => rs.slice(0, 5).map(mapCookist)).catch(() => []),
+      mealdb.searchMeals(en).then((rs) => rs.slice(0, 5).map(mapMealdb)).catch(() => [])
     ];
-    if (SPOONACULAR_ENABLED) tasks.push(searchSpoon(en).then((rs) => rs.slice(0, 6).map(mapSpoon)).catch(() => []));
+    if (SPOONACULAR_ENABLED) tasks.push(searchSpoon(en).then((rs) => rs.slice(0, 5).map(mapSpoon)).catch(() => []));
+    if (EDAMAM_ENABLED) tasks.push(searchEdamam(en).then((rs) => rs.slice(0, 5).map(mapEdamam)).catch(() => []));
     const arrays = await Promise.all(tasks);
     const merged = interleave(arrays);
     await translateMealTitles(merged);
@@ -2110,7 +2172,7 @@ function renderOnlineTab() {
     saveBtn.addEventListener("click", async () => {
       const old = saveBtn.innerHTML;
       saveBtn.disabled = true;
-      if (data.source === "gz" || data.source === "misya") {
+      if (data.source === "gz" || data.source === "misya" || data.source === "cookist") {
         // Siti italiani: importa la ricetta completa dal link (già in italiano).
         saveBtn.innerHTML = `${iconHtml("download-simple")} Importo...`;
         try {
@@ -2168,7 +2230,7 @@ function mealCardHtml(m, i = 0) {
         <div class="meal-card__meta"><span class="meal-src meal-src--${m.source}">${SOURCE_LABEL[m.source] || ""}</span>${m.meta ? " · " + escapeHtml(m.meta) : ""}</div>
         <div class="meal-card__actions">
           ${m.link ? `<a class="chip" href="${escapeHtml(safeUrl(m.link))}" target="_blank" rel="noopener">${iconHtml("arrow-square-out")} Apri</a>` : ""}
-          <button class="chip" data-act="save">${iconHtml("plus")} ${(m.source === "gz" || m.source === "misya") ? "Importa" : "Salva"}</button>
+          <button class="chip" data-act="save">${iconHtml("plus")} ${(m.source === "gz" || m.source === "misya" || m.source === "cookist") ? "Importa" : "Salva"}</button>
         </div>
       </div>
     </div>`;

@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    v: "4.3",
+    d: "2026-06-13",
+    items: [
+      "Nuova fonte italiana nel Ricettario: Cookist (con foto del piatto).",
+      "Modalità ospiti: nel dettaglio di una ricetta scegli per quante persone cucini, le dosi si adattano e puoi aggiungere la spesa già moltiplicata.",
+      "Predisposta la fonte Edamam (grande database in inglese): si attiva con una chiave gratuita."
+    ]
+  },
+  {
     v: "4.2",
     d: "2026-06-13",
     items: [

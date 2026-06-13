@@ -42,6 +42,25 @@ export async function searchMisya(query) {
   return Array.isArray(d.results) ? d.results : [];
 }
 
+// Ricerca diretta su Cookist (italiano): ritorna [{ title, url, image }].
+export async function searchCookist(query) {
+  if (!WORKER_URL || !query.trim()) return [];
+  const res = await fetch(`${WORKER_URL}/searchcookist?q=${encodeURIComponent(query.trim())}`);
+  if (!res.ok) throw new Error("Servizio non raggiungibile.");
+  const d = await res.json().catch(() => ({}));
+  return Array.isArray(d.results) ? d.results : [];
+}
+
+// Ricerca su Edamam (inglese, richiede le chiavi sul worker).
+export async function searchEdamam(query) {
+  if (!WORKER_URL || !query.trim()) return [];
+  const res = await fetch(`${WORKER_URL}/edamam?q=${encodeURIComponent(query.trim())}`);
+  if (!res.ok) throw new Error("Servizio non raggiungibile.");
+  const d = await res.json().catch(() => ({}));
+  if (d.error === "nokey") { const e = new Error("Edamam non è configurato sul worker."); e.code = "nokey"; throw e; }
+  return Array.isArray(d.results) ? d.results : [];
+}
+
 // Ricerca su Spoonacular (inglese, richiede la chiave sul worker).
 export async function searchSpoon(query) {
   if (!WORKER_URL || !query.trim()) return [];
