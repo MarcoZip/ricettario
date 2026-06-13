@@ -63,6 +63,11 @@ function fxBurstFrom(el, opts) {
   fxBurst(r.left + r.width / 2, r.top + r.height / 2, opts);
 }
 
+// Leggero feedback aptico (vibrazione) sui dispositivi che lo supportano.
+function haptic(ms = 15) {
+  try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* ignora */ }
+}
+
 // Anima un numero da 0 al valore finale.
 function countUp(el, to) {
   if (!el) return;
@@ -203,6 +208,34 @@ export function mount(rootEl) {
   } catch {}
   maybeShowWhatsNew();
   setupBackHandler();
+  setupRipple();
+  setupAurora();
+}
+
+// Onda "ripple" sui pulsanti al tocco.
+function setupRipple() {
+  if (reduceMotion) return;
+  document.addEventListener("pointerdown", (e) => {
+    const btn = e.target.closest(".btn");
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height);
+    const r = document.createElement("span");
+    r.className = "ripple";
+    r.style.width = r.style.height = size + "px";
+    r.style.left = (e.clientX - rect.left - size / 2) + "px";
+    r.style.top = (e.clientY - rect.top - size / 2) + "px";
+    btn.appendChild(r);
+    setTimeout(() => r.remove(), 600);
+  });
+}
+
+// Sfondo "aurora" animato dietro i contenuti (soft, gated reduce-motion).
+function setupAurora() {
+  if (reduceMotion || document.getElementById("aurora")) return;
+  const a = document.createElement("div");
+  a.id = "aurora";
+  document.body.insertBefore(a, document.body.firstChild);
 }
 
 // Tasto Indietro del telefono: torna alla schermata precedente DENTRO l'app
@@ -1175,6 +1208,7 @@ function renderRecipeDetail() {
 
     <button class="btn btn--block" id="cookedBtn" style="margin-bottom:10px">${iconHtml("fire")} Segna come cucinata${r.cookCount ? ` · ${r.cookCount} ${r.cookCount === 1 ? "volta" : "volte"}` : ""}</button>
     <button class="btn btn--block" id="shareImg" style="margin-bottom:10px">${iconHtml("image")} Condividi come immagine</button>
+    <button class="btn btn--block" id="qrBtn" style="margin-bottom:10px">${iconHtml("qr-code")} Mostra codice QR</button>
     <div style="display:flex;gap:8px;margin-top:4px">
       <button class="btn btn--ghost" id="editRecipe">${iconHtml("pencil-simple")} Modifica</button>
       <button class="btn btn--ghost" id="shareRecipe">${iconHtml("arrow-square-out")} Condividi</button>
@@ -1201,7 +1235,7 @@ function renderRecipeDetail() {
   if (pPlus) pPlus.addEventListener("click", () => { detailServings = (detailServings || base || 1) + 1; render(); });
 
   root.querySelector("#favBtn").addEventListener("click", (e) => {
-    if (!r.favorite) fxBurstFrom(e.currentTarget, { emojis: ["❤️", "💛", "✨"] });
+    if (!r.favorite) { fxBurstFrom(e.currentTarget, { emojis: ["❤️", "💛", "✨"] }); haptic(15); }
     store.updateRecipe(r.id, { favorite: !r.favorite });
   });
   root.querySelectorAll("#rating .star").forEach((st) => st.addEventListener("click", () => {
@@ -1234,7 +1268,7 @@ function renderRecipeDetail() {
   const cookBtn = root.querySelector("#cookBtn");
   if (cookBtn) cookBtn.addEventListener("click", () => openCookingMode(r));
 
-  root.querySelector("#cookedBtn").addEventListener("click", async (e) => { fxBurstFrom(e.currentTarget); await store.markCooked(r.id); toast("Segnata come cucinata 🔥", "success"); });
+  root.querySelector("#cookedBtn").addEventListener("click", async (e) => { haptic(25); fxBurstFrom(e.currentTarget); await store.markCooked(r.id); toast("Segnata come cucinata 🔥", "success"); });
 
   // Galleria "Le mie creazioni"
   const galFile = root.querySelector("#galFile");
@@ -1280,6 +1314,9 @@ function renderRecipeDetail() {
     } catch (e) { toast("Impossibile creare l'immagine", "error"); }
     shareImgBtn.disabled = false; shareImgBtn.innerHTML = old;
   });
+
+  const qrBtn = root.querySelector("#qrBtn");
+  if (qrBtn) qrBtn.addEventListener("click", () => openQr(r));
 
   const wineBtn = root.querySelector("#wineBtn");
   if (wineBtn) wineBtn.addEventListener("click", async () => {
@@ -1397,6 +1434,34 @@ function recipeShareText(r) {
   if (r.url) lines.push("", r.url);
   lines.push("", "— da Fornelli");
   return lines.join("\n");
+}
+
+// Codice QR di una ricetta: se ha un link, punta alla fonte; altrimenti
+// contiene il testo essenziale (titolo + ingredienti) da leggere col telefono.
+function openQr(r) {
+  const url = safeUrl(r.url);
+  let data, note;
+  if (url) {
+    data = url;
+    note = "Inquadra col telefono per aprire la ricetta originale.";
+  } else {
+    const lines = [r.title];
+    if (r.servings) lines.push(`Per ${r.servings} persone`);
+    if (r.ingredients && r.ingredients.length) {
+      lines.push("", "Ingredienti:");
+      r.ingredients.forEach((i) => lines.push("- " + (i.raw || ingredientText(i))));
+    }
+    data = lines.join("\n").slice(0, 800);
+    note = "Inquadra col telefono per leggere la ricetta.";
+  }
+  const src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=12&data=${encodeURIComponent(data)}`;
+  const m = openModal(`
+    <h3 class="modal__title">${escapeHtml(r.title)}</h3>
+    <p class="hint" style="margin-top:-8px;margin-bottom:12px">${note}</p>
+    <div style="text-align:center"><img src="${src}" alt="Codice QR" style="width:260px;height:260px;max-width:100%;border-radius:14px;background:#fff;padding:10px;box-sizing:border-box" /></div>
+    <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
+  `);
+  m.el.querySelector('[data-act="ok"]').addEventListener("click", m.close);
 }
 
 // Finestra per scegliere dove inserire il testo riconosciuto via OCR.
@@ -2250,6 +2315,7 @@ function renderShoppingList() {
       <button class="btn btn--primary" id="shopAddBtn">${iconHtml("plus")}</button>
     </div>
     <div id="shopBody">${body}</div>
+    ${(() => { const c = estimateCost(active); return c.counted ? `<div class="shop-cost">${iconHtml("basket")} Costo stimato del carrello: <b>€ ${c.total.toFixed(2)}</b><span class="shop-cost__note"> · stima su ${c.counted} articoli</span></div>` : ""; })()}
     ${done.length ? `<button class="btn btn--primary btn--block" id="toPantry" style="margin-top:18px">${iconHtml("basket")} Spesa fatta: presi in dispensa</button>` : ""}
     ${items.length ? `<div style="display:flex;gap:8px;margin-top:${done.length ? "8px" : "18px"};flex-wrap:wrap">
       <button class="btn btn--ghost" id="aisleBtn">${iconHtml("sliders-horizontal")} Reparti</button>
@@ -2276,6 +2342,7 @@ function renderShoppingList() {
       const it = store.getShopping().find((s) => s.id === id);
       const willCheck = !(it && it.checked);
       lastShopToggled = willCheck ? id : null; // anima solo quando si spunta
+      if (willCheck) haptic(10);
       store.toggleShoppingItem(id, willCheck);
     };
     rowEl.querySelector('[data-act="check"]').addEventListener("click", toggle);

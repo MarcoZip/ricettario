@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    v: "4.2",
+    d: "2026-06-13",
+    items: [
+      "Costo stimato del carrello nella Lista della spesa: vedi quanto spenderai (stima indicativa).",
+      "Codice QR della ricetta: aprila o leggila al volo da un altro telefono.",
+      "Tocchi più vivi: vibrazione leggera, onde sui pulsanti, passi della cucina in dolce transizione e sfondo aurora animato."
+    ]
+  },
+  {
     v: "4.1",
     d: "2026-06-04",
     minor: true,
