@@ -44,7 +44,10 @@
       "Bash(grep -oE '\"\\(mainImage|image|media|imageUrl|picture|thumbnail\\)\"[: ]*\"?[^\",}]{0,90}' /tmp/comp.html)",
       "Bash(grep -oE '.{0,40}\"[^\"]*[Cc]aprese[^\"]*\".{0,200}' /tmp/comp.html)",
       "Bash(curl -s -o /tmp/ci.json -w 'HTTP %{http_code}\\\\n' --max-time 35 https://ricette-import.marcozeta73.workers.dev/?url=https://www.moulinex.it/ricette/detail/PRO/caprese-classica/1648873)",
-      "Bash(curl -s -o /tmp/mx.json -w 'HTTP %{http_code}\\\\n' --max-time 35 https://ricette-import.marcozeta73.workers.dev/searchmoulinex)"
+      "Bash(curl -s -o /tmp/mx.json -w 'HTTP %{http_code}\\\\n' --max-time 35 https://ricette-import.marcozeta73.workers.dev/searchmoulinex)",
+      "Bash(curl -s -o /dev/null -w 'HTTP %{http_code} type=%{content_type} size=%{size_download}\\\\n' -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/124.0.0.0 Safari/537.36' --max-time 20 https://www.misya.info/wp-content/uploads/2023/07/straccetti-di-pollo-alla-pizzaiola.jpg)",
+      "Bash(curl -s -o /dev/null -w 'HTTP %{http_code} type=%{content_type} size=%{size_download}\\\\n' -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/124.0.0.0 Safari/537.36' -H 'Referer: https://fornelli.example/' --max-time 20 https://www.misya.info/wp-content/uploads/2023/07/straccetti-di-pollo-alla-pizzaiola.jpg)",
+      "Bash(curl -s -o /dev/null -w 'HTTP %{http_code} type=%{content_type} size=%{size_download}\\\\n' -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/124.0.0.0 Safari/537.36' -H 'Referer: https://www.misya.info/' --max-time 20 https://www.misya.info/wp-content/uploads/2023/07/straccetti-di-pollo-alla-pizzaiola.jpg)"
     ]
   }
 }

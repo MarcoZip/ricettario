@@ -932,7 +932,7 @@ function renderStrumenti() {
     const seed = n.getFullYear() * 1000 + (n.getMonth() * 31 + n.getDate());
     const rotd = allR[seed % allR.length];
     rotdCard = `<button class="rotd" data-recipe="${rotd.id}">
-        ${rotd.photo ? `<img class="rotd__img" src="${escapeHtml(rotd.photo)}" alt="" />` : `<span class="rotd__ph">${iconHtml("fork-knife")}</span>`}
+        ${rotd.photo ? `<img class="rotd__img" src="${escapeHtml(rotd.photo)}" alt="" referrerpolicy="no-referrer" />` : `<span class="rotd__ph">${iconHtml("fork-knife")}</span>`}
         <span class="rotd__grad"></span>
         <span class="rotd__body"><span class="rotd__lbl">${iconHtml("sparkle")} Ricetta del giorno</span><span class="rotd__title">${escapeHtml(rotd.title)}</span></span>
       </button>`;
@@ -1296,7 +1296,7 @@ function renderRecipeDetail() {
       <div class="toolbar__title" style="flex:1">${r.photo ? "" : escapeHtml(r.title)}</div>
       <button class="back-btn fav-btn ${r.favorite ? "is-fav" : ""}" id="favBtn" title="Preferito">${iconHtml("heart")}</button>
     </div>
-    ${r.photo ? `<div class="recipe-hero"><img src="${escapeHtml(r.photo)}" alt="" /><div class="recipe-hero__grad"></div><h2 class="recipe-hero__title">${escapeHtml(r.title)}</h2></div>` : ""}
+    ${r.photo ? `<div class="recipe-hero"><img src="${escapeHtml(r.photo)}" alt="" referrerpolicy="no-referrer" /><div class="recipe-hero__grad"></div><h2 class="recipe-hero__title">${escapeHtml(r.title)}</h2></div>` : ""}
     <div class="detail-top">
       ${tool ? `<span class="recipe-tool-chip" style="margin:0">${iconHtml(tool.icon)} ${escapeHtml(tool.name)}</span>` : "<span></span>"}
       ${ratingRow}
@@ -2502,6 +2502,14 @@ function renderOnlineTab() {
   body.querySelectorAll(".meal-card[data-meal]").forEach((card) => {
     let data;
     try { data = JSON.parse(card.dataset.meal); } catch (e) { return; }
+    // Se la foto non si carica (referer/host), mostra il segnaposto invece di un'icona rotta.
+    const imgEl = card.querySelector("img");
+    if (imgEl) imgEl.addEventListener("error", () => {
+      const ph = document.createElement("div");
+      ph.className = "meal-card__noimg";
+      ph.innerHTML = iconHtml("fork-knife");
+      imgEl.replaceWith(ph);
+    });
     const saveBtn = card.querySelector('[data-act="save"]');
     saveBtn.addEventListener("click", async () => {
       const old = saveBtn.innerHTML;
@@ -2561,7 +2569,7 @@ async function translateMealTitles(results) {
 function mealCardHtml(m, i = 0) {
   return `
     <div class="meal-card stagger" data-meal='${escapeHtml(JSON.stringify(m))}' style="--i:${i}">
-      ${m.image ? `<img src="${escapeHtml(m.image)}" alt="" loading="lazy" />` : `<div class="meal-card__noimg">${iconHtml("fork-knife")}</div>`}
+      ${m.image ? `<img src="${escapeHtml(m.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : `<div class="meal-card__noimg">${iconHtml("fork-knife")}</div>`}
       <div class="meal-card__body">
         <h3 class="meal-card__title">${escapeHtml(m.title_it || m.title)}</h3>
         <div class="meal-card__meta"><span class="meal-src meal-src--${m.source}">${SOURCE_LABEL[m.source] || ""}</span>${m.meta ? " · " + escapeHtml(m.meta) : ""}</div>

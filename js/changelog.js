@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "5.4",
+    d: "2026-06-13",
+    minor: true,
+    items: [
+      "Le foto dei risultati Misya ora si vedono anche sul telefono (sistemato un blocco del referer); se un'immagine non carica compare un segnaposto pulito."
+    ]
+  },
+  {
     v: "5.3",
     d: "2026-06-13",
     items: [
