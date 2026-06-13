@@ -155,6 +155,15 @@ export function ingredientText(item, factor = 1) {
 }
 
 // Unisce ingredienti uguali (stesso nome + unità), sommando le quantità.
+// Unisce le origini (ricette di provenienza) in una stringa "A, B" senza duplicati.
+function mergeFrom(a, b) {
+  if (!a) return b || "";
+  if (!b) return a || "";
+  const set = new Set(a.split(",").map((x) => x.trim()).filter(Boolean));
+  b.split(",").map((x) => x.trim()).filter(Boolean).forEach((x) => set.add(x));
+  return [...set].join(", ");
+}
+
 export function combine(items) {
   const map = new Map();
   for (const it of items) {
@@ -163,8 +172,9 @@ export function combine(items) {
       const ex = map.get(key);
       if (ex.qty == null || it.qty == null) ex.qty = ex.qty == null ? it.qty : ex.qty;
       else ex.qty += it.qty;
+      ex.from = mergeFrom(ex.from, it.from);
     } else {
-      map.set(key, { qty: it.qty, unit: it.unit, name: it.name });
+      map.set(key, { qty: it.qty, unit: it.unit, name: it.name, category: it.category, from: it.from || "" });
     }
   }
   return [...map.values()];

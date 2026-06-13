@@ -129,6 +129,26 @@ function greeting() {
   if (h < 18) return "Buon pomeriggio";
   return "Buonasera";
 }
+// Data della Pasqua (algoritmo di Gauss/Anonymous Gregorian) per l'anno dato.
+function easterDate(y) {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  const hh = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - hh - k) % 7, mm = Math.floor((a + 11 * hh + 22 * l) / 451);
+  const month = Math.floor((hh + l - 7 * mm + 114) / 31), day = ((hh + l - 7 * mm + 114) % 31) + 1;
+  return new Date(y, month - 1, day);
+}
+// Tema festività automatico: emoji/etichetta in base al periodo dell'anno.
+function festiveInfo() {
+  const n = new Date(), m = n.getMonth() + 1, d = n.getDate();
+  if (m === 12 && d <= 26) return { emoji: "🎄", label: "Buone feste" };
+  if ((m === 12 && d >= 27) || (m === 1 && d <= 6)) return { emoji: "✨", label: "Buon anno" };
+  if (m === 10 && d >= 24) return { emoji: "🎃", label: "Dolcetto o scherzetto" };
+  if (m === 2 && d === 14) return { emoji: "❤️", label: "Buon San Valentino" };
+  const easter = easterDate(n.getFullYear());
+  if (Math.abs((n - easter) / 86400000) <= 3) return { emoji: "🐣", label: "Buona Pasqua" };
+  return null;
+}
 // Etichetta difficoltà (1 facile · 2 media · 3 difficile).
 const DIFF_LABELS = { 1: "Facile", 2: "Media", 3: "Difficile" };
 function diffLabel(d) { return DIFF_LABELS[d] || ""; }
@@ -973,7 +993,8 @@ function renderStrumenti() {
     allTags.map((t) => `<button class="filter-chip ${homeFilter === t ? "is-on" : ""}" data-filter="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("");
 
   root.innerHTML = `
-    <h1 class="page-title">${greeting()}${getNickname() ? " " + escapeHtml(getNickname()) : ""}! 👋</h1>
+    ${(() => { const f = festiveInfo(); return f ? `<div class="festive-banner">${f.emoji} ${f.label}!</div>` : ""; })()}
+    <h1 class="page-title">${greeting()}${getNickname() ? " " + escapeHtml(getNickname()) : ""}! ${(() => { const f = festiveInfo(); return f ? f.emoji : "👋"; })()}</h1>
     ${rotdCard}
     <div class="home-hero">
       <div>
@@ -988,7 +1009,7 @@ function renderStrumenti() {
     ${seasonCard}
     ${banner}
     <div class="search-bar">
-      <input type="search" id="homeSearch" placeholder="Cerca tra le tue ricette..." value="${escapeHtml(homeQuery)}" />
+      <input type="search" id="homeSearch" placeholder="Cerca (anche più ingredienti: zucchine, pollo)" value="${escapeHtml(homeQuery)}" />
       ${voiceOK ? `<button class="btn mic-btn" id="homeMic" title="Cerca a voce" aria-label="Cerca a voce">🎤</button>` : ""}
     </div>
     ${total ? `<button class="btn btn--block" id="surpriseBtn" style="margin:4px 0 12px">${iconHtml("shuffle")} Cosa cucino oggi?</button>` : ""}
@@ -1189,6 +1210,15 @@ function similarRecipes(r, limit = 4) {
   return scored.slice(0, limit).map((x) => x.o);
 }
 
+// Idee per il contorno: pesca dalle tue ricette che sembrano contorni + idee fisse.
+const SIDE_KEYS = ["contorn", "insalat", "verdur", "patate", "purè", "pure", "spinaci", "fagiolin", "grigliat", "caponata", "peperonata", "funghi"];
+const SIDE_IDEAS = ["Insalata mista", "Patate al forno", "Verdure grigliate", "Spinaci saltati", "Purè di patate"];
+function suggestSides(r) {
+  const txt = (x) => ((x.title || "") + " " + (x.tags || []).join(" ")).toLowerCase();
+  const mine = store.getAllRecipes().filter((x) => x.id !== r.id && SIDE_KEYS.some((k) => txt(x).includes(k))).slice(0, 4);
+  return { mine, ideas: SIDE_IDEAS };
+}
+
 // ---------------- Schermata: dettaglio ricetta ----------------
 function renderRecipeDetail() {
   const r = store.getRecipe(currentRecipeId);
@@ -1250,6 +1280,15 @@ function renderRecipeDetail() {
       <h3 class="section-title">🍷 Vino consigliato</h3>
       <div id="wineBody"><button class="btn btn--ghost btn--block" id="wineBtn">Suggerisci un vino</button></div>
     </div>` : "";
+  // Idee per il contorno (non per dolci o per i contorni stessi).
+  const dishTxt = ((r.title || "") + " " + tagsArr.join(" ")).toLowerCase();
+  const isDessertOrSide = /dolc|torta|biscott|crostat|tiramis|budino|gelato|muffin|plumcake|crema|contorn|insalat/.test(dishTxt);
+  const sides = isDessertOrSide ? { mine: [], ideas: [] } : suggestSides(r);
+  const sidesCard = (sides.mine.length || sides.ideas.length) ? `<div class="section-card">
+      <h3 class="section-title">🥗 Idee per il contorno</h3>
+      ${sides.mine.length ? `<div class="sim-row" style="margin-bottom:${sides.ideas.length ? "10px" : "0"}">${sides.mine.map((s) => `<button class="sim-card" data-sim="${s.id}">${s.photo ? `<img src="${escapeHtml(s.photo)}" alt="" loading="lazy" />` : `<span class="sim-card__ph">${iconHtml("fork-knife")}</span>`}<span class="sim-card__t">${escapeHtml(s.title)}</span></button>`).join("")}</div>` : ""}
+      ${sides.ideas.length ? `<div class="tag-row">${sides.ideas.map((i) => `<span class="tagchip tagchip--ro">${escapeHtml(i)}</span>`).join("")}</div>` : ""}
+    </div>` : "";
 
   root.innerHTML = `
     <div class="toolbar">
@@ -1278,6 +1317,7 @@ function renderRecipeDetail() {
     ${costCard}
     ${subsCard}
     ${wineCard}
+    ${sidesCard}
 
     ${steps.length ? `<div class="section-card">
       <h3 class="section-title">${iconHtml("fork-knife")} Preparazione</h3>
@@ -1351,7 +1391,8 @@ function renderRecipeDetail() {
       name: it.name,
       unit: it.unit || "",
       qty: it.qty != null ? it.qty * factor : null,
-      category: categorize(it.name)
+      category: categorize(it.name),
+      from: r.title
     }));
     const res = await store.addShoppingItems(items);
     toast(shoppingToast(res), "success");
@@ -1361,7 +1402,7 @@ function renderRecipeDetail() {
   if (addMissing) addMissing.addEventListener("click", async () => {
     const items = ingredients
       .filter((it) => !store.inPantry(it.name))
-      .map((it) => ({ name: it.name, unit: it.unit || "", qty: it.qty != null ? it.qty * factor : null, category: categorize(it.name) }));
+      .map((it) => ({ name: it.name, unit: it.unit || "", qty: it.qty != null ? it.qty * factor : null, category: categorize(it.name), from: r.title }));
     if (!items.length) { toast("Hai già tutto in dispensa", "success"); return; }
     const res = await store.addShoppingItems(items);
     toast(shoppingToast(res), "success");
@@ -1693,7 +1734,7 @@ function openGuestMode(r, base, ingredients) {
   m.el.querySelector('[data-act="apply"]').addEventListener("click", () => { detailServings = n; m.close(); render(); });
   m.el.querySelector('[data-act="cart"]').addEventListener("click", async () => {
     const factor = base ? n / base : 1;
-    const items = ingredients.map((it) => ({ name: it.name, unit: it.unit || "", qty: it.qty != null ? it.qty * factor : null, category: categorize(it.name) }));
+    const items = ingredients.map((it) => ({ name: it.name, unit: it.unit || "", qty: it.qty != null ? it.qty * factor : null, category: categorize(it.name), from: r.title }));
     detailServings = n;
     m.close();
     if (items.length) { const res = await store.addShoppingItems(items); toast(shoppingToast(res), "success"); }
@@ -2638,6 +2679,7 @@ function renderShopping() {
   else renderPantry();
 }
 
+let shopGroupBy = "aisle"; // "aisle" (reparto) | "recipe" (ricetta di origine)
 function renderShoppingList() {
   const wrap = root.querySelector("#spesaBody");
   const items = store.getShopping();
@@ -2648,16 +2690,34 @@ function renderShoppingList() {
   if (!items.length) {
     body = `<div class="empty"><span class="empty__emoji">${iconHtml("shopping-cart-simple")}</span>La lista è vuota.<br>Aggiungi gli ingredienti da una ricetta o scrivili qui sotto.</div>`;
   } else {
-    const groups = {};
-    active.forEach((it) => { const c = it.category || "Altro"; (groups[c] = groups[c] || []).push(it); });
-    const orderedCats = getAisleOrder().filter((c) => groups[c]);
-    const groupsHtml = orderedCats
-      .map((cat) => `
+    let groupsHtml;
+    if (shopGroupBy === "recipe") {
+      // Per ricetta: ogni articolo compare sotto le ricette che lo richiedono.
+      const byRecipe = {};
+      active.forEach((it) => {
+        const froms = (it.from || "").split(",").map((x) => x.trim()).filter(Boolean);
+        (froms.length ? froms : ["Aggiunti a mano"]).forEach((k) => { (byRecipe[k] = byRecipe[k] || []).push(it); });
+      });
+      const names = Object.keys(byRecipe).sort((a, b) => (a === "Aggiunti a mano" ? 1 : b === "Aggiunti a mano" ? -1 : a.localeCompare(b)));
+      groupsHtml = names
+        .map((name) => `
+        <div class="shop-group">
+          <div class="shop-group__title">${iconHtml("fork-knife")} ${escapeHtml(name)}</div>
+          ${byRecipe[name].map(shopRow).join("")}
+        </div>`)
+        .join("");
+    } else {
+      const groups = {};
+      active.forEach((it) => { const c = it.category || "Altro"; (groups[c] = groups[c] || []).push(it); });
+      const orderedCats = getAisleOrder().filter((c) => groups[c]);
+      groupsHtml = orderedCats
+        .map((cat) => `
         <div class="shop-group">
           <div class="shop-group__title">${escapeHtml(cat)}</div>
           ${groups[cat].map(shopRow).join("")}
         </div>`)
-      .join("");
+        .join("");
+    }
     const doneHtml = done.length
       ? `<div class="shop-group shop-group--done">
           <div class="shop-group__title">Presi (${done.length})</div>
@@ -2676,6 +2736,7 @@ function renderShoppingList() {
     ${(() => { const c = estimateCost(active); return c.counted ? `<div class="shop-cost">${iconHtml("basket")} Costo stimato del carrello: <b>€ ${c.total.toFixed(2)}</b><span class="shop-cost__note"> · stima su ${c.counted} articoli</span></div>` : ""; })()}
     ${done.length ? `<button class="btn btn--primary btn--block" id="toPantry" style="margin-top:18px">${iconHtml("basket")} Spesa fatta: presi in dispensa</button>` : ""}
     ${items.length ? `<div style="display:flex;gap:8px;margin-top:${done.length ? "8px" : "18px"};flex-wrap:wrap">
+      <button class="btn btn--ghost" id="groupByBtn">${iconHtml("book-open")} ${shopGroupBy === "recipe" ? "Per reparto" : "Per ricetta"}</button>
       <button class="btn btn--ghost" id="aisleBtn">${iconHtml("sliders-horizontal")} Reparti</button>
       <button class="btn btn--ghost" id="clearDone">Svuota presi</button>
       <button class="btn btn--ghost" id="clearAll" style="color:var(--danger)">Svuota tutto</button>
@@ -2726,6 +2787,8 @@ function renderShoppingList() {
   });
   const ab = wrap.querySelector("#aisleBtn");
   if (ab) ab.addEventListener("click", openAisleOrder);
+  const gb = wrap.querySelector("#groupByBtn");
+  if (gb) gb.addEventListener("click", () => { shopGroupBy = shopGroupBy === "recipe" ? "aisle" : "recipe"; renderShoppingList(); });
   lastShopToggled = null; // consuma l'animazione: i prossimi render non ri-animano
 }
 
@@ -3022,6 +3085,15 @@ function renderPlanWeek() {
       <button class="back-btn" id="nextW">${iconHtml("caret-right")}</button>
     </div>
     <div class="week-list">${cards}</div>
+    ${(() => {
+      const weekEntries = days.flatMap((d) => store.getPlanByDate(ymd(d.getFullYear(), d.getMonth(), d.getDate())));
+      const wn = dayNutrition(weekEntries);
+      if (!wn.counted) return "";
+      return `<div class="nutri-box" style="margin-top:16px">
+        <div class="nutri-row"><span class="nutri-lbl">${iconHtml("carrot")} Settimana (stima)</span><span class="nutri-val"><b>${wn.kcal}</b> kcal · P ${wn.p} · C ${wn.c} · G ${wn.f}</span></div>
+        <div class="nutri-row"><span class="nutri-lbl">Media al giorno</span><span class="nutri-val">${Math.round(wn.kcal / 7)} kcal</span></div>
+      </div>${wn.counted < wn.total ? `<div class="hint" style="margin-top:4px">${wn.total - wn.counted} pasti senza valori (calcolali nelle ricette).</div>` : ""}`;
+    })()}
     <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
       <button class="btn btn--ghost" id="weekToday">Oggi</button>
       <button class="btn btn--primary" id="genWeek">${iconHtml("sparkle")} Menù settimana</button>
@@ -3107,7 +3179,7 @@ function collectIngredients(entries) {
     const r = store.getRecipe(e.recipeId);
     if (r && Array.isArray(r.ingredients)) {
       for (const it of r.ingredients) {
-        items.push({ name: it.name, unit: it.unit || "", qty: it.qty != null ? it.qty : null, category: categorize(it.name) });
+        items.push({ name: it.name, unit: it.unit || "", qty: it.qty != null ? it.qty : null, category: categorize(it.name), from: r.title });
       }
     }
   }
@@ -3281,7 +3353,7 @@ function openMenuSheet(menuId) {
   const shopBtn = m.el.querySelector('[data-act="shop"]');
   if (shopBtn) shopBtn.addEventListener("click", async () => {
     const items = [];
-    for (const r of store.getMenuRecipes(menuId)) for (const it of (r.ingredients || [])) items.push({ name: it.name, unit: it.unit || "", qty: it.qty != null ? it.qty : null, category: categorize(it.name) });
+    for (const r of store.getMenuRecipes(menuId)) for (const it of (r.ingredients || [])) items.push({ name: it.name, unit: it.unit || "", qty: it.qty != null ? it.qty : null, category: categorize(it.name), from: r.title });
     const res = await store.addShoppingItems(items);
     m.close();
     toast(shoppingToast(res), "success");

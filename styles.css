@@ -481,6 +481,7 @@ a { color: var(--primary-2); }
 .shop-cost { margin-top: 16px; padding: 12px 14px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 14px; font-size: 0.95rem; }
 .shop-cost b { color: var(--primary-2); font-size: 1.1rem; }
 .shop-cost__note { color: var(--text-soft); font-size: 0.8rem; }
+.festive-banner { display: inline-block; font-weight: 800; font-size: 0.9rem; padding: 5px 12px; border-radius: 999px; margin-bottom: 6px; background: rgba(var(--primary-rgb, 255,184,107), 0.16); color: var(--primary-2); border: 1px solid rgba(var(--primary-rgb, 255,184,107), 0.3); }
 .mic-btn.is-listening { color: var(--danger); animation: pulse 1s infinite; }
 .tabs { display: flex; gap: 8px; margin-bottom: 18px; }
 .tab-btn {

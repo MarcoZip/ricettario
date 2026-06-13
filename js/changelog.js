@@ -6,6 +6,17 @@
 
 export const CHANGELOG = [
   {
+    v: "5.2",
+    d: "2026-06-13",
+    items: [
+      "Nutrizione della settimana: nel Piano vedi la stima di calorie e macro dei 7 giorni, con media giornaliera.",
+      "Cerca con più ingredienti: scrivi \"zucchine, pollo\" e trovi le ricette che li contengono tutti.",
+      "Lista della spesa raggruppabile per ricetta: sai cosa serve per ogni piatto (tasto \"Per ricetta\").",
+      "Idee per il contorno nel dettaglio di una ricetta.",
+      "Tema festività: l'app fa gli auguri nei periodi speciali (Natale, Pasqua, Halloween…)."
+    ]
+  },
+  {
     v: "5.1",
     d: "2026-06-13",
     items: [

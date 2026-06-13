@@ -154,13 +154,16 @@ export function getFavorites() {
   return state.recipes.filter((r) => r.favorite);
 }
 export function searchRecipes(q) {
-  const s = q.toLowerCase().trim();
+  const s = (q || "").toLowerCase().trim();
   if (!s) return [];
-  return state.recipes.filter((r) =>
-    (r.title || "").toLowerCase().includes(s) ||
-    (r.tags || []).some((t) => (t || "").toLowerCase().includes(s)) ||
-    (r.ingredients || []).some((i) => (i.name || "").toLowerCase().includes(s))
-  );
+  const matchesTerm = (r, term) =>
+    (r.title || "").toLowerCase().includes(term) ||
+    (r.tags || []).some((t) => (t || "").toLowerCase().includes(term)) ||
+    (r.ingredients || []).some((i) => (i.name || "").toLowerCase().includes(term));
+  // Più ingredienti separati da virgola o " e ": devono comparire TUTTI.
+  const terms = s.split(/\s*,\s*|\s+e\s+/).map((t) => t.trim()).filter(Boolean);
+  if (terms.length > 1) return state.recipes.filter((r) => terms.every((term) => matchesTerm(r, term)));
+  return state.recipes.filter((r) => matchesTerm(r, s));
 }
 export function getByTag(tag) {
   const t = (tag || "").toLowerCase();
@@ -220,7 +223,13 @@ export async function addShoppingItems(rawItems) {
     const existing = state.shopping.find((s) => !s.checked && shopKey(s) === key);
     if (existing) {
       const qty = existing.qty != null && it.qty != null ? existing.qty + it.qty : (existing.qty != null ? existing.qty : it.qty);
-      await adapter.updateShopping(existing.id, { qty });
+      const patch = { qty };
+      if (it.from) { // unisci l'origine (ricetta) senza duplicati
+        const set = new Set((existing.from || "").split(",").map((x) => x.trim()).filter(Boolean));
+        it.from.split(",").map((x) => x.trim()).filter(Boolean).forEach((x) => set.add(x));
+        patch.from = [...set].join(", ");
+      }
+      await adapter.updateShopping(existing.id, patch);
     } else {
       await adapter.addShopping({
         id: newId(),
@@ -228,6 +237,7 @@ export async function addShoppingItems(rawItems) {
         qty: it.qty != null ? it.qty : null,
         unit: it.unit || "",
         category: it.category || categorize(it.name),
+        from: it.from || "",
         checked: false,
         createdAt: now()
       });
