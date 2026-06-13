@@ -1116,6 +1116,36 @@ function renderToolDetail() {
   });
 }
 
+// Estrae un colore dominante (medio, ravvivato) da un'immagine e lo passa al
+// callback come [r,g,b]. Funziona con foto caricate (data URL) e immagini same-
+// origin; per le immagini esterne senza CORS fallisce in silenzio (niente tinta).
+function tintFromImage(url, cb) {
+  if (!url) return;
+  const img = new Image();
+  if (!url.startsWith("data:")) img.crossOrigin = "anonymous";
+  img.onload = () => {
+    try {
+      const c = document.createElement("canvas");
+      const w = (c.width = 24), h = (c.height = 24);
+      const ctx = c.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+      const d = ctx.getImageData(0, 0, w, h).data;
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const R = d[i], G = d[i + 1], B = d[i + 2], A = d[i + 3];
+        if (A < 128) continue;
+        const mx = Math.max(R, G, B), mn = Math.min(R, G, B);
+        if (mx < 30 || (mx > 235 && mn > 235)) continue; // salta troppo scuro/slavato
+        r += R; g += G; b += B; n++;
+      }
+      if (!n) return;
+      cb([Math.round(r / n), Math.round(g / n), Math.round(b / n)]);
+    } catch (e) { /* canvas "tainted" per CORS: niente tinta */ }
+  };
+  img.onerror = () => {};
+  img.src = url;
+}
+
 // Ricette simili: punteggio per strumento, tag e ingredienti in comune.
 function similarRecipes(r, limit = 4) {
   const tags = new Set((r.tags || []).map((t) => (t || "").toLowerCase()));
@@ -1395,6 +1425,16 @@ function renderRecipeDetail() {
 
   wireNutrition(r, base, detailServings);
   wireVoiceNote(r);
+
+  // Tinta dell'hero dal colore dominante della foto (ravvivato e scurito per
+  // tenere leggibile il titolo bianco).
+  if (r.photo) tintFromImage(r.photo, ([R, G, B]) => {
+    const hero = root.querySelector(".recipe-hero");
+    if (!hero) return;
+    const mx = Math.max(R, G, B) || 1;
+    const k = Math.min(1, 110 / mx);
+    hero.style.setProperty("--hero-tint", `${Math.round(R * k)},${Math.round(G * k)},${Math.round(B * k)}`);
+  });
 }
 
 // Nota vocale di una ricetta: registrata col microfono e salvata SOLO su questo

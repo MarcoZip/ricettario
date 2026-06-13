@@ -31,7 +31,9 @@
       "PowerShell($c = Get-NetTCPConnection -LocalPort 5510 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { Stop-Process -Id $c.OwningProcess -Force -ErrorAction SilentlyContinue; \"server fermato\" } else { \"nessun server sulla 5510\" })",
       "PowerShell(Rename-Item -Path \"D:\\\\Claude-Workspace\\\\Garage-Lamborghini\" -NewName \"Gioco Tommaso 02 - Garage Lamborghini\")",
       "Bash(node -e ' *)",
-      "Bash(grep -oP '<img[^>]+data-src=\"[^\"]+\"[^>]*alt=\"[^\"]*\".{0,500}?<a href=\"https://www\\\\.ricettedellanonna\\\\.net/[a-z0-9-]+/\"[^>]*rel=\"bookmark\"[^>]*>[^<]+</a>' /tmp/rn1.html)"
+      "Bash(grep -oP '<img[^>]+data-src=\"[^\"]+\"[^>]*alt=\"[^\"]*\".{0,500}?<a href=\"https://www\\\\.ricettedellanonna\\\\.net/[a-z0-9-]+/\"[^>]*rel=\"bookmark\"[^>]*>[^<]+</a>' /tmp/rn1.html)",
+      "Bash(curl -s -o /tmp/rn.json -w 'HTTP %{http_code}\\\\n' --max-time 30 https://ricette-import.marcozeta73.workers.dev/searchricettenonna?q=pollo)",
+      "Bash(curl -s -o /tmp/imp.json -w 'HTTP %{http_code}\\\\n' --max-time 35 https://ricette-import.marcozeta73.workers.dev/?url=https://www.ricettedellanonna.net/pollo-alla-marengo/)"
     ]
   }
 }

@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "4.9",
+    d: "2026-06-13",
+    items: [
+      "Foto della ricetta più elegante: la sfumatura sotto il titolo prende il colore dominante del piatto.",
+      "Schermate vuote più curate, con un'illustrazione colorata che segue il tema scelto."
+    ]
+  },
+  {
     v: "4.8",
     d: "2026-06-13",
     items: [

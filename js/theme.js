@@ -32,11 +32,19 @@ export function getAccent() {
   try { return localStorage.getItem(ACCENT_KEY) || "arancione"; } catch { return "arancione"; }
 }
 
+function hexToRgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return "255,184,107";
+  const n = parseInt(m[1], 16);
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+}
+
 export function applyAccent(name) {
   const a = ACCENT_PRESETS[name || getAccent()] || ACCENT_PRESETS.arancione;
   const s = document.documentElement.style;
   s.setProperty("--primary", a.p);
   s.setProperty("--primary-2", a.p2);
+  s.setProperty("--primary-rgb", hexToRgb(a.p2));
   s.setProperty("--primary-grad", `linear-gradient(135deg, ${a.p2}, ${a.p})`);
 }
 
