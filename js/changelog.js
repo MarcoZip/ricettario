@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "5.0",
+    d: "2026-06-13",
+    items: [
+      "Ricettario Moulinex Companion: nel Ricettario online scegli la fonte \"Moulinex Companion\" per sfogliare le ricette del robot da cucina e importarle (con foto, ingredienti e passaggi)."
+    ]
+  },
+  {
     v: "4.9",
     d: "2026-06-13",
     items: [

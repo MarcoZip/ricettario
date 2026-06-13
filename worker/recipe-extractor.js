@@ -130,6 +130,33 @@ async function handleSearchRicettenonna(q) {
   } catch (e) { return json({ error: "unreachable", results: [] }, 200); }
 }
 
+// Ricettario Moulinex Companion (italiano): sfoglia la selezione di ricette per
+// il robot Companion dal sito Moulinex. La ricerca testuale non è esposta dal
+// sito (è via JS), quindi qui si restituisce la lista curata; le foto e i
+// dettagli arrivano all'import della singola ricetta (hanno JSON-LD Recipe).
+async function handleSearchMoulinex() {
+  try {
+    const u = "https://www.moulinex.it/ricette/elenco/crp/companion-ricette";
+    const res = await fetch(u, { headers: BROWSER_HEADERS, cf: { cacheTtl: 3600, cacheEverything: true } });
+    if (!res.ok) return json({ error: "unreachable", results: [] }, 200);
+    const html = await res.text();
+    const results = [];
+    const seen = new Set();
+    // Card: <a class="is-full-area…" href="/ricette/detail/…"><span class="is-visually-hidden…"> Titolo </span>
+    const re = /<a [^>]*class="is-full-area[^"]*"[^>]*href="(\/ricette\/detail\/[^"]+)"[^>]*>\s*<span[^>]*class="is-visually-hidden[^"]*"[^>]*>([^<]+)<\/span>/gi;
+    let m;
+    while ((m = re.exec(html)) && results.length < 24) {
+      const link = "https://www.moulinex.it" + m[1];
+      if (seen.has(link)) continue;
+      seen.add(link);
+      const title = clean(m[2]);
+      if (!title) continue;
+      results.push({ title, url: link, image: "" });
+    }
+    return json({ results }, 200);
+  } catch (e) { return json({ error: "unreachable", results: [] }, 200); }
+}
+
 // Ricerca su Spoonacular (database enorme in inglese): serve env.SPOON_KEY.
 async function handleSpoon(q, env) {
   if (!env || !env.SPOON_KEY) return json({ error: "nokey", results: [] }, 200);
@@ -264,6 +291,7 @@ export default {
     if (url.pathname === "/searchmisya") return handleSearchMisya(url.searchParams.get("q"));
     if (url.pathname === "/searchcookist") return handleSearchCookist(url.searchParams.get("q"));
     if (url.pathname === "/searchricettenonna") return handleSearchRicettenonna(url.searchParams.get("q"));
+    if (url.pathname === "/searchmoulinex") return handleSearchMoulinex();
     if (url.pathname === "/edamam") return handleEdamam(url.searchParams.get("q"), env);
     if (url.pathname === "/spoon") return handleSpoon(url.searchParams.get("q"), env);
     if (url.pathname === "/spoon-info") return handleSpoonInfo(url.searchParams.get("id"), env);
