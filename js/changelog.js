@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "3.9",
+    d: "2026-06-04",
+    items: [
+      "Cerca su tutte le fonti insieme: ogni risultato mostra da dove arriva (GialloZafferano, Misya, TheMealDB, Spoonacular).",
+      "Nuova fonte italiana: Misya. E i risultati entrano con una bella animazione."
+    ]
+  },
+  {
     v: "3.8",
     d: "2026-06-04",
     items: [

@@ -45,6 +45,32 @@ async function handleSearchGz(q) {
   } catch (e) { return json({ error: "unreachable", results: [] }, 200); }
 }
 
+// Ricerca diretta su Misya (italiano): ritorna titolo (dallo slug) + link.
+function slugTitle(url) {
+  const m = url.match(/\/ricetta\/([^/?#]+)\.htm/);
+  if (!m) return "";
+  const s = decodeURIComponent(m[1]).replace(/-/g, " ").trim();
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : "";
+}
+async function handleSearchMisya(q) {
+  if (!q || !q.trim()) return json({ results: [] }, 200);
+  try {
+    const u = "https://www.misya.info/?s=" + encodeURIComponent(q.trim());
+    const res = await fetch(u, { headers: BROWSER_HEADERS, cf: { cacheTtl: 1800, cacheEverything: true } });
+    if (!res.ok) return json({ error: "unreachable", results: [] }, 200);
+    const html = await res.text();
+    const results = [];
+    const seen = new Set();
+    const re = /href="(https:\/\/www\.misya\.info\/ricetta\/[^"]+\.htm)"/g;
+    let m;
+    while ((m = re.exec(html)) && results.length < 20) {
+      const link = m[1];
+      if (!seen.has(link)) { seen.add(link); const title = slugTitle(link); if (title) results.push({ title, url: link }); }
+    }
+    return json({ results }, 200);
+  } catch (e) { return json({ error: "unreachable", results: [] }, 200); }
+}
+
 // Ricerca su Spoonacular (database enorme in inglese): serve env.SPOON_KEY.
 async function handleSpoon(q, env) {
   if (!env || !env.SPOON_KEY) return json({ error: "nokey", results: [] }, 200);
@@ -117,6 +143,7 @@ export default {
 
     const url = new URL(request.url);
     if (url.pathname === "/searchgz") return handleSearchGz(url.searchParams.get("q"));
+    if (url.pathname === "/searchmisya") return handleSearchMisya(url.searchParams.get("q"));
     if (url.pathname === "/spoon") return handleSpoon(url.searchParams.get("q"), env);
     if (url.pathname === "/spoon-info") return handleSpoonInfo(url.searchParams.get("id"), env);
     if (url.pathname === "/wine") return handleWine(url.searchParams.get("food"), env);

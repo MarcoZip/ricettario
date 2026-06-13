@@ -7,7 +7,7 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchSpoon, spoonInfo, winePairing } from "./import-recipe.js";
+import { importFromUrl, searchGz, searchMisya, searchSpoon, spoonInfo, winePairing } from "./import-recipe.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
@@ -94,7 +94,7 @@ let weekAnchor = null; // data di riferimento per la vista settimana
 
 // Stato locale della sezione Ricettario (per non perdere i risultati ad ogni render).
 let mealTab = "online";
-let mealSource = "mealdb"; // "mealdb" | "gz" | "spoon"
+let mealSource = "all"; // "all" | "mealdb" | "gz" | "misya" | "spoon"
 let mealQuery = "";
 let mealResults = null;
 let mealLoading = false;
@@ -614,6 +614,7 @@ function openStats() {
   m.el.querySelector('[data-act="ok"]').onclick = m.close;
   m.el.querySelector("#achBtn").onclick = openAchievements;
   m.el.querySelector("#calBtn").onclick = openCookCalendar;
+  m.el.querySelectorAll(".stat-num").forEach((el) => countUp(el, parseInt(el.textContent, 10) || 0));
 }
 
 // Traguardi di cucina (badge sbloccati in base ai dati raccolti).
@@ -664,6 +665,12 @@ function openAchievements() {
     <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
   `);
   m.el.querySelector('[data-act="ok"]').onclick = m.close;
+  // Coriandoli quando ci sono nuovi traguardi sbloccati dall'ultima volta.
+  try {
+    const seen = parseInt(localStorage.getItem("ricettario.achSeen") || "0", 10);
+    if (unlocked > seen) setTimeout(() => fxBurst(window.innerWidth / 2, window.innerHeight / 3, { emojis: ["🏆", "✨", "🎉"] }), 250);
+    localStorage.setItem("ricettario.achSeen", String(unlocked));
+  } catch (e) { /* ignora */ }
 }
 
 // Calendario del diario: i giorni in cui hai cucinato, con cosa.
@@ -1923,26 +1930,54 @@ function renderRicettario() {
   else renderSitiTab();
 }
 
+const SOURCE_LABEL = { mealdb: "TheMealDB", gz: "GialloZafferano", misya: "Misya", spoon: "Spoonacular" };
 function onlineSources() {
-  const list = [{ k: "mealdb", label: "TheMealDB (tradotto)" }, { k: "gz", label: "GialloZafferano (IT)" }];
+  const list = [
+    { k: "all", label: "Tutte le fonti" },
+    { k: "gz", label: "GialloZafferano (IT)" },
+    { k: "misya", label: "Misya (IT)" },
+    { k: "mealdb", label: "TheMealDB (tradotto)" }
+  ];
   if (SPOONACULAR_ENABLED) list.push({ k: "spoon", label: "Spoonacular (tradotto)" });
   return list;
 }
 
-// Esegue la ricerca sulla fonte scelta e normalizza i risultati.
+const mapMealdb = (r) => ({ source: "mealdb", title: r.title, image: r.thumb || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], meta: [r.category, r.area].filter(Boolean).join(" · ") });
+const mapGz = (r) => ({ source: "gz", title: r.title, title_it: r.title, link: r.url, meta: "GialloZafferano" });
+const mapMisya = (r) => ({ source: "misya", title: r.title, title_it: r.title, link: r.url, meta: "Misya" });
+const mapSpoon = (r) => ({ source: "spoon", id: r.id || null, title: r.title, image: r.image || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], servings: r.servings || null, time: r.time || null, meta: [r.time ? r.time + " min" : "", r.servings ? "per " + r.servings : ""].filter(Boolean).join(" · ") });
+
+// Alterna i risultati delle varie fonti per non mostrarli tutti raggruppati.
+function interleave(arrays) {
+  const out = [];
+  const max = Math.max(0, ...arrays.map((a) => a.length));
+  for (let i = 0; i < max; i++) for (const a of arrays) if (a[i]) out.push(a[i]);
+  return out;
+}
+
+// Esegue la ricerca sulla fonte scelta (o su tutte) e normalizza i risultati.
 async function runMealSearch(q) {
-  if (mealSource === "gz") {
-    const rs = await searchGz(q);
-    return rs.map((r) => ({ source: "gz", title: r.title, title_it: r.title, link: r.url, meta: "GialloZafferano" }));
-  }
+  if (mealSource === "gz") { const out = (await searchGz(q)).map(mapGz); return out; }
+  if (mealSource === "misya") { const out = (await searchMisya(q)).map(mapMisya); return out; }
   if (mealSource === "spoon") {
-    const rs = await searchSpoon(await translateToEnglish(q));
-    const out = rs.map((r) => ({ source: "spoon", id: r.id || null, title: r.title, image: r.image || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], servings: r.servings || null, time: r.time || null, meta: [r.time ? r.time + " min" : "", r.servings ? "per " + r.servings : ""].filter(Boolean).join(" · ") }));
+    const out = (await searchSpoon(await translateToEnglish(q))).map(mapSpoon);
     await translateMealTitles(out);
     return out;
   }
-  const rs = await mealdb.searchMeals(await translateToEnglish(q));
-  const out = rs.map((r) => ({ source: "mealdb", title: r.title, image: r.thumb || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], meta: [r.category, r.area].filter(Boolean).join(" · ") }));
+  if (mealSource === "all") {
+    const en = await translateToEnglish(q);
+    const tasks = [
+      searchGz(q).then((rs) => rs.slice(0, 6).map(mapGz)).catch(() => []),
+      searchMisya(q).then((rs) => rs.slice(0, 6).map(mapMisya)).catch(() => []),
+      mealdb.searchMeals(en).then((rs) => rs.slice(0, 6).map(mapMealdb)).catch(() => [])
+    ];
+    if (SPOONACULAR_ENABLED) tasks.push(searchSpoon(en).then((rs) => rs.slice(0, 6).map(mapSpoon)).catch(() => []));
+    const arrays = await Promise.all(tasks);
+    const merged = interleave(arrays);
+    await translateMealTitles(merged);
+    return merged;
+  }
+  const out = (await mealdb.searchMeals(await translateToEnglish(q))).map(mapMealdb);
   await translateMealTitles(out);
   return out;
 }
@@ -1996,8 +2031,7 @@ function renderOnlineTab() {
   if (randomBtn) randomBtn.addEventListener("click", async () => {
     mealLoading = true; mealError = ""; mealQuery = ""; renderOnlineTab();
     try {
-      const rs = await mealdb.randomMeals(6);
-      const out = rs.map((r) => ({ source: "mealdb", title: r.title, image: r.thumb || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], meta: [r.category, r.area].filter(Boolean).join(" · ") }));
+      const out = (await mealdb.randomMeals(6)).map(mapMealdb);
       await translateMealTitles(out);
       mealResults = out;
     } catch (e) { mealError = "Servizio non raggiungibile o troppo lento. Riprova."; mealResults = null; }
@@ -2011,8 +2045,8 @@ function renderOnlineTab() {
     saveBtn.addEventListener("click", async () => {
       const old = saveBtn.innerHTML;
       saveBtn.disabled = true;
-      if (data.source === "gz") {
-        // GialloZafferano: importa la ricetta completa dal link (già in italiano).
+      if (data.source === "gz" || data.source === "misya") {
+        // Siti italiani: importa la ricetta completa dal link (già in italiano).
         saveBtn.innerHTML = `${iconHtml("download-simple")} Importo...`;
         try {
           const r = await importFromUrl(data.link);
@@ -2050,25 +2084,26 @@ function renderOnlineTab() {
   });
 }
 
-// Traduce in italiano i titoli dei risultati (per la sola visualizzazione).
+// Traduce in italiano i titoli che non lo sono già (salta quelli con title_it).
 async function translateMealTitles(results) {
-  if (!results || !results.length) return;
+  const todo = (results || []).filter((r) => !r.title_it);
+  if (!todo.length) return;
   try {
-    const its = await translateList(results.map((r) => r.title));
-    results.forEach((r, i) => { r.title_it = (its[i] || r.title); });
+    const its = await translateList(todo.map((r) => r.title));
+    todo.forEach((r, i) => { r.title_it = (its[i] || r.title); });
   } catch (e) { /* in caso d'errore restano in inglese */ }
 }
 
-function mealCardHtml(m) {
+function mealCardHtml(m, i = 0) {
   return `
-    <div class="meal-card" data-meal='${escapeHtml(JSON.stringify(m))}'>
+    <div class="meal-card stagger" data-meal='${escapeHtml(JSON.stringify(m))}' style="--i:${i}">
       ${m.image ? `<img src="${escapeHtml(m.image)}" alt="" loading="lazy" />` : `<div class="meal-card__noimg">${iconHtml("fork-knife")}</div>`}
       <div class="meal-card__body">
         <h3 class="meal-card__title">${escapeHtml(m.title_it || m.title)}</h3>
-        <div class="meal-card__meta">${escapeHtml(m.meta || "")}</div>
+        <div class="meal-card__meta"><span class="meal-src meal-src--${m.source}">${SOURCE_LABEL[m.source] || ""}</span>${m.meta ? " · " + escapeHtml(m.meta) : ""}</div>
         <div class="meal-card__actions">
           ${m.link ? `<a class="chip" href="${escapeHtml(safeUrl(m.link))}" target="_blank" rel="noopener">${iconHtml("arrow-square-out")} Apri</a>` : ""}
-          <button class="chip" data-act="save">${iconHtml("plus")} ${m.source === "gz" ? "Importa" : "Salva"}</button>
+          <button class="chip" data-act="save">${iconHtml("plus")} ${(m.source === "gz" || m.source === "misya") ? "Importa" : "Salva"}</button>
         </div>
       </div>
     </div>`;

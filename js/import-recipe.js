@@ -33,6 +33,15 @@ export async function spoonInfo(id) {
   return d;
 }
 
+// Ricerca diretta su Misya (italiano): ritorna [{ title, url }].
+export async function searchMisya(query) {
+  if (!WORKER_URL || !query.trim()) return [];
+  const res = await fetch(`${WORKER_URL}/searchmisya?q=${encodeURIComponent(query.trim())}`);
+  if (!res.ok) throw new Error("Servizio non raggiungibile.");
+  const d = await res.json().catch(() => ({}));
+  return Array.isArray(d.results) ? d.results : [];
+}
+
 // Ricerca su Spoonacular (inglese, richiede la chiave sul worker).
 export async function searchSpoon(query) {
   if (!WORKER_URL || !query.trim()) return [];
