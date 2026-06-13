@@ -35,11 +35,17 @@ async function handleSearchGz(q) {
     const html = await res.text();
     const results = [];
     const seen = new Set();
-    const re = /class="gz-title"[^>]*>\s*<a href="([^"]+)"[^>]*>([^<]+)<\/a>/g;
-    let m;
-    while ((m = re.exec(html)) && results.length < 20) {
-      const link = m[1], title = clean(m[2]);
-      if (link && title && !seen.has(link)) { seen.add(link); results.push({ title, url: link }); }
+    // Ogni card: <div class="gz-card-image">…<img src="…">… <h2 class="gz-title"><a href="…">Titolo</a>
+    const parts = html.split("gz-card-image");
+    for (let i = 1; i < parts.length && results.length < 20; i++) {
+      const seg = parts[i];
+      const a = seg.match(/class="gz-title"[^>]*>\s*<a href="([^"]+)"[^>]*>([^<]+)<\/a>/);
+      if (!a) continue;
+      const link = a[1], title = clean(a[2]);
+      if (!link || !title || seen.has(link)) continue;
+      seen.add(link);
+      const img = seg.match(/<img[^>]+src="([^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/i);
+      results.push({ title, url: link, image: img ? img[1] : "" });
     }
     return json({ results }, 200);
   } catch (e) { return json({ error: "unreachable", results: [] }, 200); }

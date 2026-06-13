@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "4.0",
+    d: "2026-06-04",
+    minor: true,
+    items: [
+      "I risultati di GialloZafferano ora mostrano anche la foto del piatto."
+    ]
+  },
+  {
     v: "3.9",
     d: "2026-06-04",
     items: [
