@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "4.5",
+    d: "2026-06-13",
+    minor: true,
+    items: [
+      "La finestra delle Novità ora appare dopo l'accesso (prima sul cellulare lampeggiava tra avvio e login e spariva subito)."
+    ]
+  },
+  {
     v: "4.4",
     d: "2026-06-13",
     items: [

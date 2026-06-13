@@ -206,7 +206,6 @@ export function mount(rootEl) {
       setTimeout(() => openGuide(true), 500);
     }
   } catch {}
-  maybeShowWhatsNew();
   setupBackHandler();
   setupRipple();
   setupAurora();
@@ -268,8 +267,9 @@ function setupBackHandler() {
 }
 
 // Mostra le novità quando la versione è cambiata dall'ultima volta (non al primo
-// avvio assoluto). Salva la versione vista in localStorage.
-function maybeShowWhatsNew() {
+// avvio assoluto). Salva la versione vista in localStorage. Va chiamata SOLO dopo
+// l'accesso (quando si è nell'app vera), non sulla schermata di login.
+export function maybeShowWhatsNew() {
   try {
     const KEY = "ricettario.seenVersion";
     const seen = localStorage.getItem(KEY);

@@ -62,6 +62,7 @@ async function startLocal() {
   ui.navigate("strumenti");
   updateBadge();
   scheduleReminders();
+  ui.maybeShowWhatsNew();
   ui.promptNicknameIfMissing();
 }
 
@@ -114,6 +115,7 @@ async function startCloud() {
       ui.navigate("strumenti");
       updateBadge();
       scheduleReminders();
+      ui.maybeShowWhatsNew();
       ui.promptNicknameIfMissing();
     } else {
       accountEmail = null;
