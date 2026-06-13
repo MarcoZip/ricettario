@@ -1944,7 +1944,7 @@ function onlineSources() {
 
 const mapMealdb = (r) => ({ source: "mealdb", title: r.title, image: r.thumb || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], meta: [r.category, r.area].filter(Boolean).join(" · ") });
 const mapGz = (r) => ({ source: "gz", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "GialloZafferano" });
-const mapMisya = (r) => ({ source: "misya", title: r.title, title_it: r.title, link: r.url, meta: "Misya" });
+const mapMisya = (r) => ({ source: "misya", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "Misya" });
 const mapSpoon = (r) => ({ source: "spoon", id: r.id || null, title: r.title, image: r.image || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], servings: r.servings || null, time: r.time || null, meta: [r.time ? r.time + " min" : "", r.servings ? "per " + r.servings : ""].filter(Boolean).join(" · ") });
 
 // Alterna i risultati delle varie fonti per non mostrarli tutti raggruppati.

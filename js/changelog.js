@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "4.1",
+    d: "2026-06-04",
+    minor: true,
+    items: [
+      "Anche i risultati di Misya mostrano la foto del piatto."
+    ]
+  },
+  {
     v: "4.0",
     d: "2026-06-04",
     minor: true,

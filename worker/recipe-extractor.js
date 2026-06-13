@@ -67,11 +67,27 @@ async function handleSearchMisya(q) {
     const html = await res.text();
     const results = [];
     const seen = new Set();
-    const re = /href="(https:\/\/www\.misya\.info\/ricetta\/[^"]+\.htm)"/g;
+    // Card Misya: <a class="cont-foto" href="…htm" title="Ricetta …"><img … data-src="…jpg">
+    const re = /class="cont-foto"[^>]*href="(https:\/\/www\.misya\.info\/ricetta\/[^"]+\.htm)"[^>]*title="([^"]*)"[\s\S]{0,300}?<img[^>]+(?:data-src|src)="([^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/gi;
     let m;
     while ((m = re.exec(html)) && results.length < 20) {
       const link = m[1];
-      if (!seen.has(link)) { seen.add(link); const title = slugTitle(link); if (title) results.push({ title, url: link }); }
+      if (seen.has(link)) continue;
+      seen.add(link);
+      const title = clean(m[2]).replace(/^Ricetta\s+/i, "").trim() || slugTitle(link);
+      results.push({ title, url: link, image: m[3] || "" });
+    }
+    // Fallback: se il pattern con immagine non trova nulla, prendi i soli link.
+    if (!results.length) {
+      const re2 = /href="(https:\/\/www\.misya\.info\/ricetta\/[^"]+\.htm)"/g;
+      let m2;
+      while ((m2 = re2.exec(html)) && results.length < 20) {
+        const link = m2[1];
+        if (seen.has(link)) continue;
+        seen.add(link);
+        const title = slugTitle(link);
+        if (title) results.push({ title, url: link, image: "" });
+      }
     }
     return json({ results }, 200);
   } catch (e) { return json({ error: "unreachable", results: [] }, 200); }
