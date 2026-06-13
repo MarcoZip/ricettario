@@ -51,6 +51,15 @@ export async function searchCookist(query) {
   return Array.isArray(d.results) ? d.results : [];
 }
 
+// Ricerca diretta su Ricette della Nonna (italiano): ritorna [{ title, url, image }].
+export async function searchRicettenonna(query) {
+  if (!WORKER_URL || !query.trim()) return [];
+  const res = await fetch(`${WORKER_URL}/searchricettenonna?q=${encodeURIComponent(query.trim())}`);
+  if (!res.ok) throw new Error("Servizio non raggiungibile.");
+  const d = await res.json().catch(() => ({}));
+  return Array.isArray(d.results) ? d.results : [];
+}
+
 // Ricerca su Edamam (inglese, richiede le chiavi sul worker).
 export async function searchEdamam(query) {
   if (!WORKER_URL || !query.trim()) return [];

@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "4.8",
+    d: "2026-06-13",
+    items: [
+      "Nuova fonte italiana nel Ricettario: Ricette della Nonna (con foto del piatto).",
+      "Import da link più potente: ora legge gli ingredienti e i passaggi anche da pagine senza dati strutturati."
+    ]
+  },
+  {
     v: "4.7",
     d: "2026-06-13",
     items: [

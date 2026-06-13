@@ -93,6 +93,43 @@ async function handleSearchMisya(q) {
   } catch (e) { return json({ error: "unreachable", results: [] }, 200); }
 }
 
+// Ricerca diretta su Ricette della Nonna (italiano): titolo + link + foto.
+async function handleSearchRicettenonna(q) {
+  if (!q || !q.trim()) return json({ results: [] }, 200);
+  try {
+    const u = "https://www.ricettedellanonna.net/?s=" + encodeURIComponent(q.trim());
+    const res = await fetch(u, { headers: BROWSER_HEADERS, cf: { cacheTtl: 1800, cacheEverything: true } });
+    if (!res.ok) return json({ error: "unreachable", results: [] }, 200);
+    const html = await res.text();
+    const results = [];
+    const seen = new Set();
+    // Card: <img data-src="thumb" alt="Titolo"> … <a href="…/slug/" rel="bookmark">Titolo</a>
+    const re = /<img[^>]+data-src="([^"]+)"[^>]*alt="[^"]*"[\s\S]{0,500}?<a href="(https:\/\/www\.ricettedellanonna\.net\/[a-z0-9-]+\/)"[^>]*rel="bookmark"[^>]*>([^<]+)<\/a>/gi;
+    let m;
+    while ((m = re.exec(html)) && results.length < 20) {
+      const link = m[2];
+      if (seen.has(link)) continue;
+      seen.add(link);
+      const title = clean(m[3]);
+      if (!title) continue;
+      results.push({ title, url: link, image: m[1] || "" });
+    }
+    // Fallback: solo i link "bookmark" se il pattern con immagine non aggancia.
+    if (!results.length) {
+      const re2 = /<a href="(https:\/\/www\.ricettedellanonna\.net\/[a-z0-9-]+\/)"[^>]*rel="bookmark"[^>]*>([^<]+)<\/a>/gi;
+      let m2;
+      while ((m2 = re2.exec(html)) && results.length < 20) {
+        const link = m2[1];
+        if (seen.has(link)) continue;
+        seen.add(link);
+        const title = clean(m2[2]);
+        if (title) results.push({ title, url: link, image: "" });
+      }
+    }
+    return json({ results }, 200);
+  } catch (e) { return json({ error: "unreachable", results: [] }, 200); }
+}
+
 // Ricerca su Spoonacular (database enorme in inglese): serve env.SPOON_KEY.
 async function handleSpoon(q, env) {
   if (!env || !env.SPOON_KEY) return json({ error: "nokey", results: [] }, 200);
@@ -226,6 +263,7 @@ export default {
     if (url.pathname === "/searchgz") return handleSearchGz(url.searchParams.get("q"));
     if (url.pathname === "/searchmisya") return handleSearchMisya(url.searchParams.get("q"));
     if (url.pathname === "/searchcookist") return handleSearchCookist(url.searchParams.get("q"));
+    if (url.pathname === "/searchricettenonna") return handleSearchRicettenonna(url.searchParams.get("q"));
     if (url.pathname === "/edamam") return handleEdamam(url.searchParams.get("q"), env);
     if (url.pathname === "/spoon") return handleSpoon(url.searchParams.get("q"), env);
     if (url.pathname === "/spoon-info") return handleSpoonInfo(url.searchParams.get("id"), env);
@@ -261,7 +299,7 @@ export default {
     if (!res.ok) return json({ error: "unreachable", message: "Pagina non raggiungibile" }, 502);
 
     html = await res.text();
-    const recipe = extractRecipe(html) || extractMicrodata(html);
+    const recipe = extractRecipe(html) || extractMicrodata(html) || extractHeuristic(html);
     if (recipe) return json(recipe, 200);
 
     // Nessuna ricetta trovata: distingui una pagina di sfida anti-bot da una
@@ -274,6 +312,45 @@ export default {
     return json({ error: "notfound", message: "Nessuna ricetta strutturata trovata" }, 404);
   }
 };
+
+// Prende gli <li> della prima lista (ul/ol) che segue un'intestazione (h1-h4)
+// il cui testo combacia con `re`. Usato dall'estrazione euristica.
+function listAfterHeading(html, re) {
+  const hRe = /<h[1-4][^>]*>([\s\S]*?)<\/h[1-4]>/gi;
+  let m;
+  while ((m = hRe.exec(html))) {
+    if (re.test(clean(m[1]))) {
+      const list = html.slice(m.index).match(/<(ul|ol)[^>]*>([\s\S]*?)<\/\1>/i);
+      if (list) {
+        const items = [...list[2].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)].map((x) => clean(x[1])).filter(Boolean);
+        if (items.length) return items;
+      }
+    }
+  }
+  return [];
+}
+
+// Import "più potente": quando non ci sono dati strutturati (schema.org), prova
+// a ricavare titolo, foto, ingredienti e passi dall'HTML con euristiche comuni.
+function extractHeuristic(html) {
+  let title = (html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) || [])[1]
+    || (html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || [])[1]
+    || (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || "";
+  title = clean(title);
+  const image = (html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) || [])[1] || "";
+
+  let ingredients = [...html.matchAll(/<li[^>]*itemprop=["']recipeIngredient["'][^>]*>([\s\S]*?)<\/li>/gi)].map((m) => clean(m[1])).filter(Boolean);
+  if (!ingredients.length) ingredients = [...html.matchAll(/<li[^>]*class=["'][^"']*ingredient[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi)].map((m) => clean(m[1])).filter(Boolean);
+  if (!ingredients.length) ingredients = listAfterHeading(html, /ingredient/i);
+
+  let steps = [...html.matchAll(/<li[^>]*itemprop=["']recipeInstructions["'][^>]*>([\s\S]*?)<\/li>/gi)].map((m) => clean(m[1])).filter(Boolean);
+  if (!steps.length) steps = [...html.matchAll(/<(?:li|p)[^>]*class=["'][^"']*(?:instruction|step|preparaz|procedimento)[^"']*["'][^>]*>([\s\S]*?)<\/(?:li|p)>/gi)].map((m) => clean(m[1])).filter(Boolean);
+  if (!steps.length) steps = listAfterHeading(html, /preparaz|procedimento|istruzion|metodo|come si fa/i);
+
+  // Troppi pochi dati: meglio dichiarare "non trovato" che restituire spazzatura.
+  if (ingredients.length < 2 && steps.length < 1) return null;
+  return { title, image, servings: null, time: null, ingredients, steps, tags: [] };
+}
 
 function json(obj, status) {
   return new Response(JSON.stringify(obj), {

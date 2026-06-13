@@ -22,7 +22,16 @@
       "Bash(curl -s -o /tmp/a.json -w 'HTTP %{http_code}\\\\n' --max-time 25 'https://api.edamam.com/api/recipes/v2?type=public&q=chicken&app_id=530cbe14&app_key=7f0d3404507eafb91d3337ba8bd016e0&field=label&field=url')",
       "Bash(curl -s -o /tmp/b.json -w 'HTTP %{http_code}\\\\n' -H 'Edamam-Account-User: marcozeta73' --max-time 25 'https://api.edamam.com/api/recipes/v2?type=public&q=chicken&app_id=530cbe14&app_key=7f0d3404507eafb91d3337ba8bd016e0&field=label&field=url')",
       "Bash(curl -s -o /tmp/c.json -w 'HTTP %{http_code}\\\\n' -H 'Edamam-Account-User: MarcoZip' --max-time 25 'https://api.edamam.com/api/recipes/v2?type=public&q=chicken&app_id=530cbe14&app_key=7f0d3404507eafb91d3337ba8bd016e0&field=label&field=url')",
-      "Bash(curl -s -o /tmp/e.json -w 'HTTP %{http_code}\\\\n' --max-time 30 https://ricette-import.marcozeta73.workers.dev/edamam?q=chicken)"
+      "Bash(curl -s -o /tmp/e.json -w 'HTTP %{http_code}\\\\n' --max-time 30 https://ricette-import.marcozeta73.workers.dev/edamam?q=chicken)",
+      "Bash(mkdir -p /d/Claude-Workspace/Garage-Lamborghini && echo creato)",
+      "Bash(grep -oE '.{0,420}pollo_marengo_[^\"]+\\\\.jpg.{0,200}' /tmp/rn1.html)",
+      "Bash(grep -oE '.{0,200}href=\"https://www.salepepe.it/ricette/[a-z0-9-]+/\"[^>]*>.{0,160}' /tmp/sp1.html)",
+      "Bash(grep -oE '.{0,260}pollo_marengo_1845424756-220x144\\\\.jpg.{0,120}' /tmp/rn1.html)",
+      "Bash(grep -oE 'pollo_marengo_1845424756-220x144\\\\.jpg.{0,520}' /tmp/rn1.html)",
+      "PowerShell($c = Get-NetTCPConnection -LocalPort 5510 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { Stop-Process -Id $c.OwningProcess -Force -ErrorAction SilentlyContinue; \"server fermato\" } else { \"nessun server sulla 5510\" })",
+      "PowerShell(Rename-Item -Path \"D:\\\\Claude-Workspace\\\\Garage-Lamborghini\" -NewName \"Gioco Tommaso 02 - Garage Lamborghini\")",
+      "Bash(node -e ' *)",
+      "Bash(grep -oP '<img[^>]+data-src=\"[^\"]+\"[^>]*alt=\"[^\"]*\".{0,500}?<a href=\"https://www\\\\.ricettedellanonna\\\\.net/[a-z0-9-]+/\"[^>]*rel=\"bookmark\"[^>]*>[^<]+</a>' /tmp/rn1.html)"
     ]
   }
 }

@@ -7,7 +7,7 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchMisya, searchCookist, searchEdamam, searchSpoon, spoonInfo, winePairing } from "./import-recipe.js";
+import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchEdamam, searchSpoon, spoonInfo, winePairing } from "./import-recipe.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
@@ -2158,13 +2158,14 @@ function renderRicettario() {
   else renderSitiTab();
 }
 
-const SOURCE_LABEL = { mealdb: "TheMealDB", gz: "GialloZafferano", misya: "Misya", cookist: "Cookist", spoon: "Spoonacular", edamam: "Edamam" };
+const SOURCE_LABEL = { mealdb: "TheMealDB", gz: "GialloZafferano", misya: "Misya", cookist: "Cookist", ricettenonna: "Ricette della Nonna", spoon: "Spoonacular", edamam: "Edamam" };
 function onlineSources() {
   const list = [
     { k: "all", label: "Tutte le fonti" },
     { k: "gz", label: "GialloZafferano (IT)" },
     { k: "misya", label: "Misya (IT)" },
     { k: "cookist", label: "Cookist (IT)" },
+    { k: "ricettenonna", label: "Ricette della Nonna (IT)" },
     { k: "mealdb", label: "TheMealDB (tradotto)" }
   ];
   if (SPOONACULAR_ENABLED) list.push({ k: "spoon", label: "Spoonacular (tradotto)" });
@@ -2176,6 +2177,7 @@ const mapMealdb = (r) => ({ source: "mealdb", title: r.title, image: r.thumb || 
 const mapGz = (r) => ({ source: "gz", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "GialloZafferano" });
 const mapMisya = (r) => ({ source: "misya", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "Misya" });
 const mapCookist = (r) => ({ source: "cookist", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "Cookist" });
+const mapRicettenonna = (r) => ({ source: "ricettenonna", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "Ricette della Nonna" });
 const mapEdamam = (r) => ({ source: "edamam", title: r.title, image: r.image || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], servings: r.servings || null, time: r.time || null, meta: [r.time ? r.time + " min" : "", r.servings ? "per " + r.servings : ""].filter(Boolean).join(" · ") });
 const mapSpoon = (r) => ({ source: "spoon", id: r.id || null, title: r.title, image: r.image || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], servings: r.servings || null, time: r.time || null, meta: [r.time ? r.time + " min" : "", r.servings ? "per " + r.servings : ""].filter(Boolean).join(" · ") });
 
@@ -2192,6 +2194,7 @@ async function runMealSearch(q) {
   if (mealSource === "gz") { const out = (await searchGz(q)).map(mapGz); return out; }
   if (mealSource === "misya") { const out = (await searchMisya(q)).map(mapMisya); return out; }
   if (mealSource === "cookist") { const out = (await searchCookist(q)).map(mapCookist); return out; }
+  if (mealSource === "ricettenonna") { const out = (await searchRicettenonna(q)).map(mapRicettenonna); return out; }
   if (mealSource === "spoon") {
     const out = (await searchSpoon(await translateToEnglish(q))).map(mapSpoon);
     await translateMealTitles(out);
@@ -2208,6 +2211,7 @@ async function runMealSearch(q) {
       searchGz(q).then((rs) => rs.slice(0, 5).map(mapGz)).catch(() => []),
       searchMisya(q).then((rs) => rs.slice(0, 5).map(mapMisya)).catch(() => []),
       searchCookist(q).then((rs) => rs.slice(0, 5).map(mapCookist)).catch(() => []),
+      searchRicettenonna(q).then((rs) => rs.slice(0, 4).map(mapRicettenonna)).catch(() => []),
       mealdb.searchMeals(en).then((rs) => rs.slice(0, 5).map(mapMealdb)).catch(() => [])
     ];
     if (SPOONACULAR_ENABLED) tasks.push(searchSpoon(en).then((rs) => rs.slice(0, 5).map(mapSpoon)).catch(() => []));
@@ -2334,7 +2338,7 @@ function renderOnlineTab() {
     saveBtn.addEventListener("click", async () => {
       const old = saveBtn.innerHTML;
       saveBtn.disabled = true;
-      if (data.source === "gz" || data.source === "misya" || data.source === "cookist") {
+      if (data.source === "gz" || data.source === "misya" || data.source === "cookist" || data.source === "ricettenonna") {
         // Siti italiani: importa la ricetta completa dal link (già in italiano).
         saveBtn.innerHTML = `${iconHtml("download-simple")} Importo...`;
         try {
@@ -2395,7 +2399,7 @@ function mealCardHtml(m, i = 0) {
         <div class="meal-card__meta"><span class="meal-src meal-src--${m.source}">${SOURCE_LABEL[m.source] || ""}</span>${m.meta ? " · " + escapeHtml(m.meta) : ""}</div>
         <div class="meal-card__actions">
           ${m.link ? `<a class="chip" href="${escapeHtml(safeUrl(m.link))}" target="_blank" rel="noopener">${iconHtml("arrow-square-out")} Apri</a>` : ""}
-          <button class="chip" data-act="save">${iconHtml("plus")} ${(m.source === "gz" || m.source === "misya" || m.source === "cookist") ? "Importa" : "Salva"}</button>
+          <button class="chip" data-act="save">${iconHtml("plus")} ${(m.source === "gz" || m.source === "misya" || m.source === "cookist" || m.source === "ricettenonna") ? "Importa" : "Salva"}</button>
         </div>
       </div>
     </div>`;
