@@ -14,7 +14,7 @@
 // ============================================================
 
 // Versione dell'app (mostrata in Impostazioni). Da alzare a ogni release.
-export const APP_VERSION = "4.3";
+export const APP_VERSION = "4.4";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyDOpr2Q0KXamaMdyAXzLvP9dA_U3kQj14E",
@@ -70,4 +70,4 @@ export const SPOONACULAR_ENABLED = true;
 // crea un'app gratuita su https://developer.edamam.com (piano "Recipe Search API"),
 // aggiungi al worker import i secret EDAMAM_ID e EDAMAM_KEY (e, se richiesto,
 // EDAMAM_USER = il tuo username Edamam), ripubblica il worker e metti true qui.
-export const EDAMAM_ENABLED = false;
+export const EDAMAM_ENABLED = true;

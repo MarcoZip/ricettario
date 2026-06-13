@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "4.4",
+    d: "2026-06-13",
+    items: [
+      "Nuova fonte attiva nel Ricettario: Edamam, un grande database di ricette (in inglese, tradotte)."
+    ]
+  },
+  {
     v: "4.3",
     d: "2026-06-13",
     items: [
