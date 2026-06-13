@@ -439,6 +439,30 @@ function exportRecipesPdf() {
   w.document.open(); w.document.write(html); w.document.close();
 }
 
+// Esporta/stampa una singola ricetta come scheda PDF.
+function exportRecipePdf(r) {
+  const html = `<!doctype html><html lang="it"><head><meta charset="utf-8"><title>${escapeHtml(r.title)}</title><style>${PRINT_CSS}</style></head><body><h1>${escapeHtml(r.title)}</h1>${recipePrintHtml(r)}<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>`;
+  const w = window.open("", "_blank");
+  if (!w) { toast("Consenti i popup del browser per esportare", "error"); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
+// Modalità chef: legge ad alta voce l'intera ricetta (titolo, ingredienti, passi).
+// Ritorna una funzione per fermare la lettura.
+function speakRecipe(r) {
+  if (!window.speechSynthesis) { toast("Lettura vocale non supportata", "error"); return null; }
+  const parts = [r.title];
+  const ings = Array.isArray(r.ingredients) ? r.ingredients : [];
+  if (ings.length) { parts.push("Ingredienti."); ings.forEach((it) => parts.push(ingredientText(it))); }
+  const steps = Array.isArray(r.steps) ? r.steps : [];
+  if (steps.length) { parts.push("Preparazione."); steps.forEach((s, i) => parts.push(`Passo ${i + 1}. ${s}`)); }
+  try {
+    window.speechSynthesis.cancel();
+    for (const p of parts) { const u = new SpeechSynthesisUtterance(p); u.lang = "it-IT"; window.speechSynthesis.speak(u); }
+  } catch (e) { return null; }
+  return () => { try { window.speechSynthesis.cancel(); } catch (e) {} };
+}
+
 const ADMIN_EMAIL = "marcozeta73@gmail.com";
 
 // Statistiche accessi degli utenti (solo amministratore): riepilogo per
@@ -907,14 +931,15 @@ function renderStrumenti() {
       </div>`
     : "";
 
-  // Avviso scadenze
-  const exp = store.getExpiringPantry(3);
+  // Avviso scadenze (giorni di anticipo configurabili in Opzioni → Notifiche).
+  const expDays = getNotifyPrefs().days || 3;
+  const exp = store.getExpiringPantry(expDays);
   const expBanner = exp.length
     ? `<button class="alert-banner" id="expAlert">${iconHtml("basket")} <span>${exp.length} ${exp.length === 1 ? "alimento in scadenza" : "alimenti in scadenza"} — controlla la dispensa</span></button>`
     : "";
 
   // "Usa prima che scada": ricette che sfruttano gli alimenti in scadenza
-  const useFirst = exp.length ? store.recipesForExpiring(3).slice(0, 4) : [];
+  const useFirst = exp.length ? store.recipesForExpiring(expDays).slice(0, 4) : [];
   const useFirstCard = useFirst.length
     ? `<div class="today-card">
         <div class="today__h">${iconHtml("basket")} Usa prima che scada</div>
@@ -1284,6 +1309,8 @@ function renderRecipeDetail() {
     <button class="btn btn--block" id="cookedBtn" style="margin-bottom:10px">${iconHtml("fire")} Segna come cucinata${r.cookCount ? ` · ${r.cookCount} ${r.cookCount === 1 ? "volta" : "volte"}` : ""}</button>
     <button class="btn btn--block" id="shareImg" style="margin-bottom:10px">${iconHtml("image")} Condividi come immagine</button>
     <button class="btn btn--block" id="qrBtn" style="margin-bottom:10px">${iconHtml("qr-code")} Mostra codice QR</button>
+    ${steps.length ? `<button class="btn btn--block" id="chefBtn" style="margin-bottom:10px">🍳 Leggi la ricetta</button>` : ""}
+    <button class="btn btn--block" id="pdfRecipeBtn" style="margin-bottom:10px">${iconHtml("download-simple")} Esporta in PDF</button>
     <div style="display:flex;gap:8px;margin-top:4px">
       <button class="btn btn--ghost" id="editRecipe">${iconHtml("pencil-simple")} Modifica</button>
       <button class="btn btn--ghost" id="shareRecipe">${iconHtml("arrow-square-out")} Condividi</button>
@@ -1397,6 +1424,17 @@ function renderRecipeDetail() {
 
   const qrBtn = root.querySelector("#qrBtn");
   if (qrBtn) qrBtn.addEventListener("click", () => openQr(r));
+
+  let chefStop = null;
+  const chefBtn = root.querySelector("#chefBtn");
+  if (chefBtn) chefBtn.addEventListener("click", () => {
+    if (chefStop) { chefStop(); chefStop = null; chefBtn.innerHTML = "🍳 Leggi la ricetta"; return; }
+    chefStop = speakRecipe(r);
+    if (chefStop) chefBtn.innerHTML = "⏹ Ferma la lettura";
+  });
+
+  const pdfRecipeBtn = root.querySelector("#pdfRecipeBtn");
+  if (pdfRecipeBtn) pdfRecipeBtn.addEventListener("click", () => exportRecipePdf(r));
 
   const wineBtn = root.querySelector("#wineBtn");
   if (wineBtn) wineBtn.addEventListener("click", async () => {
@@ -2269,6 +2307,18 @@ async function runMealSearch(q) {
   return out;
 }
 
+// Illustrazione SVG (pentola con vapore) per le schermate vuote del Ricettario.
+function emptyArt() {
+  return `<svg class="empty__art" viewBox="0 0 120 120" width="124" height="124" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <circle cx="60" cy="62" r="52" fill="rgba(var(--primary-rgb,255,184,107),0.10)"/>
+    <path d="M36 66h48v14a9 9 0 0 1-9 9H45a9 9 0 0 1-9-9V66Z" fill="rgba(var(--primary-rgb,255,184,107),0.22)" stroke="currentColor" stroke-width="3.2" stroke-linejoin="round"/>
+    <path d="M30 66h60" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>
+    <path d="M28 74h-5M92 74h5" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>
+    <path d="M48 48c0-7 4-11 12-11s12 4 12 11" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>
+    <path d="M50 40v-7M60 38v-9M70 40v-7" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" opacity="0.85"/>
+  </svg>`;
+}
+
 // Esegue una ricerca online e aggiorna lo stato (usata da pulsante, invio e
 // dal "tira-per-aggiornare").
 // Fonti "da sfogliare": non hanno la ricerca testuale, mostrano una lista curata.
@@ -2350,7 +2400,7 @@ function renderOnlineTab() {
   } else if (mealResults) {
     resultsHtml = mealResults.map(mealCardHtml).join("");
   } else {
-    resultsHtml = `<div class="empty"><span class="empty__emoji">${iconHtml("fork-knife")}</span>Cerca una ricetta in italiano.<br><small>Scegli la fonte qui sopra.</small></div>`;
+    resultsHtml = `<div class="empty">${emptyArt()}<div style="margin-top:6px">Cerca una ricetta in italiano.<br><small>Scegli la fonte qui sopra, o lasciati sorprendere dal Companion.</small></div></div>`;
   }
   const srcOpts = onlineSources().map((s) => `<option value="${s.k}" ${mealSource === s.k ? "selected" : ""}>${s.label}</option>`).join("");
   const browse = BROWSE_SOURCES.has(mealSource);
@@ -2360,6 +2410,7 @@ function renderOnlineTab() {
 
   body.innerHTML = `
     <div class="field" style="margin-bottom:10px"><select id="mealSource">${srcOpts}</select></div>
+    <button class="btn btn--ghost btn--block" id="companionRandom" style="margin-bottom:12px">🎲 Sorprendimi col Companion</button>
     ${browse
       ? `<div class="banner" style="margin-bottom:14px">🤖 <div>Sfoglia il <b>ricettario Moulinex Companion</b>. Tocca <b>Importa</b> su una ricetta: arriva con foto, ingredienti e passaggi.</div></div>`
       : `<div class="search-bar">
@@ -2384,6 +2435,24 @@ function renderOnlineTab() {
   }
   const randomBtn = body.querySelector("#mealRandom");
   if (randomBtn) randomBtn.addEventListener("click", () => performMealRandom());
+
+  const companionRandom = body.querySelector("#companionRandom");
+  if (companionRandom) companionRandom.addEventListener("click", async () => {
+    const old = companionRandom.innerHTML;
+    companionRandom.disabled = true;
+    companionRandom.innerHTML = "🎲 Cerco…";
+    try {
+      const list = await searchMoulinex();
+      if (!list.length) { toast("Nessuna ricetta Companion disponibile", "error"); }
+      else {
+        const pick = list[Math.floor(Math.random() * list.length)];
+        companionRandom.innerHTML = `${iconHtml("download-simple")} Importo…`;
+        const r = await importFromUrl(pick.url);
+        openRecipeForm({ prefill: { title: r.title, url: pick.url, image: r.image, servings: r.servings, time: r.time, ingredients: r.ingredients, steps: r.steps, tags: r.tags } });
+      }
+    } catch (e) { toast(e.message || "Import non riuscito", "error"); }
+    companionRandom.disabled = false; companionRandom.innerHTML = old;
+  });
 
   // Tira-per-aggiornare: trascina in basso (in cima alla pagina) per rilanciare
   // l'ultima ricerca, o pescare nuove ricette casuali su TheMealDB.

@@ -379,6 +379,10 @@ a { color: var(--primary-2); }
   .empty__emoji { animation: emptyFloat 3.6s ease-in-out infinite; }
 }
 @keyframes emptyFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.empty__art { display: block; margin: 0 auto 14px; color: var(--primary-2); max-width: 124px; height: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  .empty__art { animation: emptyFloat 4s ease-in-out infinite; }
+}
 
 /* ---------- Modal ---------- */
 .modal-backdrop {

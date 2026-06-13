@@ -6,6 +6,17 @@
 
 export const CHANGELOG = [
   {
+    v: "5.1",
+    d: "2026-06-13",
+    items: [
+      "Modalità chef: in una ricetta tocca \"Leggi la ricetta\" e l'app legge a voce ingredienti e passaggi, a mani libere.",
+      "Esporta una singola ricetta in PDF (scheda da stampare o conservare).",
+      "Sorprendimi col Companion: un tocco e importi una ricetta a caso del robot Moulinex.",
+      "L'avviso scadenze in home ora segue i giorni di anticipo scelti in Opzioni.",
+      "Schermate vuote del Ricettario con una nuova illustrazione."
+    ]
+  },
+  {
     v: "5.0",
     d: "2026-06-13",
     items: [
