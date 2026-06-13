@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "5.5",
+    d: "2026-06-13",
+    minor: true,
+    items: [
+      "Le foto di Misya ora passano dal nostro servizio e si vedono sempre, anche dove il sito le bloccava."
+    ]
+  },
+  {
     v: "5.4",
     d: "2026-06-13",
     minor: true,

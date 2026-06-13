@@ -15,7 +15,7 @@ import { estimateCost } from "./cost.js";
 import { seasonalProduce, recipeSeasonalMatches, monthName, currentMonth } from "./seasonal.js";
 import { convertMeasures } from "./measures.js";
 import { getNickname, setNickname } from "./profile.js";
-import { isImportConfigured, APP_VERSION, PUSH_WORKER_URL, SPOONACULAR_ENABLED, EDAMAM_ENABLED } from "./config.js";
+import { isImportConfigured, APP_VERSION, PUSH_WORKER_URL, SPOONACULAR_ENABLED, EDAMAM_ENABLED, WORKER_URL } from "./config.js";
 import { CHANGELOG } from "./changelog.js";
 import { fileToDataUrl } from "./image.js";
 import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS } from "./theme.js";
@@ -168,6 +168,15 @@ function safeUrl(url) {
   if (/^https?:\/\//i.test(u)) return u;
   if (u && !/^[a-z]+:/i.test(u)) return "https://" + u;
   return "";
+}
+
+// Alcuni siti (es. Misya) bloccano il caricamento delle immagini dal telefono:
+// le facciamo passare dal worker (le scarica lato server e le riserve).
+const PROXY_IMG_HOSTS = /(^|\.)misya\.info$/i;
+function proxiedImg(url) {
+  if (!url || !WORKER_URL) return url || "";
+  try { if (PROXY_IMG_HOSTS.test(new URL(url).host)) return `${WORKER_URL}/img?u=${encodeURIComponent(url)}`; } catch (e) { /* url non valido */ }
+  return url;
 }
 
 export function toast(message, type = "") {
@@ -932,7 +941,7 @@ function renderStrumenti() {
     const seed = n.getFullYear() * 1000 + (n.getMonth() * 31 + n.getDate());
     const rotd = allR[seed % allR.length];
     rotdCard = `<button class="rotd" data-recipe="${rotd.id}">
-        ${rotd.photo ? `<img class="rotd__img" src="${escapeHtml(rotd.photo)}" alt="" referrerpolicy="no-referrer" />` : `<span class="rotd__ph">${iconHtml("fork-knife")}</span>`}
+        ${rotd.photo ? `<img class="rotd__img" src="${escapeHtml(proxiedImg(rotd.photo))}" alt="" referrerpolicy="no-referrer" />` : `<span class="rotd__ph">${iconHtml("fork-knife")}</span>`}
         <span class="rotd__grad"></span>
         <span class="rotd__body"><span class="rotd__lbl">${iconHtml("sparkle")} Ricetta del giorno</span><span class="rotd__title">${escapeHtml(rotd.title)}</span></span>
       </button>`;
@@ -1286,7 +1295,7 @@ function renderRecipeDetail() {
   const sides = isDessertOrSide ? { mine: [], ideas: [] } : suggestSides(r);
   const sidesCard = (sides.mine.length || sides.ideas.length) ? `<div class="section-card">
       <h3 class="section-title">🥗 Idee per il contorno</h3>
-      ${sides.mine.length ? `<div class="sim-row" style="margin-bottom:${sides.ideas.length ? "10px" : "0"}">${sides.mine.map((s) => `<button class="sim-card" data-sim="${s.id}">${s.photo ? `<img src="${escapeHtml(s.photo)}" alt="" loading="lazy" />` : `<span class="sim-card__ph">${iconHtml("fork-knife")}</span>`}<span class="sim-card__t">${escapeHtml(s.title)}</span></button>`).join("")}</div>` : ""}
+      ${sides.mine.length ? `<div class="sim-row" style="margin-bottom:${sides.ideas.length ? "10px" : "0"}">${sides.mine.map((s) => `<button class="sim-card" data-sim="${s.id}">${s.photo ? `<img src="${escapeHtml(proxiedImg(s.photo))}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : `<span class="sim-card__ph">${iconHtml("fork-knife")}</span>`}<span class="sim-card__t">${escapeHtml(s.title)}</span></button>`).join("")}</div>` : ""}
       ${sides.ideas.length ? `<div class="tag-row">${sides.ideas.map((i) => `<span class="tagchip tagchip--ro">${escapeHtml(i)}</span>`).join("")}</div>` : ""}
     </div>` : "";
 
@@ -1296,7 +1305,7 @@ function renderRecipeDetail() {
       <div class="toolbar__title" style="flex:1">${r.photo ? "" : escapeHtml(r.title)}</div>
       <button class="back-btn fav-btn ${r.favorite ? "is-fav" : ""}" id="favBtn" title="Preferito">${iconHtml("heart")}</button>
     </div>
-    ${r.photo ? `<div class="recipe-hero"><img src="${escapeHtml(r.photo)}" alt="" referrerpolicy="no-referrer" /><div class="recipe-hero__grad"></div><h2 class="recipe-hero__title">${escapeHtml(r.title)}</h2></div>` : ""}
+    ${r.photo ? `<div class="recipe-hero"><img src="${escapeHtml(proxiedImg(r.photo))}" alt="" referrerpolicy="no-referrer" /><div class="recipe-hero__grad"></div><h2 class="recipe-hero__title">${escapeHtml(r.title)}</h2></div>` : ""}
     <div class="detail-top">
       ${tool ? `<span class="recipe-tool-chip" style="margin:0">${iconHtml(tool.icon)} ${escapeHtml(tool.name)}</span>` : "<span></span>"}
       ${ratingRow}
@@ -1334,7 +1343,7 @@ function renderRecipeDetail() {
 
     ${(() => { const sim = similarRecipes(r); return sim.length ? `<div class="section-card">
       <h3 class="section-title">${iconHtml("sparkle")} Ti potrebbe piacere</h3>
-      <div class="sim-row">${sim.map((s) => `<button class="sim-card" data-sim="${s.id}">${s.photo ? `<img src="${escapeHtml(s.photo)}" alt="" loading="lazy" />` : `<span class="sim-card__ph">${iconHtml("fork-knife")}</span>`}<span class="sim-card__t">${escapeHtml(s.title)}</span></button>`).join("")}</div>
+      <div class="sim-row">${sim.map((s) => `<button class="sim-card" data-sim="${s.id}">${s.photo ? `<img src="${escapeHtml(proxiedImg(s.photo))}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : `<span class="sim-card__ph">${iconHtml("fork-knife")}</span>`}<span class="sim-card__t">${escapeHtml(s.title)}</span></button>`).join("")}</div>
     </div>` : ""; })()}
 
     <div class="section-card">
@@ -2569,7 +2578,7 @@ async function translateMealTitles(results) {
 function mealCardHtml(m, i = 0) {
   return `
     <div class="meal-card stagger" data-meal='${escapeHtml(JSON.stringify(m))}' style="--i:${i}">
-      ${m.image ? `<img src="${escapeHtml(m.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : `<div class="meal-card__noimg">${iconHtml("fork-knife")}</div>`}
+      ${m.image ? `<img src="${escapeHtml(proxiedImg(m.image))}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : `<div class="meal-card__noimg">${iconHtml("fork-knife")}</div>`}
       <div class="meal-card__body">
         <h3 class="meal-card__title">${escapeHtml(m.title_it || m.title)}</h3>
         <div class="meal-card__meta"><span class="meal-src meal-src--${m.source}">${SOURCE_LABEL[m.source] || ""}</span>${m.meta ? " · " + escapeHtml(m.meta) : ""}</div>

@@ -282,11 +282,32 @@ async function handleEdamam(q, env) {
   } catch (e) { return json({ error: "edamamerr", results: [] }, 200); }
 }
 
+// Proxy immagini: scarica l'immagine lato server (niente blocchi di referer/hotlink
+// sul telefono) e la riserve dal dominio del worker. Solo host di ricette noti.
+const IMG_HOSTS = /(^|\.)(misya\.info|giallozafferano\.it|cookist\.it|akamaized\.net|ricettedellanonna\.net|moulinex\.it|twicpics\.moulinex\.it|groupe-seb\.com)$/i;
+async function handleImageProxy(target) {
+  if (!target) return new Response("missing url", { status: 400, headers: CORS });
+  let host;
+  try { host = new URL(target).host; } catch (e) { return new Response("bad url", { status: 400, headers: CORS }); }
+  if (!IMG_HOSTS.test(host)) return new Response("forbidden", { status: 403, headers: CORS });
+  try {
+    const res = await fetch(target, { headers: BROWSER_HEADERS, cf: { cacheTtl: 86400, cacheEverything: true } });
+    if (!res.ok) return new Response("unreachable", { status: 502, headers: CORS });
+    const ct = res.headers.get("content-type") || "image/jpeg";
+    if (!/^image\//i.test(ct)) return new Response("not an image", { status: 415, headers: CORS });
+    return new Response(res.body, {
+      status: 200,
+      headers: { ...CORS, "Content-Type": ct, "Cache-Control": "public, max-age=86400" }
+    });
+  } catch (e) { return new Response("error", { status: 502, headers: CORS }); }
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
 
     const url = new URL(request.url);
+    if (url.pathname === "/img") return handleImageProxy(url.searchParams.get("u"));
     if (url.pathname === "/searchgz") return handleSearchGz(url.searchParams.get("q"));
     if (url.pathname === "/searchmisya") return handleSearchMisya(url.searchParams.get("q"));
     if (url.pathname === "/searchcookist") return handleSearchCookist(url.searchParams.get("q"));
