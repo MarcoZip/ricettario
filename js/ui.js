@@ -12,6 +12,7 @@ import { translateRecipe, translateList, translateToEnglish, translateText } fro
 import { shareRecipeImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
 import { estimateCost } from "./cost.js";
+import { seasonalProduce, recipeSeasonalMatches, monthName, currentMonth } from "./seasonal.js";
 import { getNickname, setNickname } from "./profile.js";
 import { isImportConfigured, APP_VERSION, PUSH_WORKER_URL, SPOONACULAR_ENABLED, EDAMAM_ENABLED } from "./config.js";
 import { CHANGELOG } from "./changelog.js";
@@ -831,6 +832,7 @@ function renderHomeBody() {
     else if (homeFilter === "fav") { results = store.getFavorites(); emptyIcon = "heart"; emptyMsg = "Nessun preferito: tocca il cuore in una ricetta."; }
     else if (homeFilter === "cooked") { results = store.getMostCooked(); emptyIcon = "fire"; emptyMsg = "Nessuna ricetta ancora segnata come cucinata."; }
     else if (homeFilter === "recent") { results = store.getRecentCooked(); emptyIcon = "timer"; emptyMsg = "Niente cucinato di recente."; }
+    else if (homeFilter === "season") { const m = currentMonth(); results = store.getAllRecipes().filter((r) => recipeSeasonalMatches(r, m).length); emptyIcon = "carrot"; emptyMsg = `Nessuna ricetta con ingredienti di stagione a ${monthName(m)}.`; }
     else if (homeFilter === "t15") { results = store.getAllRecipes().filter((r) => r.time && r.time <= 15); emptyIcon = "timer"; emptyMsg = "Nessuna ricetta entro 15 minuti. Aggiungi il tempo nelle ricette (modifica)."; }
     else if (homeFilter === "t30") { results = store.getAllRecipes().filter((r) => r.time && r.time <= 30); emptyIcon = "timer"; emptyMsg = "Nessuna ricetta entro 30 minuti. Aggiungi il tempo nelle ricette (modifica)."; }
     else if (homeFilter === "easy") { results = store.getAllRecipes().filter((r) => r.difficulty === 1); emptyIcon = "fire"; emptyMsg = "Nessuna ricetta facile. Segna la difficoltà nelle ricette (modifica)."; }
@@ -919,7 +921,18 @@ function renderStrumenti() {
       </div>`
     : "";
 
+  // Di stagione: prodotti del mese corrente (sezione informativa + filtro).
+  const sMonth = currentMonth();
+  const produce = seasonalProduce(sMonth);
+  const seasonCard = produce.length
+    ? `<div class="today-card season-card">
+        <div class="today__h">${iconHtml("carrot")} Di stagione a ${monthName(sMonth)}</div>
+        <div class="season-row">${produce.map((p) => `<span class="season-chip">${p.emoji} ${escapeHtml(p.name)}</span>`).join("")}</div>
+      </div>`
+    : "";
+
   const specials = [
+    { k: "season", label: "Di stagione", icon: "carrot" },
     { k: "fav", label: "Preferiti", icon: "heart" },
     { k: "cooked", label: "Più cucinate", icon: "fire" },
     { k: "recent", label: "Di recente", icon: "timer" },
@@ -946,6 +959,7 @@ function renderStrumenti() {
     ${expBanner}
     ${useFirstCard}
     ${todayCard}
+    ${seasonCard}
     ${banner}
     <div class="search-bar">
       <input type="search" id="homeSearch" placeholder="Cerca tra le tue ricette..." value="${escapeHtml(homeQuery)}" />
@@ -1101,6 +1115,24 @@ function renderToolDetail() {
   });
 }
 
+// Ricette simili: punteggio per strumento, tag e ingredienti in comune.
+function similarRecipes(r, limit = 4) {
+  const tags = new Set((r.tags || []).map((t) => (t || "").toLowerCase()));
+  const ings = new Set((r.ingredients || []).map((i) => (i.name || "").toLowerCase()).filter(Boolean));
+  const scored = [];
+  for (const o of store.getAllRecipes()) {
+    if (o.id === r.id) continue;
+    let s = 0;
+    if (o.toolId && o.toolId === r.toolId) s += 1;
+    if (o.difficulty && o.difficulty === r.difficulty) s += 0.5;
+    for (const t of (o.tags || [])) if (tags.has((t || "").toLowerCase())) s += 2;
+    for (const i of (o.ingredients || [])) { const n = (i.name || "").toLowerCase(); if (n && ings.has(n)) s += 1; }
+    if (s > 0) scored.push({ o, s });
+  }
+  scored.sort((a, b) => b.s - a.s);
+  return scored.slice(0, limit).map((x) => x.o);
+}
+
 // ---------------- Schermata: dettaglio ricetta ----------------
 function renderRecipeDetail() {
   const r = store.getRecipe(currentRecipeId);
@@ -1174,6 +1206,7 @@ function renderRecipeDetail() {
       ${tool ? `<span class="recipe-tool-chip" style="margin:0">${iconHtml(tool.icon)} ${escapeHtml(tool.name)}</span>` : "<span></span>"}
       ${ratingRow}
     </div>
+    ${(() => { const sh = recipeSeasonalMatches(r, currentMonth()); return sh.length ? `<div class="tag-row"><span class="tagchip tagchip--season">${iconHtml("carrot")} Di stagione · ${sh.slice(0, 3).map((p) => escapeHtml(p.name)).join(", ")}</span></div>` : ""; })()}
     ${(tagsArr.length || r.time || r.difficulty) ? `<div class="tag-row">${r.time ? `<span class="tagchip tagchip--ro">${iconHtml("timer")} ${r.time} min</span>` : ""}${r.difficulty ? `<span class="tagchip tagchip--ro">${iconHtml("fire")} ${diffLabel(r.difficulty)}</span>` : ""}${tagsArr.map((t) => `<span class="tagchip tagchip--ro">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
     ${Array.isArray(r.allergens) && r.allergens.length ? `<div class="tag-row">${r.allergens.map((a) => `<span class="tagchip tagchip--allerg">⚠ ${escapeHtml(a)}</span>`).join("")}</div>` : ""}
     ${url ? `<a class="btn btn--block" id="openLink" href="${escapeHtml(url)}" target="_blank" rel="noopener" style="margin-bottom:16px">${iconHtml("arrow-square-out")} Apri la ricetta</a>` : ""}
@@ -1197,6 +1230,11 @@ function renderRecipeDetail() {
     </div>` : ""}
 
     ${r.notes ? `<div class="section-card"><h3 class="section-title">${iconHtml("note-pencil")} Note</h3><div class="recipe-item__notes" style="margin-top:0">${escapeHtml(r.notes)}</div></div>` : ""}
+
+    ${(() => { const sim = similarRecipes(r); return sim.length ? `<div class="section-card">
+      <h3 class="section-title">${iconHtml("sparkle")} Ti potrebbe piacere</h3>
+      <div class="sim-row">${sim.map((s) => `<button class="sim-card" data-sim="${s.id}">${s.photo ? `<img src="${escapeHtml(s.photo)}" alt="" loading="lazy" />` : `<span class="sim-card__ph">${iconHtml("fork-knife")}</span>`}<span class="sim-card__t">${escapeHtml(s.title)}</span></button>`).join("")}</div>
+    </div>` : ""; })()}
 
     <div class="section-card">
       <h3 class="section-title">${iconHtml("image")} Le mie creazioni</h3>
@@ -1268,6 +1306,8 @@ function renderRecipeDetail() {
 
   const guestModeBtn = root.querySelector("#guestMode");
   if (guestModeBtn) guestModeBtn.addEventListener("click", () => openGuestMode(r, base, ingredients));
+
+  root.querySelectorAll("[data-sim]").forEach((b) => b.addEventListener("click", () => openRecipe(b.dataset.sim)));
 
   const cookBtn = root.querySelector("#cookBtn");
   if (cookBtn) cookBtn.addEventListener("click", () => openCookingMode(r));
@@ -1574,6 +1614,7 @@ function openCookingMode(recipe) {
   let ticker = null;
   let tseq = 0;
   let speak = false; // lettura vocale
+  let xl = localStorage.getItem("ricettario.cookXL") === "1"; // testo grande
   let voiceOn = false; // comandi vocali a mani libere
   let vrec = null;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1698,6 +1739,7 @@ function openCookingMode(recipe) {
       <div class="cook__bar">
         <button class="cook__close" id="ckClose">${iconHtml("x")}</button>
         <div class="cook__progress">Passo ${idx + 1} di ${steps.length}</div>
+        <button class="cook__close ${xl ? "is-on" : ""}" id="ckXL" title="Testo grande">Aa</button>
         ${SR ? `<button class="cook__close ${voiceOn ? "is-on" : ""}" id="ckVoice" title="Comandi vocali">🎤</button>` : ""}
         <button class="cook__close ${speak ? "is-on" : ""}" id="ckSpeak" title="Leggi ad alta voce">🔊</button>
       </div>
@@ -1715,7 +1757,9 @@ function openCookingMode(recipe) {
         <button class="btn btn--primary btn--block" id="ckNext">${idx === steps.length - 1 ? "Fine " + iconHtml("check") : "Avanti " + iconHtml("caret-right")}</button>
       </div>
     `;
+    el.classList.toggle("cook--xl", xl);
     el.querySelector("#ckClose").onclick = close;
+    el.querySelector("#ckXL").onclick = () => { xl = !xl; try { localStorage.setItem("ricettario.cookXL", xl ? "1" : "0"); } catch {} el.classList.toggle("cook--xl", xl); el.querySelector("#ckXL").classList.toggle("is-on", xl); };
     el.querySelector("#ckSpeak").onclick = () => { speak = !speak; if (speak) speakStep(); else stopSpeak(); el.querySelector("#ckSpeak").classList.toggle("is-on", speak); };
     const ckVoice = el.querySelector("#ckVoice");
     if (ckVoice) ckVoice.onclick = toggleVoice;
@@ -2109,6 +2153,70 @@ async function runMealSearch(q) {
   return out;
 }
 
+// Esegue una ricerca online e aggiorna lo stato (usata da pulsante, invio e
+// dal "tira-per-aggiornare").
+async function performMealSearch(q) {
+  q = (q || "").trim();
+  if (!q) return;
+  mealQuery = q; mealLoading = true; mealError = ""; renderOnlineTab();
+  try {
+    mealResults = await runMealSearch(q);
+  } catch (e) {
+    mealError = e && e.code === "nokey" ? "Questa fonte non è configurata (vedi README)." : "Servizio non raggiungibile o troppo lento. Riprova.";
+    mealResults = null;
+  }
+  mealLoading = false; renderOnlineTab();
+}
+async function performMealRandom() {
+  mealLoading = true; mealError = ""; mealQuery = ""; renderOnlineTab();
+  try {
+    const out = (await mealdb.randomMeals(6)).map(mapMealdb);
+    await translateMealTitles(out);
+    mealResults = out;
+  } catch (e) { mealError = "Servizio non raggiungibile o troppo lento. Riprova."; mealResults = null; }
+  mealLoading = false; renderOnlineTab();
+}
+
+function setupPullToRefresh(body) {
+  // Indicatore: ricreato a ogni render (l'innerHTML viene riscritto).
+  if (!body.querySelector(".pull-ind")) {
+    const ind = document.createElement("div");
+    ind.className = "pull-ind";
+    ind.textContent = "↻ Rilascia per aggiornare";
+    body.prepend(ind);
+  }
+  if (body.dataset.ptBound) return; // gli ascoltatori si legano una sola volta
+  body.dataset.ptBound = "1";
+  let start = -1, pulling = false;
+  const ind = () => body.querySelector(".pull-ind");
+  body.addEventListener("touchstart", (e) => {
+    if ((window.scrollY || 0) <= 0 && e.touches.length === 1) { start = e.touches[0].clientY; pulling = true; }
+  }, { passive: true });
+  body.addEventListener("touchmove", (e) => {
+    if (!pulling) return;
+    const el = ind();
+    const dy = e.touches[0].clientY - start;
+    if (dy > 0 && (window.scrollY || 0) <= 0 && el) {
+      const d = Math.min(dy, 90);
+      el.style.height = d + "px"; el.style.opacity = String(Math.min(1, d / 70));
+      el.classList.toggle("ready", d >= 70);
+    } else { pulling = false; }
+  }, { passive: true });
+  const end = () => {
+    if (!pulling) return;
+    pulling = false;
+    const el = ind();
+    const ready = el && el.classList.contains("ready");
+    if (el) { el.style.height = "0px"; el.style.opacity = "0"; el.classList.remove("ready"); }
+    if (ready && mealTab === "online") {
+      if (mealQuery) performMealSearch(mealQuery);
+      else if (mealSource === "mealdb") performMealRandom();
+    }
+  };
+  body.addEventListener("touchend", end);
+  body.addEventListener("touchcancel", end);
+}
+
 function renderOnlineTab() {
   const body = root.querySelector("#ricettarioBody");
   let resultsHtml = "";
@@ -2140,30 +2248,15 @@ function renderOnlineTab() {
   body.querySelector("#mealSource").addEventListener("change", (e) => { mealSource = e.target.value; mealResults = null; mealError = ""; renderOnlineTab(); });
 
   const input = body.querySelector("#mealSearch");
-  const doSearch = async () => {
-    const q = input.value.trim();
-    if (!q) return;
-    mealQuery = q; mealLoading = true; mealError = ""; renderOnlineTab();
-    try {
-      mealResults = await runMealSearch(q);
-    } catch (e) {
-      mealError = e && e.code === "nokey" ? "Spoonacular non è configurato (vedi README)." : "Servizio non raggiungibile o troppo lento. Riprova.";
-      mealResults = null;
-    }
-    mealLoading = false; renderOnlineTab();
-  };
+  const doSearch = () => performMealSearch(input.value);
   body.querySelector("#mealSearchBtn").addEventListener("click", doSearch);
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(); });
   const randomBtn = body.querySelector("#mealRandom");
-  if (randomBtn) randomBtn.addEventListener("click", async () => {
-    mealLoading = true; mealError = ""; mealQuery = ""; renderOnlineTab();
-    try {
-      const out = (await mealdb.randomMeals(6)).map(mapMealdb);
-      await translateMealTitles(out);
-      mealResults = out;
-    } catch (e) { mealError = "Servizio non raggiungibile o troppo lento. Riprova."; mealResults = null; }
-    mealLoading = false; renderOnlineTab();
-  });
+  if (randomBtn) randomBtn.addEventListener("click", () => performMealRandom());
+
+  // Tira-per-aggiornare: trascina in basso (in cima alla pagina) per rilanciare
+  // l'ultima ricerca, o pescare nuove ricette casuali su TheMealDB.
+  setupPullToRefresh(body);
 
   body.querySelectorAll(".meal-card[data-meal]").forEach((card) => {
     let data;

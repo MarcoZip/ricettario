@@ -6,6 +6,16 @@
 
 export const CHANGELOG = [
   {
+    v: "4.6",
+    d: "2026-06-13",
+    items: [
+      "Ingredienti di stagione: in home vedi i prodotti del mese e un filtro \"Di stagione\"; nelle ricette un badge segnala gli ingredienti di stagione.",
+      "Ricette simili: in fondo a una ricetta, \"Ti potrebbe piacere\" con piatti affini del tuo ricettario.",
+      "Modalità cucina con testo grande: tocca \"Aa\" per leggere i passi da lontano.",
+      "Tira verso il basso nel Ricettario online per aggiornare i risultati."
+    ]
+  },
+  {
     v: "4.5",
     d: "2026-06-13",
     minor: true,
