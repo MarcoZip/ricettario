@@ -13,6 +13,7 @@ import { shareRecipeImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
 import { estimateCost } from "./cost.js";
 import { seasonalProduce, recipeSeasonalMatches, monthName, currentMonth } from "./seasonal.js";
+import { convertMeasures } from "./measures.js";
 import { getNickname, setNickname } from "./profile.js";
 import { isImportConfigured, APP_VERSION, PUSH_WORKER_URL, SPOONACULAR_ENABLED, EDAMAM_ENABLED } from "./config.js";
 import { CHANGELOG } from "./changelog.js";
@@ -1231,6 +1232,11 @@ function renderRecipeDetail() {
 
     ${r.notes ? `<div class="section-card"><h3 class="section-title">${iconHtml("note-pencil")} Note</h3><div class="recipe-item__notes" style="margin-top:0">${escapeHtml(r.notes)}</div></div>` : ""}
 
+    <div class="section-card" id="voiceCard">
+      <h3 class="section-title">🎙️ Nota vocale</h3>
+      <div id="voiceBody"></div>
+    </div>
+
     ${(() => { const sim = similarRecipes(r); return sim.length ? `<div class="section-card">
       <h3 class="section-title">${iconHtml("sparkle")} Ti potrebbe piacere</h3>
       <div class="sim-row">${sim.map((s) => `<button class="sim-card" data-sim="${s.id}">${s.photo ? `<img src="${escapeHtml(s.photo)}" alt="" loading="lazy" />` : `<span class="sim-card__ph">${iconHtml("fork-knife")}</span>`}<span class="sim-card__t">${escapeHtml(s.title)}</span></button>`).join("")}</div>
@@ -1388,6 +1394,69 @@ function renderRecipeDetail() {
   });
 
   wireNutrition(r, base, detailServings);
+  wireVoiceNote(r);
+}
+
+// Nota vocale di una ricetta: registrata col microfono e salvata SOLO su questo
+// telefono (in localStorage, non sincronizzata). Max 30 secondi.
+function voiceKey(id) { return "ricettario.voice." + id; }
+function wireVoiceNote(r) {
+  const body = root.querySelector("#voiceBody");
+  if (!body) return;
+  const supported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+  let rec = null, chunks = [], startTs = 0, durTimer = null;
+  const stored = () => { try { return localStorage.getItem(voiceKey(r.id)); } catch (e) { return null; } };
+
+  function paint() {
+    const note = stored();
+    if (note) {
+      body.innerHTML = `<audio controls src="${note}" style="width:100%"></audio>
+        <button class="btn btn--block" id="voiceDel" style="margin-top:8px;color:var(--danger)">${iconHtml("trash")} Elimina nota</button>`;
+      body.querySelector("#voiceDel").addEventListener("click", async () => {
+        const ok = await confirmDialog({ title: "Eliminare la nota vocale?", confirmText: "Elimina", danger: true });
+        if (ok) { try { localStorage.removeItem(voiceKey(r.id)); } catch (e) {} paint(); }
+      });
+    } else if (!supported) {
+      body.innerHTML = `<div class="hint" style="margin:0">La registrazione vocale non è supportata su questo dispositivo.</div>`;
+    } else {
+      body.innerHTML = `<button class="btn btn--block" id="voiceRec">🎙️ Registra una nota</button>
+        <div class="hint" style="margin-top:6px">Un promemoria vocale per questa ricetta (max 30s, salvato solo su questo telefono).</div>`;
+      body.querySelector("#voiceRec").addEventListener("click", startRec);
+    }
+  }
+
+  async function startRec() {
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch (e) { toast("Permesso microfono negato", "error"); return; }
+    try {
+      rec = new MediaRecorder(stream); chunks = []; startTs = Date.now();
+      rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        clearInterval(durTimer);
+        const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+        const fr = new FileReader();
+        fr.onload = () => {
+          try { localStorage.setItem(voiceKey(r.id), fr.result); toast("Nota vocale salvata", "success"); }
+          catch (e) { toast("Memoria piena: prova una nota più breve", "error"); }
+          paint();
+        };
+        fr.readAsDataURL(blob);
+      };
+      rec.start();
+      body.innerHTML = `<button class="btn btn--block btn--primary" id="voiceStop">⏹ Ferma · <span id="voiceTime">0:00</span></button>
+        <div class="hint" style="margin-top:6px">Sto registrando… tocca per fermare (max 30s).</div>`;
+      body.querySelector("#voiceStop").addEventListener("click", () => { if (rec && rec.state !== "inactive") rec.stop(); });
+      durTimer = setInterval(() => {
+        const s = Math.floor((Date.now() - startTs) / 1000);
+        const t = body.querySelector("#voiceTime"); if (t) t.textContent = `0:${String(s).padStart(2, "0")}`;
+        if (s >= 30 && rec && rec.state !== "inactive") rec.stop();
+      }, 250);
+    } catch (e) { stream.getTracks().forEach((t) => t.stop()); toast("Registrazione non riuscita", "error"); }
+  }
+
+  paint();
 }
 
 // ---- Valori nutrizionali (stima dagli ingredienti) ----
@@ -2291,6 +2360,9 @@ function renderOnlineTab() {
             };
           } catch (e) { /* uso i dati della ricerca */ }
         }
+        // Converte le misure estere (cups, oz, °F…) in metrico prima di tradurre.
+        src.ingredients = (src.ingredients || []).map(convertMeasures);
+        src.steps = (src.steps || []).map(convertMeasures);
         saveBtn.innerHTML = `${iconHtml("download-simple")} Traduco...`;
         let prefill = { title: src.title, url: src.link, image: src.image, servings: src.servings, time: src.time, ingredients: src.ingredients, steps: src.steps };
         try {
@@ -2858,22 +2930,35 @@ function renderPlanWeek() {
     toast(shoppingToast(res), "success");
   });
 
-  // Menù settimana: riempie le cene vuote pescando dai preferiti (poi da tutte),
-  // senza ripetere, e genera la spesa della settimana.
+  // Menù settimana smart: riempie le cene vuote pescando dai preferiti (poi da
+  // tutte), senza ripetere, dando priorità alle ricette che usano gli alimenti
+  // in scadenza (anti-spreco) e variando strumento/categoria di giorno in giorno.
+  // Poi genera la spesa della settimana.
   root.querySelector("#genWeek").addEventListener("click", async () => {
     const recipes = allRecipes();
     if (!recipes.length) { toast("Aggiungi prima qualche ricetta", "error"); return; }
     const favs = recipes.filter((r) => r.favorite);
     const base = favs.length >= 3 ? favs : recipes;
+    let expSet = new Set();
+    try { expSet = new Set(store.recipesForExpiring(3).map((r) => r.id)); } catch (e) { /* niente dispensa */ }
     const used = new Set();
-    let added = 0;
+    let added = 0, antiWaste = 0;
+    let prevTool = null, prevTag = null;
     for (const d of days) {
       const ds = ymd(d.getFullYear(), d.getMonth(), d.getDate());
       if (store.getPlanByDate(ds).some((e) => e.slot === "cena")) continue;
       let cand = base.filter((r) => !used.has(r.id));
       if (!cand.length) { used.clear(); cand = base.slice(); }
-      const r = cand[Math.floor(Math.random() * cand.length)];
+      // Anti-spreco: se ci sono candidati che usano alimenti in scadenza, scegli tra quelli.
+      const expCand = cand.filter((r) => expSet.has(r.id));
+      let pool = expCand.length ? expCand : cand;
+      // Varietà: evita stesso strumento/categoria del giorno precedente, se possibile.
+      const varied = pool.filter((r) => r.toolId !== prevTool && !((r.tags || []).includes(prevTag)));
+      if (varied.length) pool = varied;
+      const r = pool[Math.floor(Math.random() * pool.length)];
       used.add(r.id);
+      if (expSet.has(r.id)) antiWaste++;
+      prevTool = r.toolId; prevTag = (r.tags || [])[0] || null;
       await store.addPlan(ds, r.id, "cena");
       added++;
     }
@@ -2881,7 +2966,7 @@ function renderPlanWeek() {
     const set = new Set(days.map((d) => ymd(d.getFullYear(), d.getMonth(), d.getDate())));
     const entries = store.getPlan().filter((p) => set.has(p.date));
     const res = await store.addShoppingItems(collectIngredients(entries));
-    toast(`Menù creato: ${added} cene · ${shoppingToast(res)}`, "success");
+    toast(`Menù creato: ${added} cene${antiWaste ? ` · ${antiWaste} anti-spreco` : ""} · ${shoppingToast(res)}`, "success");
   });
 }
 

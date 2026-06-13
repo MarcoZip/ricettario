@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    v: "4.7",
+    d: "2026-06-13",
+    items: [
+      "Menù settimana più intelligente: dà priorità alle ricette che usano gli alimenti in scadenza (anti-spreco) e varia strumento e categoria di giorno in giorno.",
+      "Note vocali: registra un promemoria a voce su una ricetta (max 30s, salvato sul telefono).",
+      "Misure estere convertite in automatico: importando ricette in inglese, cups/once/°F diventano grammi, ml e °C."
+    ]
+  },
+  {
     v: "4.6",
     d: "2026-06-13",
     items: [
