@@ -1034,10 +1034,16 @@ function renderHomeBody() {
       results = base.filter((r) => ids.has(r.id));
       emptyMsg = homeFilter ? `Nessuna ricetta con "${escapeHtml(homeQuery.trim())}" in questa categoria.` : "Nessuna ricetta trovata.";
     }
-    body.innerHTML = results.length
+    const qText = homeQuery.trim();
+    const onlineBtn = qText
+      ? `<button class="btn btn--ghost btn--block" id="homeSearchOnline" style="margin-top:14px">${iconHtml("magnifying-glass")} Cerca "${escapeHtml(qText)}" nel ricettario online</button>`
+      : "";
+    body.innerHTML = (results.length
       ? `<div class="result-grid">${results.map((r, i) => recipeResultRow(r, i)).join("")}</div>`
-      : `<div class="empty">${emptyArt(emptyIcon === "heart" ? "heart" : "pot")}<div style="margin-top:6px">${emptyMsg}</div></div>`;
+      : `<div class="empty">${emptyArt(emptyIcon === "heart" ? "heart" : "pot")}<div style="margin-top:6px">${emptyMsg}</div></div>`) + onlineBtn;
     body.querySelectorAll(".pick-row").forEach((b) => b.addEventListener("click", () => openRecipe(b.dataset.id)));
+    const ob = body.querySelector("#homeSearchOnline");
+    if (ob) ob.addEventListener("click", () => searchOnline(qText));
     return;
   }
 
@@ -1163,7 +1169,8 @@ function renderStrumenti() {
   const seasonCard = produce.length && prefBool("homeSeason", true)
     ? `<div class="today-card season-card">
         <div class="today__h">${iconHtml("carrot")} Di stagione a ${monthName(sMonth)}</div>
-        <div class="season-row">${produce.map((p) => `<span class="season-chip">${p.emoji} ${escapeHtml(p.name)}</span>`).join("")}</div>
+        <div class="season-row">${produce.map((p) => `<button class="season-chip" data-season="${escapeHtml(p.name)}" title="Cerca ricette con ${escapeHtml(p.name)}">${p.emoji} ${escapeHtml(p.name)}</button>`).join("")}</div>
+        <div class="season-hint">Tocca un ingrediente per cercare le tue ricette (e online).</div>
       </div>`
     : "";
 
@@ -1256,6 +1263,14 @@ function renderStrumenti() {
 
   const mic = root.querySelector("#homeMic");
   if (mic) mic.addEventListener("click", () => startVoiceSearch());
+
+  // "Di stagione": tocca un ingrediente per cercarlo tra le ricette salvate.
+  root.querySelectorAll(".season-chip[data-season]").forEach((c) => c.addEventListener("click", () => {
+    homeQuery = c.dataset.season; homeFilter = "";
+    renderStrumenti();
+    const sb = root.querySelector("#homeSearch");
+    if (sb) { try { sb.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }
+  }));
 
   renderHomeBody();
   countUp(root.querySelector("#heroNum"), total);
@@ -2880,6 +2895,15 @@ const SERVER_PAGINATED = new Set(["moulinex", "bimby"]);
 // Fonti senza ricerca per parola (solo sfoglia): nascondiamo il campo di ricerca.
 const SEARCH_DISABLED = new Set([]);
 const MEAL_PAGE_SIZE = 12;
+// Va al Ricettario online (scheda "Cerca online") e lancia subito la ricerca.
+function searchOnline(term) {
+  const q = (term || "").trim();
+  if (!q) return;
+  mealTab = "online";
+  if (BROWSE_SOURCES.has(mealSource)) mealSource = "all"; // una fonte con ricerca testuale
+  navigate("ricettario");
+  performMealSearch(q);
+}
 async function performMealSearch(q, keepPage = false) {
   q = (q || "").trim();
   if (!q && !BROWSE_SOURCES.has(mealSource)) return;

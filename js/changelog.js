@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.10",
+    d: "2026-06-14",
+    items: [
+      "Gli ingredienti \"Di stagione\" in Home ora sono toccabili: cerca al volo le tue ricette con quell'ingrediente.",
+      "Dai risultati di ricerca puoi estendere la ricerca al ricettario online con un tocco."
+    ]
+  },
+  {
     v: "7.9",
     d: "2026-06-14",
     items: [

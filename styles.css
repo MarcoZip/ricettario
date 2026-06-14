@@ -1102,7 +1102,9 @@ a { color: var(--primary-2); }
 .today__slot { font-size: 0.7rem; font-weight: 800; color: var(--primary-2); background: rgba(255, 184, 107, 0.16); border-radius: 999px; padding: 3px 8px; }
 .today__item .ic { color: var(--text-soft); }
 .season-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 4px; }
-.season-chip { font-size: 0.82rem; font-weight: 700; background: rgba(120, 200, 120, 0.14); border: 1px solid rgba(120, 200, 120, 0.3); color: #9be29b; border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
+.season-chip { font-size: 0.82rem; font-weight: 700; background: rgba(120, 200, 120, 0.14); border: 1px solid rgba(120, 200, 120, 0.3); color: #9be29b; border-radius: 999px; padding: 4px 10px; white-space: nowrap; cursor: pointer; }
+.season-chip:active { transform: scale(0.94); }
+.season-hint { color: var(--text-soft); font-size: 0.75rem; margin-top: 8px; }
 .tagchip--season { background: rgba(120, 200, 120, 0.16); border: 1px solid rgba(120, 200, 120, 0.34); color: #9be29b; }
 .tagchip--ahead { background: rgba(120, 160, 255, 0.16); border: 1px solid rgba(120, 160, 255, 0.34); color: #a9c2ff; }
 .diffdots { display: inline-flex; gap: 3px; vertical-align: middle; }
