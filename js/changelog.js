@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.1",
+    d: "2026-06-13",
+    items: [
+      "Icone dedicate per i robot da cucina: una per il Moulinex Companion e una per il Bimby, da scegliere per i tuoi strumenti."
+    ]
+  },
+  {
     v: "7.0",
     d: "2026-06-13",
     items: [

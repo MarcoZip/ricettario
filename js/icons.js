@@ -14,7 +14,7 @@ export const EMOJI_TO_PH = {
 
 // Icone proposte nel selettore quando si crea/modifica uno strumento.
 export const ICON_PICKER = [
-  "food-processor", "oven", "fan", "fire", "lightning", "wind", "cooking-pot", "bowl-food", "bowl-steam",
+  "companion", "bimby", "food-processor", "oven", "fan", "fire", "lightning", "wind", "cooking-pot", "bowl-food", "bowl-steam",
   "basket", "fork-knife", "knife", "thermometer", "timer", "pizza", "hamburger", "bread",
   "cake", "cookie", "ice-cream", "popcorn", "egg", "fish", "carrot", "pepper",
   "grains", "coffee", "wine", "beer-stein", "jar", "avocado", "orange-slice", "heart"
