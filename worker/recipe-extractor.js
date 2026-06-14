@@ -146,18 +146,21 @@ async function handleSearchMoulinex(q) {
       const terms = query.toLowerCase().split(/\s*,\s*|\s+/).filter(Boolean);
       const results = [];
       const seen = new Set();
+      let total = 0; // quante combaciano in tutto (anche oltre le 30 mostrate)
       const re = /<loc>(https:\/\/www\.moulinex\.it\/ricette\/detail\/PRO\/([^/<]+)\/[^<]+)<\/loc>/g;
       let m;
-      while ((m = re.exec(xml)) && results.length < 30) {
+      while ((m = re.exec(xml))) {
         const link = m[1], slug = m[2].toLowerCase();
         if (terms.length && !terms.every((t) => slug.includes(t))) continue;
         if (seen.has(slug)) continue;
         seen.add(slug);
-        const name = m[2].replace(/-/g, " ");
-        const title = name.charAt(0).toUpperCase() + name.slice(1);
-        results.push({ title, url: link, image: "" });
+        total++;
+        if (results.length < 30) {
+          const name = m[2].replace(/-/g, " ");
+          results.push({ title: name.charAt(0).toUpperCase() + name.slice(1), url: link, image: "" });
+        }
       }
-      return json({ results }, 200);
+      return json({ results, total }, 200);
     } catch (e) { return json({ error: "unreachable", results: [] }, 200); }
   }
   try {

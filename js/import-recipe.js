@@ -62,13 +62,18 @@ export async function searchRicettenonna(query) {
 
 // Ricettario Moulinex (italiano): con una query cerca nell'intero catalogo ricette
 // (sitemap); senza query mostra la selezione curata per il Companion.
-export async function searchMoulinex(query) {
-  if (!WORKER_URL) return [];
+// Ritorna { results, total } dove total è quante combaciano in tutto.
+export async function searchMoulinexFull(query) {
+  if (!WORKER_URL) return { results: [], total: 0 };
   const q = (query || "").trim();
   const res = await fetch(`${WORKER_URL}/searchmoulinex${q ? "?q=" + encodeURIComponent(q) : ""}`);
   if (!res.ok) throw new Error("Servizio non raggiungibile.");
   const d = await res.json().catch(() => ({}));
-  return Array.isArray(d.results) ? d.results : [];
+  const results = Array.isArray(d.results) ? d.results : [];
+  return { results, total: typeof d.total === "number" ? d.total : results.length };
+}
+export async function searchMoulinex(query) {
+  return (await searchMoulinexFull(query)).results;
 }
 
 // Ricerca su Edamam (inglese, richiede le chiavi sul worker).

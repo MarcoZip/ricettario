@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "5.7",
+    d: "2026-06-13",
+    minor: true,
+    items: [
+      "Nel Ricettario online ora vedi quante ricette sono state trovate (e, per Moulinex, il totale anche oltre quelle mostrate)."
+    ]
+  },
+  {
     v: "5.6",
     d: "2026-06-13",
     items: [

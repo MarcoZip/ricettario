@@ -7,7 +7,7 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchEdamam, searchSpoon, spoonInfo, winePairing } from "./import-recipe.js";
+import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchEdamam, searchSpoon, spoonInfo, winePairing } from "./import-recipe.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage, shareMenuImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
@@ -106,6 +106,7 @@ let mealQuery = "";
 let mealResults = null;
 let mealLoading = false;
 let mealError = "";
+let mealTotal = null; // totale risultati Moulinex (può superare quelli mostrati)
 
 // Callback impostate da app.js
 export const handlers = {
@@ -2325,7 +2326,7 @@ async function runMealSearch(q) {
   if (mealSource === "misya") { const out = (await searchMisya(q)).map(mapMisya); return out; }
   if (mealSource === "cookist") { const out = (await searchCookist(q)).map(mapCookist); return out; }
   if (mealSource === "ricettenonna") { const out = (await searchRicettenonna(q)).map(mapRicettenonna); return out; }
-  if (mealSource === "moulinex") { const out = (await searchMoulinex(q)).map(mapMoulinex); return out; }
+  if (mealSource === "moulinex") { const d = await searchMoulinexFull(q); mealTotal = d.total; return d.results.map(mapMoulinex); }
   if (mealSource === "spoon") {
     const out = (await searchSpoon(await translateToEnglish(q))).map(mapSpoon);
     await translateMealTitles(out);
@@ -2376,7 +2377,7 @@ const BROWSE_SOURCES = new Set(["moulinex"]);
 async function performMealSearch(q) {
   q = (q || "").trim();
   if (!q && !BROWSE_SOURCES.has(mealSource)) return;
-  mealQuery = q; mealLoading = true; mealError = ""; renderOnlineTab();
+  mealQuery = q; mealLoading = true; mealError = ""; mealTotal = null; renderOnlineTab();
   try {
     mealResults = await runMealSearch(q);
   } catch (e) {
@@ -2448,7 +2449,10 @@ function renderOnlineTab() {
   } else if (mealResults && mealResults.length === 0) {
     resultsHtml = `<div class="empty"><span class="empty__emoji">${iconHtml("magnifying-glass")}</span>Nessun risultato. Prova un altro termine (es. "pasta", "torta", "zuppa").</div>`;
   } else if (mealResults) {
-    resultsHtml = mealResults.map(mealCardHtml).join("");
+    const shown = mealResults.length;
+    const tot = (mealTotal != null && mealTotal > shown) ? mealTotal : shown;
+    const countLine = `<div class="result-count">${iconHtml("magnifying-glass")} Trovate <b>${tot}</b> ${tot === 1 ? "ricetta" : "ricette"}${tot > shown ? ` · mostrate le prime ${shown}` : ""}</div>`;
+    resultsHtml = countLine + mealResults.map(mealCardHtml).join("");
   } else {
     resultsHtml = `<div class="empty">${emptyArt()}<div style="margin-top:6px">Cerca una ricetta in italiano.<br><small>Scegli la fonte qui sopra, o lasciati sorprendere dal Companion.</small></div></div>`;
   }
