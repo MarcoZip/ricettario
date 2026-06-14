@@ -154,6 +154,7 @@ function festiveInfo() {
 // Etichetta difficoltà (1 facile · 2 media · 3 difficile).
 const DIFF_LABELS = { 1: "Facile", 2: "Media", 3: "Difficile" };
 function diffLabel(d) { return DIFF_LABELS[d] || ""; }
+function diffDots(d) { if (!d) return ""; return `<span class="diffdots">${[1, 2, 3].map((i) => `<span class="diffdot${i <= d ? " on" : ""}"></span>`).join("")}</span>`; }
 
 // ---------------- Utility ----------------
 function escapeHtml(str) {
@@ -242,6 +243,7 @@ export function mount(rootEl) {
   setupBackHandler();
   setupRipple();
   setupAurora();
+  setupSeasonalDecor();
   checkPrepReminders();
   setInterval(checkPrepReminders, 60000);
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkPrepReminders(); });
@@ -271,6 +273,32 @@ function setupAurora() {
   const a = document.createElement("div");
   a.id = "aurora";
   document.body.insertBefore(a, document.body.firstChild);
+}
+
+// Decorazioni stagionali discrete sullo sfondo (neve d'inverno, petali in primavera,
+// foglie in autunno). Gated reduce-motion; d'estate niente.
+function setupSeasonalDecor() {
+  if (reduceMotion) return;
+  const old = document.getElementById("seasonDecor");
+  if (old) old.remove();
+  const m = new Date().getMonth() + 1;
+  let emoji = null;
+  if (m === 12 || m === 1 || m === 2) emoji = "❄️";
+  else if (m >= 3 && m <= 5) emoji = "🌸";
+  else if (m >= 9 && m <= 11) emoji = "🍂";
+  if (!emoji) return;
+  const layer = document.createElement("div");
+  layer.id = "seasonDecor";
+  for (let i = 0; i < 9; i++) {
+    const s = document.createElement("span");
+    s.textContent = emoji;
+    s.style.left = (Math.random() * 100).toFixed(1) + "%";
+    s.style.animationDuration = (9 + Math.random() * 9).toFixed(1) + "s";
+    s.style.animationDelay = (-Math.random() * 12).toFixed(1) + "s";
+    s.style.fontSize = (12 + Math.random() * 14).toFixed(0) + "px";
+    layer.appendChild(s);
+  }
+  document.body.appendChild(layer);
 }
 
 // Tasto Indietro del telefono: torna alla schermata precedente DENTRO l'app
@@ -842,6 +870,9 @@ export function navigate(route) {
   });
   withTransition(() => render());
   window.scrollTo(0, 0);
+  // Dissolvenza/scorrimento morbido tra le schede (anche dove le View Transitions
+  // non sono supportate). Gated reduce-motion via CSS.
+  if (root) { root.classList.remove("view-anim"); void root.offsetWidth; root.classList.add("view-anim"); }
 }
 
 function openTool(toolId) {
@@ -890,8 +921,10 @@ function recipeResultRow(r, i = 0) {
   const fav = r.favorite ? ` <span class="meta-fav">${iconHtml("heart")}</span>` : "";
   const rate = r.rating ? ` <span class="meta-star">${iconHtml("star")} ${r.rating}</span>` : "";
   const cooked = r.cookCount ? ` <span class="meta-cooked">${iconHtml("fire")} ${r.cookCount}</span>` : "";
-  const thumb = r.photo ? `<img class="pick-thumb" src="${escapeHtml(r.photo)}" alt="" />` : `<span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span>`;
-  return `<button class="pick-row stagger" data-id="${r.id}" style="--i:${i}">${thumb}<span class="day-row__name">${escapeHtml(r.title)}${fav}${rate}${cooked}</span></button>`;
+  const tm = r.time ? ` <span class="meta-time">${iconHtml("timer")} ${r.time}′</span>` : "";
+  const diff = r.difficulty ? ` <span class="meta-diff">${diffDots(r.difficulty)}</span>` : "";
+  const thumb = r.photo ? `<img class="pick-thumb" src="${escapeHtml(proxiedImg(r.photo))}" alt="" referrerpolicy="no-referrer" />` : `<span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span>`;
+  return `<button class="pick-row stagger" data-id="${r.id}" style="--i:${i}">${thumb}<span class="day-row__name">${escapeHtml(r.title)}${fav}${rate}${cooked}${tm}${diff}</span></button>`;
 }
 
 function renderHomeBody() {
@@ -1384,7 +1417,7 @@ function renderRecipeDetail() {
     </div>
     ${(() => { const sh = recipeSeasonalMatches(r, currentMonth()); return sh.length ? `<div class="tag-row"><span class="tagchip tagchip--season">${iconHtml("carrot")} Di stagione · ${sh.slice(0, 3).map((p) => escapeHtml(p.name)).join(", ")}</span></div>` : ""; })()}
     ${(() => { const pa = prepAheadLabel(r); return pa ? `<div class="tag-row"><span class="tagchip tagchip--ahead">⏳ Richiede anticipo · ${pa}</span><button class="chip" id="prepRemind" style="margin-left:6px">⏰ Ricordamelo</button></div>` : ""; })()}
-    ${(tagsArr.length || r.time || r.difficulty) ? `<div class="tag-row">${r.time ? `<span class="tagchip tagchip--ro">${iconHtml("timer")} ${r.time} min</span>` : ""}${r.difficulty ? `<span class="tagchip tagchip--ro">${iconHtml("fire")} ${diffLabel(r.difficulty)}</span>` : ""}${tagsArr.map((t) => `<span class="tagchip tagchip--ro">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
+    ${(tagsArr.length || r.time || r.difficulty) ? `<div class="tag-row">${r.time ? `<span class="tagchip tagchip--ro">${iconHtml("timer")} ${r.time} min</span>` : ""}${r.difficulty ? `<span class="tagchip tagchip--ro">${diffDots(r.difficulty)} ${diffLabel(r.difficulty)}</span>` : ""}${tagsArr.map((t) => `<span class="tagchip tagchip--ro">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
     ${Array.isArray(r.allergens) && r.allergens.length ? `<div class="tag-row">${r.allergens.map((a) => `<span class="tagchip tagchip--allerg">⚠ ${escapeHtml(a)}</span>`).join("")}</div>` : ""}
     ${url ? `<a class="btn btn--block" id="openLink" href="${escapeHtml(url)}" target="_blank" rel="noopener" style="margin-bottom:16px">${iconHtml("arrow-square-out")} Apri la ricetta</a>` : ""}
 
@@ -2591,7 +2624,7 @@ function emptyArt() {
     <path d="M30 66h60" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>
     <path d="M28 74h-5M92 74h5" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>
     <path d="M48 48c0-7 4-11 12-11s12 4 12 11" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>
-    <path d="M50 40v-7M60 38v-9M70 40v-7" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" opacity="0.85"/>
+    <path class="empty__steam" d="M50 40v-7M60 38v-9M70 40v-7" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" opacity="0.85"/>
   </svg>`;
 }
 
@@ -2814,7 +2847,7 @@ function renderOnlineTab() {
   const browse = BROWSE_SOURCES.has(mealSource);
   const searchable = !SEARCH_DISABLED.has(mealSource);
   if (browse && !mealResults && !mealLoading && !mealError) {
-    resultsHtml = `<div class="empty"><span class="empty__emoji">${iconHtml("cooking-pot")}</span>Carico le ricette…</div>`;
+    resultsHtml = `<div class="empty">${emptyArt()}<div style="margin-top:6px">Carico le ricette…</div></div>`;
   }
   let bannerHtml = "";
   if (mealSource === "moulinex") bannerHtml = `<div class="banner" style="margin-bottom:12px">🤖 <div>Cerca tra le <b>oltre 4800 ricette Moulinex</b> (scrivi un piatto, es. "pollo"), o sfoglia la selezione qui sotto. Tocca <b>Importa</b>: arriva con foto, ingredienti e passaggi.</div></div>`;

@@ -382,7 +382,9 @@ a { color: var(--primary-2); }
 .empty__art { display: block; margin: 0 auto 14px; color: var(--primary-2); max-width: 124px; height: auto; }
 @media (prefers-reduced-motion: no-preference) {
   .empty__art { animation: emptyFloat 4s ease-in-out infinite; }
+  .empty__steam { animation: steam 1.9s ease-in-out infinite; }
 }
+@keyframes steam { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.9; } }
 
 /* ---------- Modal ---------- */
 .modal-backdrop {
@@ -690,8 +692,15 @@ a { color: var(--primary-2); }
 @keyframes ripple { to { transform: scale(2.4); opacity: 0; } }
 
 /* Sfondo aurora animato */
-#aurora { position: fixed; inset: -25%; z-index: -1; pointer-events: none; background: radial-gradient(38% 38% at 22% 18%, rgba(255, 140, 60, 0.13), transparent 70%), radial-gradient(42% 42% at 82% 65%, rgba(90, 160, 255, 0.11), transparent 70%), radial-gradient(35% 35% at 60% 95%, rgba(180, 110, 255, 0.09), transparent 70%); }
+#aurora { position: fixed; inset: -25%; z-index: -1; pointer-events: none; background: radial-gradient(40% 40% at 20% 16%, rgba(var(--primary-rgb, 255,140,60), 0.16), transparent 70%), radial-gradient(44% 44% at 82% 64%, rgba(var(--primary-rgb, 255,140,60), 0.10), transparent 70%), radial-gradient(36% 36% at 60% 96%, rgba(var(--primary-rgb, 255,140,60), 0.07), transparent 70%); }
 @media (prefers-reduced-motion: no-preference) { #aurora { animation: aurora 22s ease-in-out infinite alternate; } }
+#seasonDecor { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+#seasonDecor span { position: absolute; top: -32px; opacity: 0.45; will-change: transform; animation: seasonFall linear infinite; }
+@keyframes seasonFall { 0% { transform: translateY(-32px) rotate(0deg); } 100% { transform: translateY(104vh) rotate(320deg); } }
+@media (prefers-reduced-motion: no-preference) {
+  .view-anim { animation: viewIn 0.24s ease; }
+}
+@keyframes viewIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes aurora { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(4%, 3%) scale(1.12); } }
 
 /* Transizione fluida tra i passi (Modalità cucina) */
@@ -1056,6 +1065,10 @@ a { color: var(--primary-2); }
 .season-chip { font-size: 0.82rem; font-weight: 700; background: rgba(120, 200, 120, 0.14); border: 1px solid rgba(120, 200, 120, 0.3); color: #9be29b; border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
 .tagchip--season { background: rgba(120, 200, 120, 0.16); border: 1px solid rgba(120, 200, 120, 0.34); color: #9be29b; }
 .tagchip--ahead { background: rgba(120, 160, 255, 0.16); border: 1px solid rgba(120, 160, 255, 0.34); color: #a9c2ff; }
+.diffdots { display: inline-flex; gap: 3px; vertical-align: middle; }
+.diffdot { width: 7px; height: 7px; border-radius: 50%; background: var(--surface-3); border: 1px solid var(--border); }
+.diffdot.on { background: var(--primary-2); border-color: var(--primary-2); }
+.meta-time, .meta-diff { color: var(--text-soft); font-size: 0.78rem; }
 .sim-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 .sim-row::-webkit-scrollbar { display: none; }
 .sim-card { flex: 0 0 116px; width: 116px; background: var(--surface-2); border: 1px solid var(--surface-3); border-radius: 14px; padding: 0; overflow: hidden; text-align: left; color: var(--text); display: flex; flex-direction: column; }

@@ -6,6 +6,16 @@
 
 export const CHANGELOG = [
   {
+    v: "6.7",
+    d: "2026-06-13",
+    items: [
+      "Sfondo più caldo, con sfumature nel colore d'accento scelto.",
+      "Decorazioni stagionali discrete (neve a Natale, petali in primavera, foglie in autunno).",
+      "Difficoltà mostrata a pallini e tempo con l'orologio nelle liste.",
+      "Passaggio più morbido tra le schede e vapore animato durante i caricamenti."
+    ]
+  },
+  {
     v: "6.6",
     d: "2026-06-13",
     items: [
