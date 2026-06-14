@@ -690,6 +690,17 @@ function openStats() {
     ? listBlock(`${iconHtml("calendar-dots")} Cosa hai cucinato`, diary.map((e) => `<div class="stat-row"><span>${escapeHtml(e.title)}</span><b>${fmtD(e.ts)}</b></div>`))
     : listBlock(`${iconHtml("timer")} Cucinate di recente`, recent.map((r) => `<div class="stat-row"><span>${escapeHtml(r.title)}</span></div>`));
   const ingHtml = listBlock(`${iconHtml("list-bullets")} Ingredienti più usati`, topIng.map(([n, c]) => `<div class="stat-row"><span>${escapeHtml(n)}</span><b>${c}</b></div>`));
+
+  // Grafico: quante volte hai cucinato negli ultimi 6 mesi (dai cookLog).
+  const monthly = {};
+  recipes.forEach((r) => (r.cookLog || []).forEach((ts) => { const ym = String(ts).slice(0, 7); if (/^\d{4}-\d{2}$/.test(ym)) monthly[ym] = (monthly[ym] || 0) + 1; }));
+  const MESI_SHORT = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
+  const nowD = new Date();
+  const months6 = [];
+  for (let i = 5; i >= 0; i--) { const d = new Date(nowD.getFullYear(), nowD.getMonth() - i, 1); const ym = d.toISOString().slice(0, 7); months6.push({ label: MESI_SHORT[d.getMonth()], n: monthly[ym] || 0 }); }
+  const maxN = Math.max(1, ...months6.map((x) => x.n));
+  const chartHtml = totalCooked ? `<div class="stat-block"><div class="stat-block__t">${iconHtml("fire")} Cucinato negli ultimi 6 mesi</div>
+    <div class="bar-chart">${months6.map((x) => `<div class="bar-col"><span class="bar-n">${x.n}</span><div class="bar" style="height:${Math.round(x.n / maxN * 64) + 3}px"></div><span class="bar-lbl">${x.label}</span></div>`).join("")}</div></div>` : "";
   const toolHtml = listBlock(`${iconHtml("cooking-pot")} Strumenti più usati`, toolStats.slice(0, 5).map((t) => `<div class="stat-row"><span>${iconHtml(t.icon)} ${escapeHtml(t.name)}</span><b>${t.cooked ? t.cooked + "×" : t.n + " ric."}</b></div>`));
 
   const m = openModal(`
@@ -705,7 +716,7 @@ function openStats() {
         ${stat(favs, favs === 1 ? "preferito" : "preferiti")}
       </div>
       ${!recipes.length ? `<div class="hint">Aggiungi ricette e segna \"cucinata\" per riempire il diario.</div>` : ""}
-      ${topHtml}${recentHtml}${toolHtml}${ingHtml}
+      ${chartHtml}${topHtml}${recentHtml}${toolHtml}${ingHtml}
     </div>
     <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
   `);
@@ -2647,6 +2658,28 @@ async function saveMealResult(data, onProgress = () => {}) {
   openRecipeForm({ prefill });
 }
 
+// Spesa del mese: registro locale di quanto speso (stima) quando fai la spesa.
+const SPEND_KEY = "ricettario.spend";
+function getSpend() { try { return JSON.parse(localStorage.getItem(SPEND_KEY) || "{}"); } catch (e) { return {}; } }
+function addSpend(amount) {
+  if (!amount || amount <= 0) return;
+  const ym = new Date().toISOString().slice(0, 7);
+  const s = getSpend();
+  s[ym] = Math.round(((s[ym] || 0) + amount) * 100) / 100;
+  try { localStorage.setItem(SPEND_KEY, JSON.stringify(s)); } catch (e) {}
+}
+function currentMonthSpend() { return getSpend()[new Date().toISOString().slice(0, 7)] || 0; }
+function openSpendHistory() {
+  const s = getSpend();
+  const MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+  const rows = Object.keys(s).sort().reverse().slice(0, 12).map((ym) => {
+    const [y, mo] = ym.split("-");
+    return `<div class="stat-row"><span>${MESI[+mo - 1]} ${y}</span><b>€ ${(s[ym] || 0).toFixed(2)}</b></div>`;
+  }).join("") || `<div class="hint">Ancora nessuna spesa registrata.</div>`;
+  const m = openModal(`<h3 class="modal__title">${iconHtml("basket")} Spesa per mese</h3><div class="cl-scroll">${rows}</div><div class="hint" style="margin-top:8px">Stima indicativa, calcolata quando tocchi "Spesa fatta".</div><div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>`);
+  m.el.querySelector('[data-act="ok"]').addEventListener("click", m.close);
+}
+
 // Lista "Da provare": ricette online segnate per importarle più avanti (locale).
 const TOTRY_KEY = "ricettario.totry";
 function getToTry() { try { return JSON.parse(localStorage.getItem(TOTRY_KEY) || "[]"); } catch (e) { return []; } }
@@ -2679,6 +2712,22 @@ function openToTry() {
       if (data) { m.close(); await saveMealResult(data, () => {}); }
     });
   });
+}
+
+// Svuota frigo: cerca online ricette che usano gli ingredienti che hai.
+function openFridgeSearch() {
+  const m = openModal(`
+    <h3 class="modal__title">🧊 Svuota frigo</h3>
+    <p class="hint" style="margin-top:-8px;margin-bottom:12px">Scrivi gli ingredienti che hai (separati da virgola): cerco ricette che li usano. Funziona meglio con la fonte <b>Moulinex</b>.</p>
+    <div class="field"><input type="text" id="fridgeIn" placeholder="es. zucchine, pollo, limone" /></div>
+    <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button><button class="btn btn--primary" data-act="ok">Cerca</button></div>
+  `);
+  const input = m.el.querySelector("#fridgeIn");
+  input.focus();
+  const go = () => { const v = input.value.trim(); if (!v) return; m.close(); performMealSearch(v); };
+  m.el.querySelector('[data-act="cancel"]').addEventListener("click", m.close);
+  m.el.querySelector('[data-act="ok"]').addEventListener("click", go);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
 }
 
 function setupPullToRefresh(body) {
@@ -2763,6 +2812,7 @@ function renderOnlineTab() {
   body.innerHTML = `
     <div class="meal-controls">
       <div class="field" style="margin-bottom:10px"><select id="mealSource">${srcOpts}</select></div>
+      ${searchable ? `<button class="btn btn--ghost btn--block" id="fridgeBtn" style="margin-bottom:12px">🧊 Svuota frigo (cerca per ingredienti)</button>` : ""}
       ${(() => { const n = getToTry().length; return n ? `<button class="btn btn--ghost btn--block" id="toTryBtn" style="margin-bottom:12px">🔖 Da provare (${n})</button>` : ""; })()}
       ${mealSource === "moulinex" ? `<button class="btn btn--ghost btn--block" id="companionRandom" style="margin-bottom:12px">🎲 Sorprendimi col Companion</button>` : ""}
       ${bannerHtml}
@@ -2797,6 +2847,9 @@ function renderOnlineTab() {
 
   const toTryBtn = body.querySelector("#toTryBtn");
   if (toTryBtn) toTryBtn.addEventListener("click", () => openToTry());
+
+  const fridgeBtn = body.querySelector("#fridgeBtn");
+  if (fridgeBtn) fridgeBtn.addEventListener("click", () => openFridgeSearch());
 
   const companionRandom = body.querySelector("#companionRandom");
   if (companionRandom) companionRandom.addEventListener("click", async () => {
@@ -3034,6 +3087,7 @@ function renderShoppingList() {
     </div>
     <div id="shopBody">${body}</div>
     ${(() => { const c = estimateCost(active); return c.counted ? `<div class="shop-cost">${iconHtml("basket")} Costo stimato del carrello: <b>€ ${c.total.toFixed(2)}</b><span class="shop-cost__note"> · stima su ${c.counted} articoli</span></div>` : ""; })()}
+    ${currentMonthSpend() > 0 ? `<button class="shop-cost" id="spendLine" style="width:100%;text-align:left;cursor:pointer">${iconHtml("calendar-dots")} Spesa di questo mese (stima): <b>€ ${currentMonthSpend().toFixed(2)}</b><span class="shop-cost__note"> · tocca per lo storico</span></button>` : ""}
     ${done.length ? `<button class="btn btn--primary btn--block" id="toPantry" style="margin-top:18px">${iconHtml("basket")} Spesa fatta: presi in dispensa</button>` : ""}
     ${items.length ? `<div style="display:flex;gap:8px;margin-top:${done.length ? "8px" : "18px"};flex-wrap:wrap">
       <button class="btn btn--ghost" id="shopShare">${iconHtml("arrow-square-out")} Invia lista</button>
@@ -3078,7 +3132,13 @@ function renderShoppingList() {
   });
 
   const tp = wrap.querySelector("#toPantry");
-  if (tp) tp.addEventListener("click", () => openPutInPantry(store.getShopping().filter((s) => s.checked)));
+  if (tp) tp.addEventListener("click", () => {
+    const done = store.getShopping().filter((s) => s.checked);
+    const c = estimateCost(done); if (c.counted) addSpend(c.total);
+    openPutInPantry(done);
+  });
+  const sp = wrap.querySelector("#spendLine");
+  if (sp) sp.addEventListener("click", openSpendHistory);
   const cd = wrap.querySelector("#clearDone");
   if (cd) cd.addEventListener("click", () => store.clearCheckedShopping());
   const ca = wrap.querySelector("#clearAll");

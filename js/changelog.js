@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    v: "6.5",
+    d: "2026-06-13",
+    items: [
+      "Spesa del mese: nella lista della spesa vedi quanto hai speso (stima) toccando \"Spesa fatta\", con lo storico per mese.",
+      "Diario di cucina con grafico: quante volte hai cucinato negli ultimi 6 mesi.",
+      "Svuota frigo: nel Ricettario online cerca ricette dagli ingredienti che hai (al meglio con Moulinex)."
+    ]
+  },
+  {
     v: "6.4",
     d: "2026-06-13",
     items: [
