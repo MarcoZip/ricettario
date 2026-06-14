@@ -352,20 +352,22 @@ async function handleMoulinexImg(target) {
   } catch (e) { return new Response("error", { status: 502, headers: CORS }); }
 }
 
-// Ricerca su Ricettario Bimby (italiano): titolo + link + foto dalla pagina /cerca.
-async function handleSearchBimby(q) {
-  if (!q || !q.trim()) return json({ results: [] }, 200);
+// Ricettario Bimby (italiano): SFOGLIA il catalogo (ordinato per popolari), paginato.
+// La ricerca per parola del sito è solo lato JS, non raggiungibile da fuori, quindi
+// qui si sfoglia soltanto. Ritorna titolo + link + foto + total (per la paginazione).
+async function handleSearchBimby(pageStr) {
   try {
-    const u = "https://www.ricettario-bimby.it/cerca?q=" + encodeURIComponent(q.trim());
+    const PAGE = 12;
+    const page0 = Math.max(0, parseInt(pageStr, 10) || 0); // 0-based dal client
+    const u = "https://www.ricettario-bimby.it/cerca?sort=trending&rows=" + PAGE + "&page=" + (page0 + 1);
     const res = await fetch(u, { headers: BROWSER_HEADERS, cf: { cacheTtl: 1800, cacheEverything: true } });
     if (!res.ok) return json({ error: "unreachable", results: [] }, 200);
     const html = await res.text();
     const results = [];
     const seen = new Set();
-    // <a href="/Cat-ricette/Slug/id" title="Titolo" class="…recipe-link…"><img src="img">
     const re = /<a href="(\/[A-Za-z0-9%-]+-ricette\/[^"]+)"[^>]*title="([^"]*)"[^>]*class="[^"]*recipe-link[^"]*"[^>]*>\s*<img[^>]+src="([^"]+)"/gi;
     let m;
-    while ((m = re.exec(html)) && results.length < 24) {
+    while ((m = re.exec(html)) && results.length < PAGE) {
       const link = "https://www.ricettario-bimby.it" + m[1];
       if (seen.has(link)) continue;
       seen.add(link);
@@ -373,7 +375,10 @@ async function handleSearchBimby(q) {
       if (!title) continue;
       results.push({ title, url: link, image: m[3] || "" });
     }
-    return json({ results }, 200);
+    // Ultima pagina dai link di paginazione → totale approssimato.
+    let maxPage = page0 + 1;
+    for (const pm of html.matchAll(/[?&]page=(\d+)/g)) { const n = +pm[1]; if (n > maxPage) maxPage = n; }
+    return json({ results, total: maxPage * PAGE, page: page0, pageSize: PAGE }, 200);
   } catch (e) { return json({ error: "unreachable", results: [] }, 200); }
 }
 
@@ -384,7 +389,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/img") return handleImageProxy(url.searchParams.get("u"));
     if (url.pathname === "/moulinex-img") return handleMoulinexImg(url.searchParams.get("u"));
-    if (url.pathname === "/searchbimby") return handleSearchBimby(url.searchParams.get("q"));
+    if (url.pathname === "/searchbimby") return handleSearchBimby(url.searchParams.get("page"));
     if (url.pathname === "/searchgz") return handleSearchGz(url.searchParams.get("q"));
     if (url.pathname === "/searchmisya") return handleSearchMisya(url.searchParams.get("q"));
     if (url.pathname === "/searchcookist") return handleSearchCookist(url.searchParams.get("q"));

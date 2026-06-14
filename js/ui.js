@@ -7,7 +7,7 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchEdamam, searchSpoon, spoonInfo, winePairing } from "./import-recipe.js";
+import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing } from "./import-recipe.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage, shareMenuImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
@@ -2302,7 +2302,7 @@ function onlineSources() {
     { k: "cookist", label: "Cookist (IT)" },
     { k: "ricettenonna", label: "Ricette della Nonna (IT)" },
     { k: "moulinex", label: "Moulinex (4800+ ricette)" },
-    { k: "bimby", label: "Bimby (IT)" },
+    { k: "bimby", label: "Bimby (sfoglia)" },
     { k: "mealdb", label: "TheMealDB (tradotto)" }
   ];
   if (SPOONACULAR_ENABLED) list.push({ k: "spoon", label: "Spoonacular (tradotto)" });
@@ -2335,7 +2335,7 @@ async function runMealSearch(q) {
   if (mealSource === "cookist") { const out = (await searchCookist(q)).map(mapCookist); return out; }
   if (mealSource === "ricettenonna") { const out = (await searchRicettenonna(q)).map(mapRicettenonna); return out; }
   if (mealSource === "moulinex") { const d = await searchMoulinexFull(q, mealPage); mealTotal = d.total; return d.results.map(mapMoulinex); }
-  if (mealSource === "bimby") { const out = (await searchBimby(q)).map(mapBimby); return out; }
+  if (mealSource === "bimby") { const d = await searchBimbyFull(mealPage); mealTotal = d.total; return d.results.map(mapBimby); }
   if (mealSource === "spoon") {
     const out = (await searchSpoon(await translateToEnglish(q))).map(mapSpoon);
     await translateMealTitles(out);
@@ -2354,7 +2354,6 @@ async function runMealSearch(q) {
       searchCookist(q).then((rs) => rs.slice(0, 5).map(mapCookist)).catch(() => []),
       searchRicettenonna(q).then((rs) => rs.slice(0, 5).map(mapRicettenonna)).catch(() => []),
       searchMoulinex(q).then((rs) => rs.slice(0, 5).map(mapMoulinex)).catch(() => []),
-      searchBimby(q).then((rs) => rs.slice(0, 5).map(mapBimby)).catch(() => []),
       mealdb.searchMeals(en).then((rs) => rs.slice(0, 5).map(mapMealdb)).catch(() => [])
     ];
     if (SPOONACULAR_ENABLED) tasks.push(searchSpoon(en).then((rs) => rs.slice(0, 5).map(mapSpoon)).catch(() => []));
@@ -2384,9 +2383,11 @@ function emptyArt() {
 // Esegue una ricerca online e aggiorna lo stato (usata da pulsante, invio e
 // dal "tira-per-aggiornare").
 // Fonti "da sfogliare": non hanno la ricerca testuale, mostrano una lista curata.
-const BROWSE_SOURCES = new Set(["moulinex"]);
+const BROWSE_SOURCES = new Set(["moulinex", "bimby"]);
 // Fonti paginate dal server (la pagina si rifà sul worker a ogni cambio pagina).
-const SERVER_PAGINATED = new Set(["moulinex"]);
+const SERVER_PAGINATED = new Set(["moulinex", "bimby"]);
+// Fonti senza ricerca per parola (solo sfoglia): nascondiamo il campo di ricerca.
+const SEARCH_DISABLED = new Set(["bimby"]);
 const MEAL_PAGE_SIZE = 12;
 async function performMealSearch(q, keepPage = false) {
   q = (q || "").trim();
@@ -2490,19 +2491,23 @@ function renderOnlineTab() {
   }
   const srcOpts = onlineSources().map((s) => `<option value="${s.k}" ${mealSource === s.k ? "selected" : ""}>${s.label}</option>`).join("");
   const browse = BROWSE_SOURCES.has(mealSource);
+  const searchable = !SEARCH_DISABLED.has(mealSource);
   if (browse && !mealResults && !mealLoading && !mealError) {
     resultsHtml = `<div class="empty"><span class="empty__emoji">${iconHtml("cooking-pot")}</span>Carico le ricette…</div>`;
   }
+  let bannerHtml = "";
+  if (mealSource === "moulinex") bannerHtml = `<div class="banner" style="margin-bottom:12px">🤖 <div>Cerca tra le <b>oltre 4800 ricette Moulinex</b> (scrivi un piatto, es. "pollo"), o sfoglia la selezione qui sotto. Tocca <b>Importa</b>: arriva con foto, ingredienti e passaggi.</div></div>`;
+  else if (mealSource === "bimby") bannerHtml = `<div class="banner" style="margin-bottom:12px">🥣 <div>Sfoglia il <b>ricettario Bimby</b> (le più popolari), a pagine. Tocca <b>Importa</b> per salvarne una. La ricerca per parola non è disponibile per questa fonte.</div></div>`;
 
   body.innerHTML = `
     <div class="meal-controls">
       <div class="field" style="margin-bottom:10px"><select id="mealSource">${srcOpts}</select></div>
       ${mealSource === "moulinex" ? `<button class="btn btn--ghost btn--block" id="companionRandom" style="margin-bottom:12px">🎲 Sorprendimi col Companion</button>` : ""}
-      ${browse ? `<div class="banner" style="margin-bottom:12px">🤖 <div>Cerca tra le <b>oltre 4800 ricette Moulinex</b> (scrivi un piatto, es. "pollo"), o sfoglia la selezione qui sotto. Tocca <b>Importa</b>: arriva con foto, ingredienti e passaggi.</div></div>` : ""}
-      <div class="search-bar">
+      ${bannerHtml}
+      ${searchable ? `<div class="search-bar">
         <input type="search" id="mealSearch" placeholder="Cerca in italiano (es. pollo, torta...)" value="${escapeHtml(mealQuery)}" />
         <button class="btn btn--primary" id="mealSearchBtn">Cerca</button>
-      </div>
+      </div>` : ""}
       ${mealSource === "mealdb" ? `<div style="margin-top:10px"><button class="btn btn--ghost" id="mealRandom">${iconHtml("shuffle")} Ispirami</button></div>` : ""}
     </div>
     <div id="mealResults">${resultsHtml}</div>

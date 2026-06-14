@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "6.1",
+    d: "2026-06-13",
+    items: [
+      "Fonte Bimby ora corretta: si sfoglia il ricettario (le più popolari) a pagine, con foto e import. La ricerca per parola non è disponibile per questa fonte (il sito la fa solo nella sua app)."
+    ]
+  },
+  {
     v: "6.0",
     d: "2026-06-13",
     items: [

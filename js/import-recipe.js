@@ -77,13 +77,15 @@ export async function searchMoulinex(query) {
   return (await searchMoulinexFull(query)).results;
 }
 
-// Ricerca su Ricettario Bimby (italiano): ritorna [{ title, url, image }].
-export async function searchBimby(query) {
-  if (!WORKER_URL || !query.trim()) return [];
-  const res = await fetch(`${WORKER_URL}/searchbimby?q=${encodeURIComponent(query.trim())}`);
+// Ricettario Bimby (italiano): si SFOGLIA il catalogo (popolari), paginato.
+// Ritorna { results, total } per la paginazione.
+export async function searchBimbyFull(page = 0) {
+  if (!WORKER_URL) return { results: [], total: 0 };
+  const res = await fetch(`${WORKER_URL}/searchbimby?page=${page}`);
   if (!res.ok) throw new Error("Servizio non raggiungibile.");
   const d = await res.json().catch(() => ({}));
-  return Array.isArray(d.results) ? d.results : [];
+  const results = Array.isArray(d.results) ? d.results : [];
+  return { results, total: typeof d.total === "number" ? d.total : results.length };
 }
 
 // Ricerca su Edamam (inglese, richiede le chiavi sul worker).

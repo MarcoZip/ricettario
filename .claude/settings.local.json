@@ -96,7 +96,20 @@
       "Bash(echo \"=== #2 Moulinex paginazione \\(pollo, page 0\\) ===\")",
       "Bash(curl -s -o /tmp/m0.json -w 'HTTP %{http_code}\\\\n' --max-time 35 'https://ricette-import.marcozeta73.workers.dev/searchmoulinex?q=pollo&page=0')",
       "Bash(grep -o '\"title\"' /tmp/m0.json)",
-      "Bash(echo \"mostrate: $\\(grep -o '\"title\"' /tmp/m0.json)"
+      "Bash(echo \"mostrate: $\\(grep -o '\"title\"' /tmp/m0.json)",
+      "Bash(grep -oE '<[a-z]+[^>]*class=\"[^\"]*pagination[^\"]*\"[^>]*>.{0,400}' /tmp/bb1.html)",
+      "Bash(echo \"### page1 rows=12: titoli ###\")",
+      "Bash(curl -s -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/124 Safari/537.36' --max-time 25 'https://www.ricettario-bimby.it/cerca?q=pollo&page=1&rows=12')",
+      "Bash(grep -oE '\\([0-9.]+\\)\\\\s*\\(ricett|risultat\\)[^<]{0,15}')",
+      "Bash(sort -t= -k2 -n)",
+      "Bash(echo \"### sort=relevance ###\")",
+      "Bash(curl -s -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/124 Safari/537.36' --max-time 25 'https://www.ricettario-bimby.it/cerca?q=pollo&sort=relevance&rows=12')",
+      "Bash(echo \"### form di ricerca \\(action + input name\\) ###\")",
+      "Bash(grep -oE '<form[^>]*action=\"[^\"]*cerca[^\"]*\"[^>]*>.{0,400}')",
+      "Bash(echo 'URL: https://www.ricettario-bimby.it/cerca?filter%5Bingredients_incl%5D%5B%5D=pollo&rows=12&page=1')",
+      "Bash(curl -s -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/124 Safari/537.36' --max-time 25 'https://www.ricettario-bimby.it/cerca?filter%5Bingredients_incl%5D%5B%5D=pollo&rows=12&page=1' -o /tmp/f.html)",
+      "Bash(echo \"titoli \\(devono essere pollo\\):\")",
+      "Bash(grep -oE 'title=\"[^\"]+\" class=\"[^\"]*recipe-link' /tmp/f1.html)"
     ]
   }
 }
