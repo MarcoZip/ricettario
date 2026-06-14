@@ -60,11 +60,12 @@ export async function searchRicettenonna(query) {
   return Array.isArray(d.results) ? d.results : [];
 }
 
-// Ricettario Moulinex Companion (italiano): sfoglia la selezione di ricette per
-// il robot da cucina Companion. Ignora la query (il sito non espone la ricerca).
-export async function searchMoulinex() {
+// Ricettario Moulinex (italiano): con una query cerca nell'intero catalogo ricette
+// (sitemap); senza query mostra la selezione curata per il Companion.
+export async function searchMoulinex(query) {
   if (!WORKER_URL) return [];
-  const res = await fetch(`${WORKER_URL}/searchmoulinex`);
+  const q = (query || "").trim();
+  const res = await fetch(`${WORKER_URL}/searchmoulinex${q ? "?q=" + encodeURIComponent(q) : ""}`);
   if (!res.ok) throw new Error("Servizio non raggiungibile.");
   const d = await res.json().catch(() => ({}));
   return Array.isArray(d.results) ? d.results : [];

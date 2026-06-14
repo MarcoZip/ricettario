@@ -47,7 +47,32 @@
       "Bash(curl -s -o /tmp/mx.json -w 'HTTP %{http_code}\\\\n' --max-time 35 https://ricette-import.marcozeta73.workers.dev/searchmoulinex)",
       "Bash(curl -s -o /dev/null -w 'HTTP %{http_code} type=%{content_type} size=%{size_download}\\\\n' -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/124.0.0.0 Safari/537.36' --max-time 20 https://www.misya.info/wp-content/uploads/2023/07/straccetti-di-pollo-alla-pizzaiola.jpg)",
       "Bash(curl -s -o /dev/null -w 'HTTP %{http_code} type=%{content_type} size=%{size_download}\\\\n' -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/124.0.0.0 Safari/537.36' -H 'Referer: https://fornelli.example/' --max-time 20 https://www.misya.info/wp-content/uploads/2023/07/straccetti-di-pollo-alla-pizzaiola.jpg)",
-      "Bash(curl -s -o /dev/null -w 'HTTP %{http_code} type=%{content_type} size=%{size_download}\\\\n' -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/124.0.0.0 Safari/537.36' -H 'Referer: https://www.misya.info/' --max-time 20 https://www.misya.info/wp-content/uploads/2023/07/straccetti-di-pollo-alla-pizzaiola.jpg)"
+      "Bash(curl -s -o /dev/null -w 'HTTP %{http_code} type=%{content_type} size=%{size_download}\\\\n' -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/124.0.0.0 Safari/537.36' -H 'Referer: https://www.misya.info/' --max-time 20 https://www.misya.info/wp-content/uploads/2023/07/straccetti-di-pollo-alla-pizzaiola.jpg)",
+      "Bash(python3 -c 'import urllib.parse,sys;print\\(urllib.parse.quote\\(sys.argv[1],safe='\\\\'''\\\\''\\)\\)' https://www.misya.info/wp-content/uploads/2023/07/straccetti-di-pollo-alla-pizzaiola.jpg)",
+      "Bash(curl -s -o /tmp/proxy.bin -w 'HTTP %{http_code} type=%{content_type} size=%{size_download}\\\\n' --max-time 35 https://ricette-import.marcozeta73.workers.dev/img?u=__CMDSUB_OUTPUT__)",
+      "Bash(curl -s -o /dev/null -w 'HTTP %{http_code}\\\\n' --max-time 20 https://ricette-import.marcozeta73.workers.dev/img?u=https%3A%2F%2Fexample.com%2Fx.jpg)",
+      "Bash(grep -oE 'https?://[^\"`'\\\\'' ]*\\(groupe-seb|brandsites|model-t\\)[^\"`'\\\\'' ]*' /tmp/main.js)",
+      "Bash(grep -oE '\\(recipeApi|apiBase|apiUrl|brandSitesApi|gateway\\)[^,;]{0,80}' /tmp/main.js)",
+      "Bash(grep -oE 'https://[a-z0-9.-]+\\\\.[a-z]{2,}' /tmp/main.js)",
+      "Bash(echo \"### robots/sitemap ###\")",
+      "Bash(curl -s -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/124 Safari/537.36' --max-time 20 https://www.moulinex.it/robots.txt)",
+      "Bash(grep -oE 'https://[a-z0-9.-]*\\(commerce\\\\.ondemand|groupe-seb|luigisbox\\)[^\"\\\\\\\\]*' /tmp/comp.html)",
+      "Bash(grep -oE '\"baseSite\"[: ]*\"[^\"]+\"|baseSite\\\\\\\\?\":\\\\\\\\?\"[^\"\\\\\\\\]+' /tmp/comp.html)",
+      "Bash(grep -oE '[^\"\\\\\\\\]{0,30}v1\\\\\\\\?/recipes[^\"\\\\\\\\]{0,60}' /tmp/comp.html)",
+      "Bash(grep -oE 'brandsites[^\"\\\\\\\\]*recipe[^\"\\\\\\\\]*' /tmp/comp.html)",
+      "Bash(grep -oE 'https:\\(\\\\\\\\u002F|/\\){2}brandsites\\\\.api\\\\.groupe-seb\\\\.com[^\"\\\\\\\\]*' /tmp/comp.html)",
+      "Bash(echo \"--- variante con \\\\\\\\u002F ---\")",
+      "Bash(grep -oE '\\(brandsites\\\\.api\\\\.groupe-seb\\\\.com|sebplatform\\\\.api\\\\.groupe-seb\\\\.com\\)\\(\\\\\\\\u002F|/\\)[^\"]{0,120}' /tmp/comp.html)",
+      "Bash(grep -oE '\"content\":\\\\[\\\\{.{0,400}' /tmp/comp.html)",
+      "Bash(curl -s -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/124 Safari/537.36' --max-time 25 https://www.moulinex.it/sitemap.xml -o /tmp/sm.xml)",
+      "Bash(wc -c)",
+      "Bash(echo \"size: $\\(wc -c </tmp/sm.xml\\)\")",
+      "Bash(echo \"### è un indice? sub-sitemap ###\")",
+      "Bash(grep -oE '<loc>[^<]+</loc>' /tmp/sm.xml)",
+      "Bash(curl -s -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/124 Safari/537.36' --max-time 40 https://www.moulinex.it/Recipe-it-EUR.xml -o /tmp/rsm.xml)",
+      "Bash(echo \"size: $\\(wc -c </tmp/rsm.xml\\)\")",
+      "Bash(echo \"### numero ricette ###\")",
+      "Bash(grep -oE '<loc>[^<]+</loc>' /tmp/rsm.xml)"
     ]
   }
 }

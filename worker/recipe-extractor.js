@@ -134,7 +134,32 @@ async function handleSearchRicettenonna(q) {
 // il robot Companion dal sito Moulinex. La ricerca testuale non è esposta dal
 // sito (è via JS), quindi qui si restituisce la lista curata; le foto e i
 // dettagli arrivano all'import della singola ricetta (hanno JSON-LD Recipe).
-async function handleSearchMoulinex() {
+async function handleSearchMoulinex(q) {
+  const query = (q || "").trim();
+  // Con una ricerca: filtra l'intero catalogo ricette Moulinex (sitemap), il cui
+  // slug contiene il nome del piatto. Senza ricerca: la selezione curata Companion.
+  if (query) {
+    try {
+      const res = await fetch("https://www.moulinex.it/Recipe-it-EUR.xml", { headers: BROWSER_HEADERS, cf: { cacheTtl: 86400, cacheEverything: true } });
+      if (!res.ok) return json({ error: "unreachable", results: [] }, 200);
+      const xml = await res.text();
+      const terms = query.toLowerCase().split(/\s*,\s*|\s+/).filter(Boolean);
+      const results = [];
+      const seen = new Set();
+      const re = /<loc>(https:\/\/www\.moulinex\.it\/ricette\/detail\/PRO\/([^/<]+)\/[^<]+)<\/loc>/g;
+      let m;
+      while ((m = re.exec(xml)) && results.length < 30) {
+        const link = m[1], slug = m[2].toLowerCase();
+        if (terms.length && !terms.every((t) => slug.includes(t))) continue;
+        if (seen.has(slug)) continue;
+        seen.add(slug);
+        const name = m[2].replace(/-/g, " ");
+        const title = name.charAt(0).toUpperCase() + name.slice(1);
+        results.push({ title, url: link, image: "" });
+      }
+      return json({ results }, 200);
+    } catch (e) { return json({ error: "unreachable", results: [] }, 200); }
+  }
   try {
     const u = "https://www.moulinex.it/ricette/elenco/crp/companion-ricette";
     const res = await fetch(u, { headers: BROWSER_HEADERS, cf: { cacheTtl: 3600, cacheEverything: true } });
@@ -142,7 +167,6 @@ async function handleSearchMoulinex() {
     const html = await res.text();
     const results = [];
     const seen = new Set();
-    // Card: <a class="is-full-area…" href="/ricette/detail/…"><span class="is-visually-hidden…"> Titolo </span>
     const re = /<a [^>]*class="is-full-area[^"]*"[^>]*href="(\/ricette\/detail\/[^"]+)"[^>]*>\s*<span[^>]*class="is-visually-hidden[^"]*"[^>]*>([^<]+)<\/span>/gi;
     let m;
     while ((m = re.exec(html)) && results.length < 24) {
@@ -312,7 +336,7 @@ export default {
     if (url.pathname === "/searchmisya") return handleSearchMisya(url.searchParams.get("q"));
     if (url.pathname === "/searchcookist") return handleSearchCookist(url.searchParams.get("q"));
     if (url.pathname === "/searchricettenonna") return handleSearchRicettenonna(url.searchParams.get("q"));
-    if (url.pathname === "/searchmoulinex") return handleSearchMoulinex();
+    if (url.pathname === "/searchmoulinex") return handleSearchMoulinex(url.searchParams.get("q"));
     if (url.pathname === "/edamam") return handleEdamam(url.searchParams.get("q"), env);
     if (url.pathname === "/spoon") return handleSpoon(url.searchParams.get("q"), env);
     if (url.pathname === "/spoon-info") return handleSpoonInfo(url.searchParams.get("id"), env);

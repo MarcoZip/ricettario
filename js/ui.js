@@ -2325,7 +2325,7 @@ async function runMealSearch(q) {
   if (mealSource === "misya") { const out = (await searchMisya(q)).map(mapMisya); return out; }
   if (mealSource === "cookist") { const out = (await searchCookist(q)).map(mapCookist); return out; }
   if (mealSource === "ricettenonna") { const out = (await searchRicettenonna(q)).map(mapRicettenonna); return out; }
-  if (mealSource === "moulinex") { const out = (await searchMoulinex()).map(mapMoulinex); return out; }
+  if (mealSource === "moulinex") { const out = (await searchMoulinex(q)).map(mapMoulinex); return out; }
   if (mealSource === "spoon") {
     const out = (await searchSpoon(await translateToEnglish(q))).map(mapSpoon);
     await translateMealTitles(out);
@@ -2461,12 +2461,11 @@ function renderOnlineTab() {
   body.innerHTML = `
     <div class="field" style="margin-bottom:10px"><select id="mealSource">${srcOpts}</select></div>
     <button class="btn btn--ghost btn--block" id="companionRandom" style="margin-bottom:12px">🎲 Sorprendimi col Companion</button>
-    ${browse
-      ? `<div class="banner" style="margin-bottom:14px">🤖 <div>Sfoglia il <b>ricettario Moulinex Companion</b>. Tocca <b>Importa</b> su una ricetta: arriva con foto, ingredienti e passaggi.</div></div>`
-      : `<div class="search-bar">
+    ${browse ? `<div class="banner" style="margin-bottom:12px">🤖 <div>Cerca tra le <b>oltre 4800 ricette Moulinex</b> (scrivi un piatto, es. "pollo"), o sfoglia la selezione Companion qui sotto. Tocca <b>Importa</b>: arriva con foto, ingredienti e passaggi.</div></div>` : ""}
+    <div class="search-bar">
       <input type="search" id="mealSearch" placeholder="Cerca in italiano (es. pollo, torta...)" value="${escapeHtml(mealQuery)}" />
       <button class="btn btn--primary" id="mealSearchBtn">Cerca</button>
-    </div>`}
+    </div>
     ${mealSource === "mealdb" ? `<div style="margin-bottom:16px"><button class="btn btn--ghost" id="mealRandom">${iconHtml("shuffle")} Ispirami</button></div>` : `<div style="margin-bottom:16px"></div>`}
     <div id="mealResults">${resultsHtml}</div>
   `;

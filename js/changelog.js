@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "5.6",
+    d: "2026-06-13",
+    items: [
+      "Ricettario Moulinex: ora puoi cercare tra oltre 4800 ricette (scrivi un piatto, es. \"pollo\"), non solo la selezione iniziale. Importi quella che vuoi con foto e passaggi."
+    ]
+  },
+  {
     v: "5.5",
     d: "2026-06-13",
     minor: true,
