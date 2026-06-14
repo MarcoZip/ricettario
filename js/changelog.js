@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "6.6",
+    d: "2026-06-13",
+    items: [
+      "Nel tuo ricettario puoi combinare ricerca e categoria: scrivi \"peperoni\" e tocca una categoria (es. Primi) per trovarli solo lì."
+    ]
+  },
+  {
     v: "6.5",
     d: "2026-06-13",
     items: [

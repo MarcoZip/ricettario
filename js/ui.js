@@ -902,18 +902,27 @@ function renderHomeBody() {
 
   const searching = homeQuery.trim() || homeFilter;
   if (searching) {
-    let results, emptyIcon = "magnifying-glass", emptyMsg = "Nessuna ricetta trovata.";
-    if (homeQuery.trim()) results = store.searchRecipes(homeQuery);
-    else if (homeFilter === "fav") { results = store.getFavorites(); emptyIcon = "heart"; emptyMsg = "Nessun preferito: tocca il cuore in una ricetta."; }
-    else if (homeFilter === "cooked") { results = store.getMostCooked(); emptyIcon = "fire"; emptyMsg = "Nessuna ricetta ancora segnata come cucinata."; }
-    else if (homeFilter === "recent") { results = store.getRecentCooked(); emptyIcon = "timer"; emptyMsg = "Niente cucinato di recente."; }
-    else if (homeFilter === "season") { const m = currentMonth(); results = store.getAllRecipes().filter((r) => recipeSeasonalMatches(r, m).length); emptyIcon = "carrot"; emptyMsg = `Nessuna ricetta con ingredienti di stagione a ${monthName(m)}.`; }
-    else if (homeFilter === "t15") { results = store.getAllRecipes().filter((r) => r.time && r.time <= 15); emptyIcon = "timer"; emptyMsg = "Nessuna ricetta entro 15 minuti. Aggiungi il tempo nelle ricette (modifica)."; }
-    else if (homeFilter === "t30") { results = store.getAllRecipes().filter((r) => r.time && r.time <= 30); emptyIcon = "timer"; emptyMsg = "Nessuna ricetta entro 30 minuti. Aggiungi il tempo nelle ricette (modifica)."; }
-    else if (homeFilter === "easy") { results = store.getAllRecipes().filter((r) => r.difficulty === 1); emptyIcon = "fire"; emptyMsg = "Nessuna ricetta facile. Segna la difficoltà nelle ricette (modifica)."; }
-    else if (homeFilter === "ng") { results = store.getAllRecipes().filter((r) => !(r.allergens || []).includes("Glutine")); emptyIcon = "carrot"; emptyMsg = "Nessuna ricetta senza glutine. Segna gli allergeni nelle ricette (modifica)."; }
-    else if (homeFilter === "nl") { results = store.getAllRecipes().filter((r) => !(r.allergens || []).includes("Lattosio")); emptyIcon = "carrot"; emptyMsg = "Nessuna ricetta senza lattosio. Segna gli allergeni nelle ricette (modifica)."; }
-    else results = store.getByTag(homeFilter);
+    let emptyIcon = "magnifying-glass", emptyMsg = "Nessuna ricetta trovata.";
+    // 1) Base in funzione del filtro/categoria scelto (o tutte le ricette).
+    let base;
+    if (homeFilter === "fav") { base = store.getFavorites(); emptyIcon = "heart"; emptyMsg = "Nessun preferito: tocca il cuore in una ricetta."; }
+    else if (homeFilter === "cooked") { base = store.getMostCooked(); emptyIcon = "fire"; emptyMsg = "Nessuna ricetta ancora segnata come cucinata."; }
+    else if (homeFilter === "recent") { base = store.getRecentCooked(); emptyIcon = "timer"; emptyMsg = "Niente cucinato di recente."; }
+    else if (homeFilter === "season") { const m = currentMonth(); base = store.getAllRecipes().filter((r) => recipeSeasonalMatches(r, m).length); emptyIcon = "carrot"; emptyMsg = `Nessuna ricetta con ingredienti di stagione a ${monthName(m)}.`; }
+    else if (homeFilter === "t15") { base = store.getAllRecipes().filter((r) => r.time && r.time <= 15); emptyIcon = "timer"; emptyMsg = "Nessuna ricetta entro 15 minuti. Aggiungi il tempo nelle ricette (modifica)."; }
+    else if (homeFilter === "t30") { base = store.getAllRecipes().filter((r) => r.time && r.time <= 30); emptyIcon = "timer"; emptyMsg = "Nessuna ricetta entro 30 minuti. Aggiungi il tempo nelle ricette (modifica)."; }
+    else if (homeFilter === "easy") { base = store.getAllRecipes().filter((r) => r.difficulty === 1); emptyIcon = "fire"; emptyMsg = "Nessuna ricetta facile. Segna la difficoltà nelle ricette (modifica)."; }
+    else if (homeFilter === "ng") { base = store.getAllRecipes().filter((r) => !(r.allergens || []).includes("Glutine")); emptyIcon = "carrot"; emptyMsg = "Nessuna ricetta senza glutine. Segna gli allergeni nelle ricette (modifica)."; }
+    else if (homeFilter === "nl") { base = store.getAllRecipes().filter((r) => !(r.allergens || []).includes("Lattosio")); emptyIcon = "carrot"; emptyMsg = "Nessuna ricetta senza lattosio. Segna gli allergeni nelle ricette (modifica)."; }
+    else if (homeFilter) base = store.getByTag(homeFilter);
+    else base = store.getAllRecipes();
+    // 2) Se c'è anche un testo, restringi la base ai risultati della ricerca.
+    let results = base;
+    if (homeQuery.trim()) {
+      const ids = new Set(store.searchRecipes(homeQuery).map((r) => r.id));
+      results = base.filter((r) => ids.has(r.id));
+      emptyMsg = homeFilter ? `Nessuna ricetta con "${escapeHtml(homeQuery.trim())}" in questa categoria.` : "Nessuna ricetta trovata.";
+    }
     body.innerHTML = results.length
       ? results.map((r, i) => recipeResultRow(r, i)).join("")
       : `<div class="empty"><span class="empty__emoji">${iconHtml(emptyIcon)}</span>${emptyMsg}</div>`;
@@ -1087,12 +1096,14 @@ function renderStrumenti() {
 
   const search = root.querySelector("#homeSearch");
   search.addEventListener("input", () => {
-    homeQuery = search.value; homeFilter = "";
-    root.querySelectorAll(".filter-chip").forEach((c) => c.classList.remove("is-on"));
-    renderHomeBody();
+    homeQuery = search.value;
+    // Il filtro "Menu" non si combina con la ricerca testuale: lo azzero.
+    if (homeFilter === "menu") { homeFilter = ""; renderStrumenti(); }
+    else renderHomeBody();
   });
   root.querySelectorAll(".filter-chip").forEach((c) => c.addEventListener("click", () => {
-    homeFilter = homeFilter === c.dataset.filter ? "" : c.dataset.filter; homeQuery = "";
+    homeFilter = homeFilter === c.dataset.filter ? "" : c.dataset.filter;
+    if (homeFilter === "menu") homeQuery = ""; // Menu è una vista a parte
     renderStrumenti();
   }));
 
