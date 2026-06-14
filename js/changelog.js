@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "6.0",
+    d: "2026-06-13",
+    items: [
+      "\"Tutte le fonti\" ora include anche Moulinex e Bimby, ed è chiaro che mostra un assaggio per fonte: per l'elenco completo scegli la singola fonte (es. Moulinex per tutte le sue ricette)."
+    ]
+  },
+  {
     v: "5.9",
     d: "2026-06-13",
     minor: true,

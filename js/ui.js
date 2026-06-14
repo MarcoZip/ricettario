@@ -2352,7 +2352,9 @@ async function runMealSearch(q) {
       searchGz(q).then((rs) => rs.slice(0, 5).map(mapGz)).catch(() => []),
       searchMisya(q).then((rs) => rs.slice(0, 5).map(mapMisya)).catch(() => []),
       searchCookist(q).then((rs) => rs.slice(0, 5).map(mapCookist)).catch(() => []),
-      searchRicettenonna(q).then((rs) => rs.slice(0, 4).map(mapRicettenonna)).catch(() => []),
+      searchRicettenonna(q).then((rs) => rs.slice(0, 5).map(mapRicettenonna)).catch(() => []),
+      searchMoulinex(q).then((rs) => rs.slice(0, 5).map(mapMoulinex)).catch(() => []),
+      searchBimby(q).then((rs) => rs.slice(0, 5).map(mapBimby)).catch(() => []),
       mealdb.searchMeals(en).then((rs) => rs.slice(0, 5).map(mapMealdb)).catch(() => [])
     ];
     if (SPOONACULAR_ENABLED) tasks.push(searchSpoon(en).then((rs) => rs.slice(0, 5).map(mapSpoon)).catch(() => []));
@@ -2474,7 +2476,9 @@ function renderOnlineTab() {
     const totalItems = serverPaged ? (mealTotal != null ? mealTotal : mealResults.length) : mealResults.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / MEAL_PAGE_SIZE));
     const pageItems = serverPaged ? mealResults : mealResults.slice(mealPage * MEAL_PAGE_SIZE, mealPage * MEAL_PAGE_SIZE + MEAL_PAGE_SIZE);
-    const countLine = `<div class="result-count">${iconHtml("magnifying-glass")} Trovate <b>${totalItems}</b> ${totalItems === 1 ? "ricetta" : "ricette"}${totalPages > 1 ? ` · pagina ${mealPage + 1} di ${totalPages}` : ""}</div>`;
+    const countLine = mealSource === "all"
+      ? `<div class="result-count">${iconHtml("magnifying-glass")} Un assaggio da più fonti · <b>${totalItems}</b> ricette${totalPages > 1 ? ` · pag. ${mealPage + 1}/${totalPages}` : ""}<span class="shop-cost__note"> · scegli una fonte per vederne di più</span></div>`
+      : `<div class="result-count">${iconHtml("magnifying-glass")} Trovate <b>${totalItems}</b> ${totalItems === 1 ? "ricetta" : "ricette"}${totalPages > 1 ? ` · pagina ${mealPage + 1} di ${totalPages}` : ""}</div>`;
     const pager = totalPages > 1 ? `<div class="pager">
         <button class="btn btn--ghost" id="pagePrev" ${mealPage === 0 ? "disabled" : ""}>${iconHtml("caret-left")} Prec.</button>
         <span class="pager__info">${mealPage + 1} / ${totalPages}</span>
