@@ -527,6 +527,9 @@ a { color: var(--primary-2); }
 .meal-src--moulinex { background: #d2ecff; color: #0a4a6e; }
 .meal-src--bimby { background: #e6dcff; color: #3a1f7a; }
 .meal-controls { position: sticky; top: calc(var(--header-h, 56px) + var(--safe-top, 0px)); z-index: 6; background: var(--bg, #15161b); padding: 8px 0 6px; margin: -4px 0 4px; }
+.welcome-empty { text-align: center; padding: 24px 16px; display: flex; flex-direction: column; align-items: center; }
+.welcome-empty__t { margin: 6px 0 4px; font-size: 1.4rem; font-weight: 800; }
+.welcome-empty__p { color: var(--text-soft); margin: 0 0 18px; max-width: 340px; line-height: 1.5; }
 .tool-card--reorder { cursor: default; }
 .tool-reorder { display: flex; gap: 6px; margin-top: 6px; }
 .tool-reorder .stepper__btn { width: 34px; height: 30px; }

@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.5",
+    d: "2026-06-14",
+    minor: true,
+    items: [
+      "Schermata di benvenuto al primo avvio: quando non hai ancora strumenti, l'app ti guida a crearne uno (o a usare quelli predefiniti) e non sembra più vuota."
+    ]
+  },
+  {
     v: "7.4",
     d: "2026-06-13",
     items: [

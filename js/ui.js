@@ -1018,6 +1018,18 @@ function renderHomeBody() {
   }
 
   const tools = store.getTools();
+  // Primo avvio (nessuno strumento): schermata di benvenuto che riempie e invita.
+  if (!tools.length) {
+    body.innerHTML = `<div class="welcome-empty">${emptyArt("pot")}
+      <h2 class="welcome-empty__t">Inizia da qui!</h2>
+      <p class="welcome-empty__p">Crea uno <b>strumento</b> di cottura (forno, friggitrice, Bimby, Companion…), poi salva le tue ricette al suo interno.</p>
+      <button class="btn btn--primary btn--block" id="addTool" style="max-width:300px">${iconHtml("plus")} Crea il primo strumento</button>
+      <button class="btn btn--ghost btn--block" id="seedTools" style="max-width:300px;margin-top:8px">${iconHtml("sparkle")} Usa gli strumenti predefiniti</button>
+    </div>`;
+    body.querySelector("#addTool").addEventListener("click", () => openToolForm());
+    body.querySelector("#seedTools").addEventListener("click", async () => { const n = await store.seedDefaults(); toast(n ? `${n} strumenti aggiunti` : "Fatto", "success"); });
+    return;
+  }
   const cards = tools
     .map((t, i) => {
       const n = store.countRecipes(t.id);
