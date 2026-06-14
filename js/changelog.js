@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    v: "6.8",
+    d: "2026-06-13",
+    items: [
+      "Valori nutrizionali con anelli colorati (calorie e macro a colpo d'occhio).",
+      "Le ricette con foto appaiono come card grandi con il titolo in sovrimpressione.",
+      "Illustrazioni anche nelle altre schermate vuote (spesa, dispensa, preferiti)."
+    ]
+  },
+  {
     v: "6.7",
     d: "2026-06-13",
     items: [

@@ -918,13 +918,29 @@ export function render() {
 // ---------------- Schermata: Strumenti ----------------
 function recipeResultRow(r, i = 0) {
   const tool = store.getTool(r.toolId);
+  // Con foto: card grande con titolo in sovrimpressione (stile ricetta del giorno).
+  if (r.photo) {
+    const meta = [];
+    if (r.time) meta.push(`${iconHtml("timer")} ${r.time}′`);
+    if (r.difficulty) meta.push(diffDots(r.difficulty));
+    if (r.cookCount) meta.push(`${iconHtml("fire")} ${r.cookCount}`);
+    return `<button class="pick-row pick-row--photo stagger" data-id="${r.id}" style="--i:${i}">
+      <img src="${escapeHtml(proxiedImg(r.photo))}" alt="" loading="lazy" referrerpolicy="no-referrer" />
+      <span class="pcard__grad"></span>
+      ${r.favorite ? `<span class="pcard__fav">${iconHtml("heart")}</span>` : ""}
+      <span class="pcard__body">
+        <span class="pcard__title">${escapeHtml(r.title)}</span>
+        ${meta.length ? `<span class="pcard__meta">${meta.join(" · ")}</span>` : ""}
+      </span>
+    </button>`;
+  }
+  // Senza foto: riga compatta con icona strumento.
   const fav = r.favorite ? ` <span class="meta-fav">${iconHtml("heart")}</span>` : "";
   const rate = r.rating ? ` <span class="meta-star">${iconHtml("star")} ${r.rating}</span>` : "";
   const cooked = r.cookCount ? ` <span class="meta-cooked">${iconHtml("fire")} ${r.cookCount}</span>` : "";
   const tm = r.time ? ` <span class="meta-time">${iconHtml("timer")} ${r.time}′</span>` : "";
   const diff = r.difficulty ? ` <span class="meta-diff">${diffDots(r.difficulty)}</span>` : "";
-  const thumb = r.photo ? `<img class="pick-thumb" src="${escapeHtml(proxiedImg(r.photo))}" alt="" referrerpolicy="no-referrer" />` : `<span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span>`;
-  return `<button class="pick-row stagger" data-id="${r.id}" style="--i:${i}">${thumb}<span class="day-row__name">${escapeHtml(r.title)}${fav}${rate}${cooked}${tm}${diff}</span></button>`;
+  return `<button class="pick-row stagger" data-id="${r.id}" style="--i:${i}"><span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span><span class="day-row__name">${escapeHtml(r.title)}${fav}${rate}${cooked}${tm}${diff}</span></button>`;
 }
 
 function renderHomeBody() {
@@ -958,7 +974,7 @@ function renderHomeBody() {
     }
     body.innerHTML = results.length
       ? results.map((r, i) => recipeResultRow(r, i)).join("")
-      : `<div class="empty"><span class="empty__emoji">${iconHtml(emptyIcon)}</span>${emptyMsg}</div>`;
+      : `<div class="empty">${emptyArt(emptyIcon === "heart" ? "heart" : "pot")}<div style="margin-top:6px">${emptyMsg}</div></div>`;
     body.querySelectorAll(".pick-row").forEach((b) => b.addEventListener("click", () => openRecipe(b.dataset.id)));
     return;
   }
@@ -1723,6 +1739,13 @@ function nutritionCardHtml(r, base, detailServings) {
   const factor = base && detailServings ? detailServings / base : 1;
   const totalScaled = { kcal: Math.round(nut.kcal * factor), p: Math.round(nut.p * factor), c: Math.round(nut.c * factor), f: Math.round(nut.f * factor) };
   const perPortion = base ? { kcal: Math.round(nut.kcal / base), p: Math.round(nut.p / base), c: Math.round(nut.c / base), f: Math.round(nut.f / base) } : null;
+  const ringVals = perPortion || totalScaled;
+  const ringsHtml = `<div class="nrings">
+    ${nutriRing("kcal", ringVals.kcal, "", 2000, "var(--primary-2)")}
+    ${nutriRing("Prot.", ringVals.p, "g", 75, "#5aa9ff")}
+    ${nutriRing("Carb.", ringVals.c, "g", 260, "#ffd166")}
+    ${nutriRing("Grassi", ringVals.f, "g", 70, "#ef6f9c")}
+  </div><div class="hint" style="margin:-2px 0 8px;text-align:center">${perPortion ? "per porzione" : "totale"}</div>`;
   const rows = [];
   if (perPortion) rows.push(`<div class="nutri-row"><span class="nutri-lbl">Per porzione</span><span class="nutri-val">${macroLine(perPortion)}</span></div>`);
   rows.push(`<div class="nutri-row"><span class="nutri-lbl">Totale${detailServings ? ` (${detailServings} porz.)` : ""}</span><span class="nutri-val">${macroLine(totalScaled)}</span></div>`);
@@ -1732,10 +1755,26 @@ function nutritionCardHtml(r, base, detailServings) {
     ? `<div class="nutri-missing">Non conteggiati: ${missing.map((m) => escapeHtml(m)).join(", ")}.<br>Aggiungili nelle note o correggi la riga per migliorare la stima.</div>`
     : "";
   return `${title}
+    ${ringsHtml}
     <div class="nutri-box">${rows.join("")}</div>
     ${note}
     ${missList}
     <button class="btn btn--ghost btn--block" id="nutriCalc" style="margin-top:10px">${iconHtml("sparkle")} Ricalcola</button>`;
+}
+
+// Anello di progresso per un macronutriente (valore / riferimento giornaliero).
+function nutriRing(label, value, unit, ref, color) {
+  const pct = Math.max(0, Math.min(1, (value || 0) / ref));
+  const R = 20, CIRC = 2 * Math.PI * R;
+  const off = CIRC * (1 - pct);
+  return `<div class="nring">
+    <svg viewBox="0 0 50 50" width="58" height="58" aria-hidden="true">
+      <circle cx="25" cy="25" r="${R}" fill="none" stroke="var(--surface-3)" stroke-width="5"/>
+      <circle cx="25" cy="25" r="${R}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${CIRC.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 25 25)"/>
+    </svg>
+    <div class="nring__v">${value || 0}${unit}</div>
+    <div class="nring__l">${label}</div>
+  </div>`;
 }
 
 async function wireNutrition(r, base, detailServings) {
@@ -2617,15 +2656,36 @@ async function runMealSearch(q) {
 }
 
 // Illustrazione SVG (pentola con vapore) per le schermate vuote del Ricettario.
-function emptyArt() {
-  return `<svg class="empty__art" viewBox="0 0 120 120" width="124" height="124" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <circle cx="60" cy="62" r="52" fill="rgba(var(--primary-rgb,255,184,107),0.10)"/>
-    <path d="M36 66h48v14a9 9 0 0 1-9 9H45a9 9 0 0 1-9-9V66Z" fill="rgba(var(--primary-rgb,255,184,107),0.22)" stroke="currentColor" stroke-width="3.2" stroke-linejoin="round"/>
-    <path d="M30 66h60" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>
-    <path d="M28 74h-5M92 74h5" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>
-    <path d="M48 48c0-7 4-11 12-11s12 4 12 11" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>
-    <path class="empty__steam" d="M50 40v-7M60 38v-9M70 40v-7" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" opacity="0.85"/>
-  </svg>`;
+function emptyArt(kind = "pot") {
+  const tint = "rgba(var(--primary-rgb,255,184,107),0.22)";
+  const bg = `<circle cx="60" cy="62" r="52" fill="rgba(var(--primary-rgb,255,184,107),0.10)"/>`;
+  const sw = `stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"`;
+  let inner;
+  if (kind === "cart") {
+    inner = `<path d="M34 42h8l6 30h30l6-20H46" fill="none" ${sw}/>
+      <path d="M52 72h26" ${sw}/>
+      <circle cx="52" cy="84" r="4.5" fill="${tint}" ${sw}/>
+      <circle cx="76" cy="84" r="4.5" fill="${tint}" ${sw}/>
+      <path d="M58 56h12M58 64h12" ${sw} opacity="0.7"/>`;
+  } else if (kind === "calendar") {
+    inner = `<rect x="34" y="40" width="52" height="44" rx="6" fill="${tint}" ${sw}/>
+      <path d="M34 52h52" ${sw}/>
+      <path d="M46 36v8M74 36v8" ${sw}/>
+      <path d="M44 64h8M58 64h8M44 74h8" ${sw} opacity="0.8"/>`;
+  } else if (kind === "heart") {
+    inner = `<path d="M60 84S38 70 38 55a12 12 0 0 1 22-7 12 12 0 0 1 22 7c0 15-22 29-22 29Z" fill="${tint}" ${sw}/>`;
+  } else if (kind === "jar") {
+    inner = `<rect x="42" y="44" width="36" height="42" rx="7" fill="${tint}" ${sw}/>
+      <path d="M46 40h28a4 4 0 0 1 4 4H42a4 4 0 0 1 4-4Z" ${sw}/>
+      <path d="M42 60h36" ${sw} opacity="0.7"/>`;
+  } else { // pot (default)
+    inner = `<path d="M36 66h48v14a9 9 0 0 1-9 9H45a9 9 0 0 1-9-9V66Z" fill="${tint}" ${sw}/>
+      <path d="M30 66h60" ${sw}/>
+      <path d="M28 74h-5M92 74h5" ${sw}/>
+      <path d="M48 48c0-7 4-11 12-11s12 4 12 11" ${sw}/>
+      <path class="empty__steam" d="M50 40v-7M60 38v-9M70 40v-7" ${sw} opacity="0.85"/>`;
+  }
+  return `<svg class="empty__art" viewBox="0 0 120 120" width="124" height="124" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${bg}${inner}</svg>`;
 }
 
 // Esegue una ricerca online e aggiorna lo stato (usata da pulsante, invio e
@@ -3085,7 +3145,7 @@ function renderShoppingList() {
 
   let body;
   if (!items.length) {
-    body = `<div class="empty"><span class="empty__emoji">${iconHtml("shopping-cart-simple")}</span>La lista è vuota.<br>Aggiungi gli ingredienti da una ricetta o scrivili qui sotto.</div>`;
+    body = `<div class="empty">${emptyArt("cart")}<div style="margin-top:6px">La lista è vuota.<br>Aggiungi gli ingredienti da una ricetta o scrivili qui sotto.</div></div>`;
   } else {
     let groupsHtml;
     if (shopGroupBy === "recipe") {
@@ -3315,7 +3375,7 @@ function renderPantry() {
   });
   const list = pantry.length
     ? pantry.map(pantryRow).join("")
-    : `<div class="empty"><span class="empty__emoji">${iconHtml("basket")}</span>Dispensa vuota.<br>Aggiungi ciò che hai già in casa: non verrà inserito nella spesa.</div>`;
+    : `<div class="empty">${emptyArt("jar")}<div style="margin-top:6px">Dispensa vuota.<br>Aggiungi ciò che hai già in casa: non verrà inserito nella spesa.</div></div>`;
 
   wrap.innerHTML = `
     <div class="hint" style="margin-bottom:10px">Quello che metti qui non verrà aggiunto alla lista della spesa. La data di scadenza è facoltativa.</div>
