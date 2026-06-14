@@ -240,6 +240,8 @@ export function confirmDialog({ title, message, confirmText = "Conferma", danger
 // ---------------- Navigazione ----------------
 export function mount(rootEl) {
   root = rootEl;
+  // Ricetta condivisa via link (#r=…): la teniamo da parte e la proponiamo dopo l'accesso.
+  try { if (location.hash.indexOf("#r=") === 0) { pendingSharedRecipe = location.hash.slice(3); history.replaceState(null, "", location.pathname + location.search); } } catch (e) {}
   // Inietta le icone Phosphor dove indicato nell'HTML (es. barra di navigazione).
   document.querySelectorAll("[data-ph]").forEach((el) => { el.innerHTML = rawIcon(el.dataset.ph); });
   store.subscribe(() => render());
@@ -526,6 +528,16 @@ function exportRecipesPdf() {
 // Esporta/stampa una singola ricetta come scheda PDF.
 function exportRecipePdf(r) {
   const html = `<!doctype html><html lang="it"><head><meta charset="utf-8"><title>${escapeHtml(r.title)}</title><style>${PRINT_CSS}</style></head><body><h1>${escapeHtml(r.title)}</h1>${recipePrintHtml(r)}<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>`;
+  const w = window.open("", "_blank");
+  if (!w) { toast("Consenti i popup del browser per esportare", "error"); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
+// Esporta in PDF tutte le ricette di una raccolta/collezione.
+function exportCollectionPdf(title, recipes) {
+  if (!recipes || !recipes.length) { toast("Raccolta vuota", "error"); return; }
+  const body = recipes.map(recipePrintHtml).join("");
+  const html = `<!doctype html><html lang="it"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${PRINT_CSS}</style></head><body><h1>${escapeHtml(title)}</h1>${body}<script>window.onload=function(){setTimeout(function(){window.print();},500);};<\/script></body></html>`;
   const w = window.open("", "_blank");
   if (!w) { toast("Consenti i popup del browser per esportare", "error"); return; }
   w.document.open(); w.document.write(html); w.document.close();
@@ -938,6 +950,7 @@ export function render() {
   } else if (currentRoute === "impostazioni") {
     renderImpostazioni();
   }
+  if (pendingSharedRecipe) consumeSharedRecipe();
 }
 
 // ---------------- Schermata: Strumenti ----------------
@@ -1541,6 +1554,7 @@ function renderRecipeDetail() {
     <button class="btn btn--block" id="qrBtn" style="margin-bottom:10px">${iconHtml("qr-code")} Mostra codice QR</button>
     ${steps.length ? `<button class="btn btn--block" id="chefBtn" style="margin-bottom:10px">🍳 Leggi la ricetta</button>` : ""}
     <button class="btn btn--block" id="pdfRecipeBtn" style="margin-bottom:10px">${iconHtml("download-simple")} Esporta in PDF</button>
+    <button class="btn btn--block" id="shareLinkBtn" style="margin-bottom:10px">${iconHtml("link-simple")} Condividi come link (Fornelli)</button>
     <div style="display:flex;gap:8px;margin-top:4px">
       <button class="btn btn--ghost" id="editRecipe">${iconHtml("pencil-simple")} Modifica</button>
       <button class="btn btn--ghost" id="shareRecipe">${iconHtml("arrow-square-out")} Condividi</button>
@@ -1675,6 +1689,8 @@ function renderRecipeDetail() {
 
   const pdfRecipeBtn = root.querySelector("#pdfRecipeBtn");
   if (pdfRecipeBtn) pdfRecipeBtn.addEventListener("click", () => exportRecipePdf(r));
+  const shareLinkBtn = root.querySelector("#shareLinkBtn");
+  if (shareLinkBtn) shareLinkBtn.addEventListener("click", () => shareRecipeLink(r));
 
   const wineBtn = root.querySelector("#wineBtn");
   if (wineBtn) wineBtn.addEventListener("click", async () => {
@@ -1888,6 +1904,36 @@ function recipeShareText(r) {
   if (r.url) lines.push("", r.url);
   lines.push("", "— da Fornelli");
   return lines.join("\n");
+}
+
+// Link "Fornelli" che incorpora la ricetta nell'hash: aprendolo nell'app, propone
+// di salvarla. Da inviare a chi ha Fornelli. (Niente foto nel link: troppo pesante.)
+function buildRecipeLink(r) {
+  const data = {
+    t: r.title || "", s: r.servings || null, m: r.time || null, u: r.url || "",
+    g: Array.isArray(r.tags) ? r.tags : [],
+    i: (r.ingredients || []).map((it) => it.raw || ingredientText(it)),
+    p: Array.isArray(r.steps) ? r.steps : []
+  };
+  const enc = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  return location.origin + location.pathname + "#r=" + enc;
+}
+async function shareRecipeLink(r) {
+  const link = buildRecipeLink(r);
+  try {
+    if (navigator.share) await navigator.share({ title: r.title, text: `${r.title} — ricetta da Fornelli`, url: link });
+    else { await navigator.clipboard.writeText(link); toast("Link copiato negli appunti", "success"); }
+  } catch (e) { /* annullato */ }
+}
+let pendingSharedRecipe = null;
+function consumeSharedRecipe() {
+  if (!pendingSharedRecipe || loginMode) return;
+  const enc = pendingSharedRecipe; pendingSharedRecipe = null;
+  try {
+    const data = JSON.parse(decodeURIComponent(escape(atob(enc))));
+    openRecipeForm({ prefill: { title: data.t, servings: data.s, time: data.m, url: data.u, tags: data.g, ingredients: data.i, steps: data.p } });
+    toast("Ricetta ricevuta: controlla e salva", "success");
+  } catch (e) { /* link non valido */ }
 }
 
 // Codice QR di una ricetta: se ha un link, punta alla fonte; altrimenti
@@ -3413,6 +3459,7 @@ function pantryRow(p) {
   return `<div class="shop-row" data-id="${p.id}">
     <span class="day-row__icon">${iconHtml("basket")}</span>
     <span class="shop-row__name">${escapeHtml(p.name)}</span>
+    <button class="shop-row__amt" data-act="qty" title="Quantità">${p.qty ? escapeHtml(p.qty) : iconHtml("pencil-simple")}</button>
     ${expiryBadge(p.expiry)}
     <button class="icon-btn icon-btn--danger shop-row__del" data-act="del">${iconHtml("trash")}</button>
   </div>`;
@@ -3487,6 +3534,11 @@ function renderPantry() {
   if (scanBtn) scanBtn.addEventListener("click", openBarcodeScanner);
   wrap.querySelectorAll(".shop-row").forEach((rowEl) => {
     rowEl.querySelector('[data-act="del"]').addEventListener("click", () => store.deletePantryItem(rowEl.dataset.id));
+    const qb = rowEl.querySelector('[data-act="qty"]');
+    if (qb) qb.addEventListener("click", () => {
+      const p = store.getPantry().find((x) => x.id === rowEl.dataset.id);
+      openPrompt("Quantità", "Es. 2 kg, 1 confezione…", (val) => store.setPantryQty(rowEl.dataset.id, val), p && p.qty ? p.qty : "");
+    });
   });
 }
 
@@ -3920,6 +3972,7 @@ function openMenuSheet(menuId) {
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
       <button class="btn btn--primary btn--block" data-act="add">${iconHtml("plus")} Aggiungi ricetta</button>
       ${recipes.length ? `<button class="btn btn--block" data-act="shop">${iconHtml("shopping-cart-simple")} Genera lista della spesa</button>` : ""}
+      ${recipes.length ? `<button class="btn btn--block" data-act="pdf">${iconHtml("download-simple")} Esporta in PDF</button>` : ""}
     </div>
     <div style="display:flex;gap:8px;margin-top:8px">
       <button class="btn btn--ghost" data-act="rename">${iconHtml("pencil-simple")} Rinomina</button>
@@ -3940,6 +3993,8 @@ function openMenuSheet(menuId) {
     m.close();
     toast(shoppingToast(res), "success");
   });
+  const pdfBtn = m.el.querySelector('[data-act="pdf"]');
+  if (pdfBtn) pdfBtn.addEventListener("click", () => exportCollectionPdf(mn.name, store.getMenuRecipes(menuId)));
   m.el.querySelector('[data-act="rename"]').addEventListener("click", () => { m.close(); openPrompt("Rinomina menu", "Nome", async (name) => { await store.renameMenu(menuId, name); openMenuSheet(menuId); }, mn.name); });
   m.el.querySelector('[data-act="del"]').addEventListener("click", async () => {
     const ok = await confirmDialog({ title: "Eliminare il menu?", message: `"${mn.name}" verrà eliminato (le ricette restano).`, confirmText: "Elimina", danger: true });

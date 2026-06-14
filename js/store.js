@@ -375,6 +375,9 @@ export async function addPantryItem(name, expiry = null) {
 export async function setPantryExpiry(id, expiry) {
   await adapter.updatePantry(id, { expiry: expiry || null });
 }
+export async function setPantryQty(id, qty) {
+  await adapter.updatePantry(id, { qty: (qty || "").trim() || null });
+}
 export async function deletePantryItem(id) {
   await adapter.deletePantry(id);
 }

@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    v: "7.4",
+    d: "2026-06-13",
+    items: [
+      "Esporta in PDF un'intera raccolta di ricette in un colpo solo.",
+      "Condividi una ricetta come link: chi ha Fornelli lo apre e se la ritrova pronta da salvare.",
+      "In Dispensa puoi indicare le quantità che hai (es. 2 kg di farina)."
+    ]
+  },
+  {
     v: "7.3",
     d: "2026-06-13",
     items: [
