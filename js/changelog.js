@@ -6,6 +6,16 @@
 
 export const CHANGELOG = [
   {
+    v: "7.2",
+    d: "2026-06-13",
+    items: [
+      "Categoria automatica: importando una ricetta l'app le assegna da sola un tag (Primi/Secondi/Dolci…) dal titolo.",
+      "Ricerca vocale anche nel Ricettario online (tocca il microfono).",
+      "Dimensione del testo regolabile in Opzioni (piccolo/normale/grande).",
+      "Promemoria per fare un backup delle ricette (in modalità solo-telefono)."
+    ]
+  },
+  {
     v: "7.1",
     d: "2026-06-13",
     items: [

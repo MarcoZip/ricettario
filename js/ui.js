@@ -18,7 +18,7 @@ import { getNickname, setNickname } from "./profile.js";
 import { isImportConfigured, APP_VERSION, PUSH_WORKER_URL, SPOONACULAR_ENABLED, EDAMAM_ENABLED, WORKER_URL } from "./config.js";
 import { CHANGELOG } from "./changelog.js";
 import { fileToDataUrl } from "./image.js";
-import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS } from "./theme.js";
+import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS, getTextScale, setTextScale } from "./theme.js";
 
 // Tag suggeriti nel form ricetta.
 const TAG_SUGGESTIONS = ["Primi", "Secondi", "Contorni", "Antipasti", "Dolci", "Colazione", "Merenda", "Zuppe", "Insalate", "Lievitati", "Veloce", "Vegetariano", "Vegano", "Pesce", "Carne", "Senza glutine", "Per ospiti", "Bambini"];
@@ -154,6 +154,21 @@ function festiveInfo() {
 // Etichetta difficoltà (1 facile · 2 media · 3 difficile).
 const DIFF_LABELS = { 1: "Facile", 2: "Media", 3: "Difficile" };
 function diffLabel(d) { return DIFF_LABELS[d] || ""; }
+
+// Indovina la categoria di una ricetta dal titolo (per il tag automatico all'import).
+const CATEGORY_GUESS = [
+  ["Dolci", /torta|crostat|biscott|tiramis|budino|gelat|muffin|plumcake|cioccolat|\bdolc|ciambell|cheesecake|brownie|panna cotta|profiterol|bign|cantucc|frittell|zeppol|crema pastic|semifreddo|sorbetto|meringa|strudel/i],
+  ["Primi", /\bpast(a|e)\b|spaghett|risott|lasagn|gnocch|zupp|minestr|vellutat|tortell|ravioli|\bpenne\b|fusill|carbonara|amatricia|tagliatell|orecchiett|cannellon|maccheron|paella|cous ?cous|tagliolin|pappardell|trofie|pici/i],
+  ["Secondi", /pollo|manzo|maiale|vitell|tacchin|polpett|arrosto|scaloppin|cotolett|spezzatin|hamburger|salsicc|pesce|salmon|tonno|merluzz|frittata|\buova\b|stufat|brasato|bistecc|filetto|spiedin|involtin|baccal|seppi|calamar|gamber|polpo|orata|branzino/i],
+  ["Antipasti", /antipast|bruschett|tartin|crostin|tartare|carpaccio|sfizi|stuzzichin/i],
+  ["Contorni", /contorn|insalat|verdur|patate al|pur[èe]\b|gratin|caponata|peperonata|spinaci/i],
+  ["Pane e pizza", /\bpane\b|pizza|focacc|panin|piadin|grissin|baguette|brioche|pan ?brioche|pizzett/i]
+];
+function guessCategory(title) {
+  const t = (title || "").toLowerCase();
+  for (const [cat, re] of CATEGORY_GUESS) if (re.test(t)) return cat;
+  return null;
+}
 function diffDots(d) { if (!d) return ""; return `<span class="diffdots">${[1, 2, 3].map((i) => `<span class="diffdot${i <= d ? " on" : ""}"></span>`).join("")}</span>`; }
 
 // ---------------- Utility ----------------
@@ -1029,6 +1044,17 @@ function renderStrumenti() {
   const allTags = store.getAllTags();
   const voiceOK = ("webkitSpeechRecognition" in window) || ("SpeechRecognition" in window);
 
+  // Promemoria backup: solo in modalità locale (dati solo sul telefono), se non
+  // esporti da oltre 30 giorni e hai qualche ricetta. Posticipabile di 7 giorni.
+  let backupBanner = "";
+  if (!info.configured && allR.length >= 3) {
+    let lastBk = 0, snooze = 0;
+    try { lastBk = Date.parse(localStorage.getItem("ricettario.lastBackup") || "") || 0; snooze = parseInt(localStorage.getItem("ricettario.bkSnooze"), 10) || 0; } catch (e) {}
+    if (Date.now() > snooze && (Date.now() - lastBk) > 30 * 86400000) {
+      backupBanner = `<button class="alert-banner" id="bkAlert">${iconHtml("download-simple")} <span>Fai un backup delle tue ricette (Opzioni → Esporta)</span></button>`;
+    }
+  }
+
   // Ricetta del giorno: stabile nell'arco della giornata (cambia ogni giorno).
   const allR = store.getAllRecipes();
   let rotdCard = "";
@@ -1122,6 +1148,7 @@ function renderStrumenti() {
       <button class="home-hero__btn" id="heroAdd">${iconHtml("plus")} Nuova ricetta</button>
     </div>
     ${expBanner}
+    ${backupBanner}
     ${useFirstCard}
     ${todayCard}
     ${neglectedCard}
@@ -1139,6 +1166,8 @@ function renderStrumenti() {
   root.querySelector("#heroAdd").addEventListener("click", () => openRecipeForm({}));
   const ea = root.querySelector("#expAlert");
   if (ea) ea.addEventListener("click", () => { shopTab = "dispensa"; navigate("spesa"); });
+  const bk = root.querySelector("#bkAlert");
+  if (bk) bk.addEventListener("click", () => { try { localStorage.setItem("ricettario.bkSnooze", String(Date.now() + 7 * 86400000)); } catch (e) {} navigate("impostazioni"); });
   root.querySelectorAll(".today__item").forEach((b) => b.addEventListener("click", () => openRecipe(b.dataset.recipe)));
   const rotdEl = root.querySelector(".rotd");
   if (rotdEl) rotdEl.addEventListener("click", () => openRecipe(rotdEl.dataset.recipe));
@@ -1188,6 +1217,23 @@ function startVoiceSearch() {
   };
   rec.onerror = (e) => { if (e && e.error !== "aborted" && e.error !== "no-speech") toast("Non ho capito, riprova", "error"); };
   rec.onend = () => { const m = root.querySelector("#homeMic"); if (m) m.classList.remove("is-listening"); };
+  try { rec.start(); } catch (e) { /* già in ascolto */ }
+}
+
+// Ricerca vocale nel Ricettario online: detta il termine e cerca sulla fonte scelta.
+function startMealVoiceSearch() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  const mic = root.querySelector("#mealMic");
+  const rec = new SR();
+  rec.lang = "it-IT"; rec.interimResults = false; rec.maxAlternatives = 1;
+  if (mic) mic.classList.add("is-listening");
+  rec.onresult = (e) => {
+    const text = ((e.results[0] && e.results[0][0] && e.results[0][0].transcript) || "").trim();
+    if (text) performMealSearch(text);
+  };
+  rec.onerror = (e) => { if (e && e.error !== "aborted" && e.error !== "no-speech") toast("Non ho capito, riprova", "error"); };
+  rec.onend = () => { const m = root.querySelector("#mealMic"); if (m) m.classList.remove("is-listening"); };
   try { rec.start(); } catch (e) { /* già in ascolto */ }
 }
 
@@ -2356,6 +2402,11 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
     : (prefill && prefill.steps ? prefill.steps.join("\n") : "");
   let photo = recipe ? (recipe.photo || "") : (prefill && prefill.image ? prefill.image : "");
   let tags = recipe ? [...(recipe.tags || [])] : (prefill && Array.isArray(prefill.tags) ? [...prefill.tags] : []);
+  // Categoria automatica all'import: aggiungi un tag (Primi/Secondi/Dolci…) dal titolo.
+  if (!recipe && prefill && prefill.title) {
+    const cat = guessCategory(prefill.title);
+    if (cat && !tags.some((t) => (t || "").toLowerCase() === cat.toLowerCase())) tags.push(cat);
+  }
   let allergens = recipe ? [...(recipe.allergens || [])] : [];
 
   const importBtn = isImportConfigured()
@@ -2926,6 +2977,7 @@ function renderOnlineTab() {
       ${bannerHtml}
       ${searchable ? `<div class="search-bar">
         <input type="search" id="mealSearch" placeholder="Cerca in italiano (es. pollo, torta...)" value="${escapeHtml(mealQuery)}" />
+        ${(("webkitSpeechRecognition" in window) || ("SpeechRecognition" in window)) ? `<button class="btn mic-btn" id="mealMic" title="Cerca a voce" aria-label="Cerca a voce">🎤</button>` : ""}
         <button class="btn btn--primary" id="mealSearchBtn">Cerca</button>
       </div>` : ""}
       ${mealSource === "mealdb" ? `<div style="margin-top:10px"><button class="btn btn--ghost" id="mealRandom">${iconHtml("shuffle")} Ispirami</button></div>` : ""}
@@ -2944,6 +2996,8 @@ function renderOnlineTab() {
     const doSearch = () => performMealSearch(input.value);
     body.querySelector("#mealSearchBtn").addEventListener("click", doSearch);
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(); });
+    const mmic = body.querySelector("#mealMic");
+    if (mmic) mmic.addEventListener("click", () => startMealVoiceSearch());
   }
   const randomBtn = body.querySelector("#mealRandom");
   if (randomBtn) randomBtn.addEventListener("click", () => performMealRandom());
@@ -4141,6 +4195,18 @@ function renderImpostazioni() {
         </div>
         <div class="accent-row">${Object.entries(ACCENT_PRESETS).map(([k, a]) => `<button class="accent-sw ${getAccent() === k ? "is-on" : ""}" data-accent="${k}" style="background:${a.p}" title="${a.label}" aria-label="${a.label}"></button>`).join("")}</div>
       </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-row__label">Dimensione testo</div>
+          <div class="setting-row__desc">Ingrandisci o rimpicciolisci il testo dell'app.</div>
+        </div>
+        <select id="textSizeSel" class="mini-select">
+          <option value="14">Piccolo</option>
+          <option value="16">Normale</option>
+          <option value="18">Grande</option>
+          <option value="20">Molto grande</option>
+        </select>
+      </div>
     </div>
     ${notifyGroupHtml()}
     <div class="setting-group">
@@ -4204,6 +4270,8 @@ function renderImpostazioni() {
   const themeSel = root.querySelector("#themeSel");
   themeSel.value = getTheme();
   themeSel.addEventListener("change", () => setTheme(themeSel.value));
+  const textSizeSel = root.querySelector("#textSizeSel");
+  if (textSizeSel) { textSizeSel.value = String(getTextScale()); textSizeSel.addEventListener("change", () => setTextScale(parseInt(textSizeSel.value, 10))); }
   root.querySelectorAll(".accent-sw").forEach((b) => b.addEventListener("click", () => {
     setAccent(b.dataset.accent);
     renderImpostazioni();
@@ -4219,6 +4287,7 @@ function renderImpostazioni() {
     a.download = `ricettario-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(a.href);
+    try { localStorage.setItem("ricettario.lastBackup", new Date().toISOString()); } catch (e) {}
     toast("Backup esportato", "success");
   });
 

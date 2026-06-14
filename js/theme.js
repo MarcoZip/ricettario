@@ -52,3 +52,19 @@ export function setAccent(name) {
   try { localStorage.setItem(ACCENT_KEY, name); } catch {}
   applyAccent(name);
 }
+
+// ---- Dimensione del testo (accessibilità) ----
+const TEXT_SCALE_KEY = "ricettario.textScale";
+export function getTextScale() {
+  const v = parseInt(localStorage.getItem(TEXT_SCALE_KEY), 10);
+  return [14, 16, 18, 20].includes(v) ? v : 16;
+}
+export function applyTextScale(px) {
+  const v = px || getTextScale();
+  document.documentElement.style.fontSize = v + "px";
+  if (document.body) document.body.style.fontSize = v + "px";
+}
+export function setTextScale(px) {
+  try { localStorage.setItem(TEXT_SCALE_KEY, String(px)); } catch {}
+  applyTextScale(px);
+}
