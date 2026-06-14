@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    v: "6.3",
+    d: "2026-06-13",
+    items: [
+      "Invia la lista della spesa su WhatsApp o messaggi (tasto \"Invia lista\").",
+      "Scala su una quantità precisa: in una ricetta tocca \"Ho una quantità precisa…\" e ricalcola le dosi su quanto hai (es. 600 g di pollo).",
+      "In home \"Non lo cucini da un po'\": ti ripropone i preferiti che non cucini da oltre un mese."
+    ]
+  },
+  {
     v: "6.2",
     d: "2026-06-13",
     items: [

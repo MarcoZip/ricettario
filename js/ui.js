@@ -993,6 +993,19 @@ function renderStrumenti() {
       </div>`
     : "";
 
+  // "Non lo cucini da un po'": preferiti cucinati ma non di recente (oltre 30 giorni).
+  const neglCutoff = Date.now() - 30 * 86400000;
+  const neglected = allR
+    .filter((r) => r.favorite && r.lastCooked && new Date(r.lastCooked).getTime() < neglCutoff)
+    .sort((a, b) => (a.lastCooked || "").localeCompare(b.lastCooked || ""))
+    .slice(0, 4);
+  const neglectedCard = neglected.length
+    ? `<div class="today-card">
+        <div class="today__h">${iconHtml("timer")} Non lo cucini da un po'</div>
+        ${neglected.map((r) => `<button class="today__item" data-recipe="${r.id}"><span class="today__name">${escapeHtml(r.title)}</span>${iconHtml("caret-right")}</button>`).join("")}
+      </div>`
+    : "";
+
   const specials = [
     { k: "season", label: "Di stagione", icon: "carrot" },
     { k: "fav", label: "Preferiti", icon: "heart" },
@@ -1022,6 +1035,7 @@ function renderStrumenti() {
     ${expBanner}
     ${useFirstCard}
     ${todayCard}
+    ${neglectedCard}
     ${seasonCard}
     ${banner}
     <div class="search-bar">
@@ -1256,7 +1270,8 @@ function renderRecipeDetail() {
           <span class="stepper__val" id="pVal">${detailServings || "—"}</span>
           <button class="stepper__btn" id="pPlus">+</button>
         </div>
-      </div>${!base ? `<div class="hint">Imposta le porzioni nella ricetta (modifica) per ricalcolare le quantità.</div>` : ""}`
+      </div>${!base ? `<div class="hint">Imposta le porzioni nella ricetta (modifica) per ricalcolare le quantità.</div>` : ""}
+      ${base && ingredients.some((it) => it.qty != null && it.unit) ? `<button class="btn btn--ghost btn--block" id="scaleByWeight" style="margin-top:8px">⚖️ Ho una quantità precisa…</button>` : ""}`
     : "";
 
   const pantryActive = store.getPantry().length > 0;
@@ -1391,6 +1406,8 @@ function renderRecipeDetail() {
   const pPlus = root.querySelector("#pPlus");
   if (pMinus) pMinus.addEventListener("click", () => { detailServings = Math.max(1, (detailServings || base || 1) - 1); render(); });
   if (pPlus) pPlus.addEventListener("click", () => { detailServings = (detailServings || base || 1) + 1; render(); });
+  const sbw = root.querySelector("#scaleByWeight");
+  if (sbw) sbw.addEventListener("click", () => openScaleByWeight(r, base, ingredients));
 
   root.querySelector("#favBtn").addEventListener("click", (e) => {
     if (!r.favorite) { fxBurstFrom(e.currentTarget, { emojis: ["❤️", "💛", "✨"] }); haptic(15); }
@@ -1710,6 +1727,40 @@ function openQr(r) {
     <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
   `);
   m.el.querySelector('[data-act="ok"]').addEventListener("click", m.close);
+}
+
+// Scala le dosi su una quantità reale di un ingrediente ("ho 600 g di pollo").
+function openScaleByWeight(r, base, ingredients) {
+  if (!base) return;
+  const scalable = ingredients.filter((it) => it.qty != null && it.unit && it.unit !== "q.b.");
+  if (!scalable.length) return;
+  const opts = scalable.map((it) => `<option value="${ingredients.indexOf(it)}">${escapeHtml(it.name)} (${formatQty(it.qty)} ${escapeHtml(it.unit)})</option>`).join("");
+  const m = openModal(`
+    <h3 class="modal__title">⚖️ Scala su una quantità</h3>
+    <p class="hint" style="margin-top:-8px;margin-bottom:12px">Hai una quantità precisa di un ingrediente? Ricalcolo tutte le dosi su quella.</p>
+    <div class="field"><label>Ingrediente</label><select id="swIng">${opts}</select></div>
+    <div class="field"><label>Quanto ne hai</label><input type="text" id="swQty" inputmode="decimal" placeholder="es. 600" /></div>
+    <div class="hint" id="swInfo" style="min-height:1.2em"></div>
+    <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button><button class="btn btn--primary" data-act="ok">Ricalcola</button></div>
+  `);
+  const sel = m.el.querySelector("#swIng"), qtyIn = m.el.querySelector("#swQty"), info = m.el.querySelector("#swInfo");
+  const calc = () => {
+    const it = ingredients[parseInt(sel.value, 10)];
+    const have = parseFloat((qtyIn.value || "").replace(",", "."));
+    if (!it || !it.qty || !isFinite(have) || have <= 0) { info.textContent = ""; return null; }
+    const serv = Math.max(1, Math.round(base * (have / it.qty)));
+    info.innerHTML = `Diventano <b>${serv}</b> ${serv === 1 ? "porzione" : "porzioni"} circa.`;
+    return serv;
+  };
+  sel.addEventListener("change", calc);
+  qtyIn.addEventListener("input", calc);
+  qtyIn.focus();
+  m.el.querySelector('[data-act="cancel"]').addEventListener("click", m.close);
+  m.el.querySelector('[data-act="ok"]').addEventListener("click", () => {
+    const serv = calc();
+    if (serv == null) { toast("Inserisci una quantità valida", "error"); return; }
+    detailServings = serv; m.close(); render();
+  });
 }
 
 // Modalità ospiti: scegli per quante persone cucini, adatta le dosi e
@@ -2801,6 +2852,7 @@ function renderShoppingList() {
     ${(() => { const c = estimateCost(active); return c.counted ? `<div class="shop-cost">${iconHtml("basket")} Costo stimato del carrello: <b>€ ${c.total.toFixed(2)}</b><span class="shop-cost__note"> · stima su ${c.counted} articoli</span></div>` : ""; })()}
     ${done.length ? `<button class="btn btn--primary btn--block" id="toPantry" style="margin-top:18px">${iconHtml("basket")} Spesa fatta: presi in dispensa</button>` : ""}
     ${items.length ? `<div style="display:flex;gap:8px;margin-top:${done.length ? "8px" : "18px"};flex-wrap:wrap">
+      <button class="btn btn--ghost" id="shopShare">${iconHtml("arrow-square-out")} Invia lista</button>
       <button class="btn btn--ghost" id="groupByBtn">${iconHtml("book-open")} ${shopGroupBy === "recipe" ? "Per reparto" : "Per ricetta"}</button>
       <button class="btn btn--ghost" id="aisleBtn">${iconHtml("sliders-horizontal")} Reparti</button>
       <button class="btn btn--ghost" id="clearDone">Svuota presi</button>
@@ -2854,6 +2906,29 @@ function renderShoppingList() {
   if (ab) ab.addEventListener("click", openAisleOrder);
   const gb = wrap.querySelector("#groupByBtn");
   if (gb) gb.addEventListener("click", () => { shopGroupBy = shopGroupBy === "recipe" ? "aisle" : "recipe"; renderShoppingList(); });
+
+  const shareBtn = wrap.querySelector("#shopShare");
+  if (shareBtn) shareBtn.addEventListener("click", async () => {
+    const list = store.getShopping().filter((i) => !i.checked);
+    if (!list.length) { toast("La lista è vuota", "error"); return; }
+    const lines = ["🛒 Lista della spesa"];
+    const groups = {};
+    list.forEach((it) => { const c = it.category || "Altro"; (groups[c] = groups[c] || []).push(it); });
+    for (const cat of getAisleOrder().filter((c) => groups[c])) {
+      lines.push("", cat + ":");
+      for (const it of groups[cat]) {
+        const qty = it.qty != null ? formatQty(it.qty) : "";
+        const amt = [qty, it.unit && it.unit !== "q.b." ? it.unit : (it.unit === "q.b." ? "q.b." : "")].filter(Boolean).join(" ");
+        lines.push("- " + it.name + (amt ? ` (${amt})` : ""));
+      }
+    }
+    lines.push("", "— da Fornelli");
+    const text = lines.join("\n");
+    try {
+      if (navigator.share) await navigator.share({ title: "Lista della spesa", text });
+      else { await navigator.clipboard.writeText(text); toast("Lista copiata negli appunti", "success"); }
+    } catch (e) { /* condivisione annullata */ }
+  });
   lastShopToggled = null; // consuma l'animazione: i prossimi render non ri-animano
 }
 
