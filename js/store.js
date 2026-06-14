@@ -89,6 +89,18 @@ export function getTool(id) {
   return state.tools.find((t) => t.id === id) || null;
 }
 
+// Sposta uno strumento su (-1) o giù (+1) nell'ordine, riscrivendo i campi order.
+export async function moveTool(id, dir) {
+  const arr = getTools();
+  const i = arr.findIndex((t) => t.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= arr.length) return;
+  const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  for (let k = 0; k < arr.length; k++) {
+    if ((arr[k].order ?? null) !== k) await adapter.updateTool(arr[k].id, { order: k });
+  }
+}
+
 export function getRecipesByTool(toolId) {
   return state.recipes
     .filter((r) => r.toolId === toolId)
@@ -296,8 +308,10 @@ export function getMenu(id) {
 }
 export async function addMenu(name) {
   const clean = (name || "").trim();
-  if (!clean) return;
-  await adapter.addMenu({ id: newId(), name: clean, recipeIds: [], createdAt: now() });
+  if (!clean) return null;
+  const id = newId();
+  await adapter.addMenu({ id, name: clean, recipeIds: [], createdAt: now() });
+  return id;
 }
 export async function renameMenu(id, name) {
   await adapter.updateMenu(id, { name: (name || "").trim() });

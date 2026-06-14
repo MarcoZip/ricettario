@@ -518,6 +518,16 @@ a { color: var(--primary-2); }
 .meal-src--moulinex { background: #d2ecff; color: #0a4a6e; }
 .meal-src--bimby { background: #e6dcff; color: #3a1f7a; }
 .meal-controls { position: sticky; top: calc(var(--header-h, 56px) + var(--safe-top, 0px)); z-index: 6; background: var(--bg, #15161b); padding: 8px 0 6px; margin: -4px 0 4px; }
+.tool-card--reorder { cursor: default; }
+.tool-reorder { display: flex; gap: 6px; margin-top: 6px; }
+.tool-reorder .stepper__btn { width: 34px; height: 30px; }
+.chip--bookmark { filter: grayscale(1); opacity: 0.5; }
+.chip--bookmark.is-on { filter: none; opacity: 1; }
+.totry-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
+.totry-row:first-child { border-top: none; }
+.totry-row img { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+.totry-row__ph { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: var(--surface-3); border-radius: 8px; color: var(--text-soft); flex-shrink: 0; }
+.totry-row__t { flex: 1; font-weight: 600; font-size: 0.9rem; min-width: 0; }
 .pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 18px 0 4px; }
 .pager__info { font-weight: 800; color: var(--text-soft); }
 .meal-card__body { padding: 10px 12px 10px 0; flex: 1; min-width: 0; }
@@ -1040,6 +1050,7 @@ a { color: var(--primary-2); }
 .season-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 4px; }
 .season-chip { font-size: 0.82rem; font-weight: 700; background: rgba(120, 200, 120, 0.14); border: 1px solid rgba(120, 200, 120, 0.3); color: #9be29b; border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
 .tagchip--season { background: rgba(120, 200, 120, 0.16); border: 1px solid rgba(120, 200, 120, 0.34); color: #9be29b; }
+.tagchip--ahead { background: rgba(120, 160, 255, 0.16); border: 1px solid rgba(120, 160, 255, 0.34); color: #a9c2ff; }
 .sim-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 .sim-row::-webkit-scrollbar { display: none; }
 .sim-card { flex: 0 0 116px; width: 116px; background: var(--surface-2); border: 1px solid var(--surface-3); border-radius: 14px; padding: 0; overflow: hidden; text-align: left; color: var(--text); display: flex; flex-direction: column; }

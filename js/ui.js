@@ -242,6 +242,9 @@ export function mount(rootEl) {
   setupBackHandler();
   setupRipple();
   setupAurora();
+  checkPrepReminders();
+  setInterval(checkPrepReminders, 60000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkPrepReminders(); });
 }
 
 // Onda "ripple" sui pulsanti al tocco.
@@ -911,6 +914,16 @@ function renderHomeBody() {
   const cards = tools
     .map((t, i) => {
       const n = store.countRecipes(t.id);
+      if (toolReorder) {
+        return `<div class="tool-card tool-card--reorder" style="--ac:${ACCENTS[i % ACCENTS.length]}">
+          <span class="tool-card__emoji">${iconHtml(t.icon)}</span>
+          <span class="tool-card__name">${escapeHtml(t.name)}</span>
+          <div class="tool-reorder">
+            <button class="stepper__btn" data-up="${t.id}" ${i === 0 ? "disabled" : ""}>↑</button>
+            <button class="stepper__btn" data-down="${t.id}" ${i === tools.length - 1 ? "disabled" : ""}>↓</button>
+          </div>
+        </div>`;
+      }
       return `
       <button class="tool-card stagger" data-tool="${t.id}" style="--ac:${ACCENTS[i % ACCENTS.length]};--i:${i}">
         <span class="tool-card__emoji">${iconHtml(t.icon)}</span>
@@ -920,13 +933,20 @@ function renderHomeBody() {
     })
     .join("");
   body.innerHTML = `<div class="tool-grid">${cards}
-    <button class="add-card stagger" id="addTool" style="--i:${tools.length}">
+    ${toolReorder ? "" : `<button class="add-card stagger" id="addTool" style="--i:${tools.length}">
       <span class="add-card__plus">${iconHtml("plus")}</span>
       <span>Aggiungi strumento</span>
-    </button></div>`;
-  body.querySelectorAll(".tool-card").forEach((c) => c.addEventListener("click", () => openTool(c.dataset.tool)));
-  body.querySelector("#addTool").addEventListener("click", () => openToolForm());
+    </button>`}</div>
+    ${tools.length > 1 ? `<button class="btn btn--ghost btn--block" id="toolReorderBtn" style="margin-top:10px">${toolReorder ? "✓ Fine riordino" : "⇅ Riordina strumenti"}</button>` : ""}`;
+  body.querySelectorAll(".tool-card[data-tool]").forEach((c) => c.addEventListener("click", () => openTool(c.dataset.tool)));
+  const addT = body.querySelector("#addTool");
+  if (addT) addT.addEventListener("click", () => openToolForm());
+  const reBtn = body.querySelector("#toolReorderBtn");
+  if (reBtn) reBtn.addEventListener("click", () => { toolReorder = !toolReorder; renderHomeBody(); });
+  body.querySelectorAll("[data-up]").forEach((b) => b.addEventListener("click", () => store.moveTool(b.dataset.up, -1)));
+  body.querySelectorAll("[data-down]").forEach((b) => b.addEventListener("click", () => store.moveTool(b.dataset.down, 1)));
 }
+let toolReorder = false;
 
 function renderStrumenti() {
   const tools = store.getTools();
@@ -1249,6 +1269,14 @@ function suggestSides(r) {
   return { mine, ideas: SIDE_IDEAS };
 }
 
+// Rileva se una ricetta va iniziata in anticipo (ammollo, lievitazione, riposo…).
+const PREP_AHEAD = [[/ammoll/i, "ammollo"], [/lievit/i, "lievitazione"], [/marin/i, "marinatura"], [/(sera prima|giorno prima|una notte|tutta la notte|per una notte|riposare in frigo|in frigo per una notte)/i, "riposo lungo"]];
+function prepAheadLabel(r) {
+  const text = ((r.steps || []).join(" ") + " " + (r.notes || "")).toLowerCase();
+  for (const [re, label] of PREP_AHEAD) if (re.test(text)) return label;
+  return null;
+}
+
 // ---------------- Schermata: dettaglio ricetta ----------------
 function renderRecipeDetail() {
   const r = store.getRecipe(currentRecipeId);
@@ -1333,6 +1361,7 @@ function renderRecipeDetail() {
       ${ratingRow}
     </div>
     ${(() => { const sh = recipeSeasonalMatches(r, currentMonth()); return sh.length ? `<div class="tag-row"><span class="tagchip tagchip--season">${iconHtml("carrot")} Di stagione · ${sh.slice(0, 3).map((p) => escapeHtml(p.name)).join(", ")}</span></div>` : ""; })()}
+    ${(() => { const pa = prepAheadLabel(r); return pa ? `<div class="tag-row"><span class="tagchip tagchip--ahead">⏳ Richiede anticipo · ${pa}</span><button class="chip" id="prepRemind" style="margin-left:6px">⏰ Ricordamelo</button></div>` : ""; })()}
     ${(tagsArr.length || r.time || r.difficulty) ? `<div class="tag-row">${r.time ? `<span class="tagchip tagchip--ro">${iconHtml("timer")} ${r.time} min</span>` : ""}${r.difficulty ? `<span class="tagchip tagchip--ro">${iconHtml("fire")} ${diffLabel(r.difficulty)}</span>` : ""}${tagsArr.map((t) => `<span class="tagchip tagchip--ro">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
     ${Array.isArray(r.allergens) && r.allergens.length ? `<div class="tag-row">${r.allergens.map((a) => `<span class="tagchip tagchip--allerg">⚠ ${escapeHtml(a)}</span>`).join("")}</div>` : ""}
     ${url ? `<a class="btn btn--block" id="openLink" href="${escapeHtml(url)}" target="_blank" rel="noopener" style="margin-bottom:16px">${iconHtml("arrow-square-out")} Apri la ricetta</a>` : ""}
@@ -1378,6 +1407,8 @@ function renderRecipeDetail() {
     </div>
 
     <button class="btn btn--block" id="cookedBtn" style="margin-bottom:10px">${iconHtml("fire")} Segna come cucinata${r.cookCount ? ` · ${r.cookCount} ${r.cookCount === 1 ? "volta" : "volte"}` : ""}</button>
+    <button class="btn btn--block" id="reviewBtn" style="margin-bottom:10px">📝 Com'è venuta? (voto, foto, nota)</button>
+    <button class="btn btn--block" id="collectionsBtn" style="margin-bottom:10px">${iconHtml("book-bookmark")} Aggiungi a una raccolta</button>
     <button class="btn btn--block" id="shareImg" style="margin-bottom:10px">${iconHtml("image")} Condividi come immagine</button>
     <button class="btn btn--block" id="qrBtn" style="margin-bottom:10px">${iconHtml("qr-code")} Mostra codice QR</button>
     ${steps.length ? `<button class="btn btn--block" id="chefBtn" style="margin-bottom:10px">🍳 Leggi la ricetta</button>` : ""}
@@ -1450,6 +1481,13 @@ function renderRecipeDetail() {
   if (cookBtn) cookBtn.addEventListener("click", () => openCookingMode(r));
 
   root.querySelector("#cookedBtn").addEventListener("click", async (e) => { haptic(25); fxBurstFrom(e.currentTarget); await store.markCooked(r.id); toast("Segnata come cucinata 🔥", "success"); });
+
+  const reviewBtn = root.querySelector("#reviewBtn");
+  if (reviewBtn) reviewBtn.addEventListener("click", () => openCookReview(r));
+  const collectionsBtn = root.querySelector("#collectionsBtn");
+  if (collectionsBtn) collectionsBtn.addEventListener("click", () => openCollections(r));
+  const prepRemind = root.querySelector("#prepRemind");
+  if (prepRemind) prepRemind.addEventListener("click", () => openPrepReminder(r));
 
   // Galleria "Le mie creazioni"
   const galFile = root.querySelector("#galFile");
@@ -1727,6 +1765,109 @@ function openQr(r) {
     <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
   `);
   m.el.querySelector('[data-act="ok"]').addEventListener("click", m.close);
+}
+
+// "Com'è venuta?": voto a stelle + nota datata + foto, dopo aver cucinato.
+function openCookReview(r) {
+  let rating = r.rating || 0;
+  const stars = () => [1, 2, 3, 4, 5].map((v) => `<button class="star ${v <= rating ? "is-on" : ""}" data-v="${v}">${iconHtml("star")}</button>`).join("");
+  const m = openModal(`
+    <h3 class="modal__title">📝 Com'è venuta?</h3>
+    <div class="field"><label>Voto</label><div class="rating" id="rvStars">${stars()}</div></div>
+    <div class="field"><label>Nota (facoltativa)</label><textarea id="rvNote" rows="3" placeholder="Es. venuta benissimo, meno sale la prossima volta"></textarea></div>
+    <button class="btn btn--ghost btn--block" id="rvPhoto">${iconHtml("image")} Aggiungi una foto</button>
+    <input type="file" id="rvFile" accept="image/*" capture="environment" hidden />
+    <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button><button class="btn btn--primary" data-act="ok">Salva</button></div>
+  `);
+  const redraw = () => m.el.querySelectorAll("#rvStars .star").forEach((s) => s.classList.toggle("is-on", parseInt(s.dataset.v, 10) <= rating));
+  m.el.querySelector("#rvStars").addEventListener("click", (e) => { const b = e.target.closest(".star"); if (!b) return; const v = parseInt(b.dataset.v, 10); rating = v === rating ? 0 : v; redraw(); });
+  const file = m.el.querySelector("#rvFile");
+  m.el.querySelector("#rvPhoto").addEventListener("click", () => file.click());
+  file.addEventListener("change", async () => {
+    const f = file.files[0]; file.value = "";
+    if (!f) return;
+    try { const url = await fileToDataUrl(f); const gallery = [...(Array.isArray(r.gallery) ? r.gallery : []), url]; await store.updateRecipe(r.id, { gallery }); r.gallery = gallery; toast("Foto aggiunta", "success"); } catch (e) { toast("Foto non aggiunta", "error"); }
+  });
+  m.el.querySelector('[data-act="cancel"]').addEventListener("click", m.close);
+  m.el.querySelector('[data-act="ok"]').addEventListener("click", async () => {
+    const note = m.el.querySelector("#rvNote").value.trim();
+    const patch = { rating };
+    if (note) { const stamp = new Date().toLocaleDateString("it-IT"); patch.notes = (r.notes ? r.notes + "\n\n" : "") + `[${stamp}] ${note}`; }
+    await store.updateRecipe(r.id, patch);
+    m.close(); toast("Salvato", "success"); render();
+  });
+}
+
+// Aggiungi/togli la ricetta dalle raccolte (basate sui menu).
+function openCollections(r) {
+  const menus = store.getMenus();
+  const rows = menus.map((mn) => {
+    const inIt = store.getMenuRecipes(mn.id).some((x) => x.id === r.id);
+    return `<label class="setting-row" style="cursor:pointer"><div class="setting-row__label">${escapeHtml(mn.name)}</div><input type="checkbox" class="mini-check" data-menu="${mn.id}" ${inIt ? "checked" : ""} /></label>`;
+  }).join("");
+  const m = openModal(`
+    <h3 class="modal__title">${iconHtml("book-bookmark")} Aggiungi a una raccolta</h3>
+    <div class="cl-scroll">${rows || `<div class="hint">Nessuna raccolta ancora. Creane una qui sotto.</div>`}</div>
+    <div class="search-bar" style="margin-top:10px"><input type="text" id="newColl" placeholder="Nuova raccolta (es. Feste)..." /><button class="btn btn--primary" id="addColl">${iconHtml("plus")}</button></div>
+    <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Fatto</button></div>
+  `);
+  m.el.querySelectorAll("[data-menu]").forEach((cb) => cb.addEventListener("change", () => store.toggleRecipeInMenu(cb.dataset.menu, r.id)));
+  const add = async () => {
+    const name = m.el.querySelector("#newColl").value.trim();
+    if (!name) return;
+    const id = await store.addMenu(name);
+    if (id) await store.toggleRecipeInMenu(id, r.id);
+    m.close(); openCollections(r);
+  };
+  m.el.querySelector("#addColl").addEventListener("click", add);
+  m.el.querySelector("#newColl").addEventListener("keydown", (e) => { if (e.key === "Enter") add(); });
+  m.el.querySelector('[data-act="ok"]').addEventListener("click", m.close);
+}
+
+// Promemoria di preparazione anticipata (ammollo, lievitazione…), salvato in locale
+// e mostrato quando scade (se l'app è aperta o in notifica, se permessa).
+const PREP_REM_KEY = "ricettario.prepReminders";
+function getPrepReminders() { try { return JSON.parse(localStorage.getItem(PREP_REM_KEY) || "[]"); } catch (e) { return []; } }
+function setPrepReminders(l) { try { localStorage.setItem(PREP_REM_KEY, JSON.stringify(l)); } catch (e) {} }
+function openPrepReminder(r) {
+  const now = new Date();
+  const at = (h, plusDay) => { const d = new Date(); if (plusDay) d.setDate(d.getDate() + 1); d.setHours(h, 0, 0, 0); return d.getTime(); };
+  const opts = [
+    { label: "Tra 1 ora", due: Date.now() + 3600000 },
+    { label: "Tra 3 ore", due: Date.now() + 3 * 3600000 },
+    { label: "Stasera 20:00", due: at(20, now.getHours() >= 20) },
+    { label: "Domani 8:00", due: at(8, true) }
+  ];
+  const m = openModal(`
+    <h3 class="modal__title">⏰ Ricordamelo</h3>
+    <p class="hint" style="margin-top:-8px;margin-bottom:12px">Ti avviso di iniziare la preparazione di "${escapeHtml(r.title)}".</p>
+    <div style="display:flex;flex-direction:column;gap:8px">${opts.map((o, i) => `<button class="btn btn--block" data-i="${i}">${o.label}</button>`).join("")}</div>
+    <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button></div>
+  `);
+  m.el.querySelector('[data-act="cancel"]').addEventListener("click", m.close);
+  m.el.querySelectorAll("[data-i]").forEach((b) => b.addEventListener("click", () => {
+    const o = opts[parseInt(b.dataset.i, 10)];
+    const list = getPrepReminders().filter((x) => x.recipeId !== r.id);
+    list.push({ recipeId: r.id, title: r.title, due: o.due });
+    setPrepReminders(list);
+    try { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
+    m.close();
+    toast(`Promemoria impostato: ${o.label.toLowerCase()}`, "success");
+  }));
+}
+function checkPrepReminders() {
+  const list = getPrepReminders();
+  if (!list.length) return;
+  const now = Date.now();
+  const due = list.filter((x) => x.due <= now);
+  if (!due.length) return;
+  setPrepReminders(list.filter((x) => x.due > now));
+  for (const x of due) {
+    const msg = `Inizia la preparazione: ${x.title}`;
+    let shown = false;
+    try { if (window.Notification && Notification.permission === "granted") { new Notification("Fornelli — promemoria", { body: msg, icon: "icons/icon-192.png" }); shown = true; } } catch (e) {}
+    if (!shown) toast("⏰ " + msg, "success");
+  }
 }
 
 // Scala le dosi su una quantità reale di un ingrediente ("ho 600 g di pollo").
@@ -2472,6 +2613,74 @@ async function performMealRandom() {
   mealLoading = false; renderOnlineTab();
 }
 
+// Salva/importa un risultato online (riusato da card e da "Da provare").
+async function saveMealResult(data, onProgress = () => {}) {
+  if (data.source === "gz" || data.source === "misya" || data.source === "cookist" || data.source === "ricettenonna" || data.source === "moulinex" || data.source === "bimby") {
+    onProgress(`${iconHtml("download-simple")} Importo...`);
+    try {
+      const r = await importFromUrl(data.link);
+      openRecipeForm({ prefill: { title: r.title, url: data.link, image: r.image, servings: r.servings, time: r.time, ingredients: r.ingredients, steps: r.steps, tags: r.tags } });
+    } catch (e) { toast(e.message || "Import non riuscito", "error"); }
+    return;
+  }
+  let src = { title: data.title, link: data.link, image: data.image || "", servings: data.servings || null, time: data.time || null, ingredients: data.ingredients || [], steps: data.steps || [] };
+  if (data.source === "spoon" && data.id) {
+    onProgress(`${iconHtml("download-simple")} Recupero...`);
+    try {
+      const info = await spoonInfo(data.id);
+      if (info) src = {
+        title: info.title || src.title, link: info.link || src.link, image: info.image || src.image,
+        servings: info.servings || src.servings, time: info.time || src.time,
+        ingredients: (info.ingredients && info.ingredients.length) ? info.ingredients : src.ingredients,
+        steps: (info.steps && info.steps.length) ? info.steps : src.steps
+      };
+    } catch (e) { /* uso i dati della ricerca */ }
+  }
+  src.ingredients = (src.ingredients || []).map(convertMeasures);
+  src.steps = (src.steps || []).map(convertMeasures);
+  onProgress(`${iconHtml("download-simple")} Traduco...`);
+  let prefill = { title: src.title, url: src.link, image: src.image, servings: src.servings, time: src.time, ingredients: src.ingredients, steps: src.steps };
+  try {
+    const tr = await translateRecipe({ title: src.title, ingredients: prefill.ingredients, steps: prefill.steps });
+    prefill = { ...prefill, title: tr.title, ingredients: tr.ingredients, steps: tr.steps };
+  } catch (e) { /* tengo l'inglese */ }
+  openRecipeForm({ prefill });
+}
+
+// Lista "Da provare": ricette online segnate per importarle più avanti (locale).
+const TOTRY_KEY = "ricettario.totry";
+function getToTry() { try { return JSON.parse(localStorage.getItem(TOTRY_KEY) || "[]"); } catch (e) { return []; } }
+function setToTry(list) { try { localStorage.setItem(TOTRY_KEY, JSON.stringify(list.slice(0, 100))); } catch (e) {} }
+function isToTry(link) { return getToTry().some((x) => x.link === link); }
+function toggleToTry(meal) {
+  const list = getToTry();
+  const i = list.findIndex((x) => x.link === meal.link);
+  if (i >= 0) { list.splice(i, 1); setToTry(list); return false; }
+  list.unshift(meal); setToTry(list); return true;
+}
+
+function openToTry() {
+  const list = getToTry();
+  const body = list.length
+    ? list.map((m) => `<div class="totry-row" data-link="${escapeHtml(m.link)}">
+        ${m.image ? `<img src="${escapeHtml(proxiedImg(m.image))}" alt="" referrerpolicy="no-referrer" />` : `<span class="totry-row__ph">${iconHtml("fork-knife")}</span>`}
+        <span class="totry-row__t">${escapeHtml(m.title_it || m.title)}<span class="meal-src meal-src--${m.source}" style="margin-left:6px">${SOURCE_LABEL[m.source] || ""}</span></span>
+        <button class="chip" data-act="imp">${iconHtml("plus")} Importa</button>
+        <button class="icon-btn icon-btn--danger" data-act="rm">${iconHtml("trash")}</button>
+      </div>`).join("")
+    : `<div class="hint">Nessuna ricetta da provare. Tocca il segnalibro 🔖 su un risultato online per aggiungerla qui.</div>`;
+  const m = openModal(`<h3 class="modal__title">🔖 Da provare</h3><div class="cl-scroll">${body}</div><div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>`);
+  m.el.querySelector('[data-act="ok"]').addEventListener("click", m.close);
+  m.el.querySelectorAll(".totry-row").forEach((row) => {
+    const link = row.dataset.link;
+    const data = getToTry().find((x) => x.link === link);
+    row.querySelector('[data-act="rm"]').addEventListener("click", () => { toggleToTry({ link }); row.remove(); });
+    row.querySelector('[data-act="imp"]').addEventListener("click", async () => {
+      if (data) { m.close(); await saveMealResult(data, () => {}); }
+    });
+  });
+}
+
 function setupPullToRefresh(body) {
   // Indicatore: ricreato a ogni render (l'innerHTML viene riscritto).
   if (!body.querySelector(".pull-ind")) {
@@ -2554,6 +2763,7 @@ function renderOnlineTab() {
   body.innerHTML = `
     <div class="meal-controls">
       <div class="field" style="margin-bottom:10px"><select id="mealSource">${srcOpts}</select></div>
+      ${(() => { const n = getToTry().length; return n ? `<button class="btn btn--ghost btn--block" id="toTryBtn" style="margin-bottom:12px">🔖 Da provare (${n})</button>` : ""; })()}
       ${mealSource === "moulinex" ? `<button class="btn btn--ghost btn--block" id="companionRandom" style="margin-bottom:12px">🎲 Sorprendimi col Companion</button>` : ""}
       ${bannerHtml}
       ${searchable ? `<div class="search-bar">
@@ -2584,6 +2794,9 @@ function renderOnlineTab() {
   if (pagePrev) pagePrev.addEventListener("click", () => changeMealPage(-1));
   const pageNext = body.querySelector("#pageNext");
   if (pageNext) pageNext.addEventListener("click", () => changeMealPage(1));
+
+  const toTryBtn = body.querySelector("#toTryBtn");
+  if (toTryBtn) toTryBtn.addEventListener("click", () => openToTry());
 
   const companionRandom = body.querySelector("#companionRandom");
   if (companionRandom) companionRandom.addEventListener("click", async () => {
@@ -2622,44 +2835,14 @@ function renderOnlineTab() {
     saveBtn.addEventListener("click", async () => {
       const old = saveBtn.innerHTML;
       saveBtn.disabled = true;
-      if (data.source === "gz" || data.source === "misya" || data.source === "cookist" || data.source === "ricettenonna" || data.source === "moulinex" || data.source === "bimby") {
-        // Siti italiani: importa la ricetta completa dal link (già in italiano).
-        saveBtn.innerHTML = `${iconHtml("download-simple")} Importo...`;
-        try {
-          const r = await importFromUrl(data.link);
-          openRecipeForm({ prefill: { title: r.title, url: data.link, image: r.image, servings: r.servings, time: r.time, ingredients: r.ingredients, steps: r.steps, tags: r.tags } });
-        } catch (e) { toast(e.message || "Import non riuscito", "error"); }
-      } else {
-        // TheMealDB / Spoonacular: in inglese → traduco al salvataggio.
-        let src = { title: data.title, link: data.link, image: data.image || "", servings: data.servings || null, time: data.time || null, ingredients: data.ingredients || [], steps: data.steps || [] };
-        // Spoonacular: recupero i dettagli completi (con i passi) prima di tradurre.
-        if (data.source === "spoon" && data.id) {
-          saveBtn.innerHTML = `${iconHtml("download-simple")} Recupero...`;
-          try {
-            const info = await spoonInfo(data.id);
-            if (info) src = {
-              title: info.title || src.title,
-              link: info.link || src.link,
-              image: info.image || src.image,
-              servings: info.servings || src.servings,
-              time: info.time || src.time,
-              ingredients: (info.ingredients && info.ingredients.length) ? info.ingredients : src.ingredients,
-              steps: (info.steps && info.steps.length) ? info.steps : src.steps
-            };
-          } catch (e) { /* uso i dati della ricerca */ }
-        }
-        // Converte le misure estere (cups, oz, °F…) in metrico prima di tradurre.
-        src.ingredients = (src.ingredients || []).map(convertMeasures);
-        src.steps = (src.steps || []).map(convertMeasures);
-        saveBtn.innerHTML = `${iconHtml("download-simple")} Traduco...`;
-        let prefill = { title: src.title, url: src.link, image: src.image, servings: src.servings, time: src.time, ingredients: src.ingredients, steps: src.steps };
-        try {
-          const tr = await translateRecipe({ title: src.title, ingredients: prefill.ingredients, steps: prefill.steps });
-          prefill = { ...prefill, title: tr.title, ingredients: tr.ingredients, steps: tr.steps };
-        } catch (e) { /* tengo l'inglese */ }
-        openRecipeForm({ prefill });
-      }
+      await saveMealResult(data, (msg) => { saveBtn.innerHTML = msg; });
       saveBtn.disabled = false; saveBtn.innerHTML = old;
+    });
+    const tryBtn = card.querySelector('[data-act="totry"]');
+    if (tryBtn) tryBtn.addEventListener("click", () => {
+      const on = toggleToTry(data);
+      tryBtn.classList.toggle("is-on", on);
+      toast(on ? "Aggiunta a \"Da provare\" 🔖" : "Rimossa da \"Da provare\"", on ? "success" : "");
     });
   });
 }
@@ -2684,6 +2867,7 @@ function mealCardHtml(m, i = 0) {
         <div class="meal-card__actions">
           ${m.link ? `<a class="chip" href="${escapeHtml(safeUrl(m.link))}" target="_blank" rel="noopener">${iconHtml("arrow-square-out")} Apri</a>` : ""}
           <button class="chip" data-act="save">${iconHtml("plus")} ${(m.source === "gz" || m.source === "misya" || m.source === "cookist" || m.source === "ricettenonna" || m.source === "moulinex" || m.source === "bimby") ? "Importa" : "Salva"}</button>
+          <button class="chip chip--bookmark ${isToTry(m.link) ? "is-on" : ""}" data-act="totry" title="Da provare">🔖</button>
         </div>
       </div>
     </div>`;

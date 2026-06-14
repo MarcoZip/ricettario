@@ -6,6 +6,17 @@
 
 export const CHANGELOG = [
   {
+    v: "6.4",
+    d: "2026-06-13",
+    items: [
+      "Lista \"Da provare\": dal Ricettario online tocca il segnalibro 🔖 per salvare una ricetta e importarla quando vuoi.",
+      "Raccolte: organizza le ricette in collezioni a tema (es. \"Feste\") dal tasto \"Aggiungi a una raccolta\".",
+      "Riordina gli strumenti nella schermata principale (tasto \"Riordina strumenti\").",
+      "\"Com'è venuta?\": dopo aver cucinato lascia voto, foto e una nota nella ricetta.",
+      "Promemoria di preparazione: per le ricette con ammollo/lievitazione un avviso per iniziare in anticipo."
+    ]
+  },
+  {
     v: "6.3",
     d: "2026-06-13",
     items: [
