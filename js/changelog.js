@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "5.9",
+    d: "2026-06-13",
+    minor: true,
+    items: [
+      "Finestra Novità: ora compare solo quando sei davvero nell'app, mai durante il lampo della schermata di accesso all'avvio."
+    ]
+  },
+  {
     v: "5.8",
     d: "2026-06-13",
     items: [

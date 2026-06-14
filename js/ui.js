@@ -306,19 +306,24 @@ export function maybeShowWhatsNew() {
   try {
     const KEY = "ricettario.seenVersion";
     const seen = localStorage.getItem(KEY);
-    localStorage.setItem(KEY, APP_VERSION);
-    if (!seen || seen === APP_VERSION) return; // primo avvio o nessun cambio
+    if (seen === APP_VERSION) return; // già vista questa versione
+    if (!seen) { localStorage.setItem(KEY, APP_VERSION); return; } // primo avvio assoluto
     const idx = CHANGELOG.findIndex((c) => c.v === seen);
     const all = idx > 0 ? CHANGELOG.slice(0, idx) : (idx === 0 ? [] : [CHANGELOG[0]]);
     // Nel popup solo le novità "degne di nota" (niente correzioni minori).
     const fresh = all.filter((c) => !c.minor);
-    if (!fresh.length) return;
-    // Aspetta che la splash di avvio sia sparita, così la finestra Novità non
-    // viene coperta e appare DOPO l'animazione.
+    if (!fresh.length) { localStorage.setItem(KEY, APP_VERSION); return; }
+    // Mostra SOLO quando si è davvero nell'app: niente splash, niente schermata di
+    // login (Firebase a volte emette prima null), niente altri popup/guida aperti.
+    // La versione viene segnata "vista" solo quando la finestra appare davvero, così
+    // non viene "consumata" durante un lampo della schermata di login.
     let tries = 0;
     const open = () => {
-      if (!document.getElementById("splash") || tries > 40) { openChangelog(fresh, { whatsNew: true }); return; }
-      tries++; setTimeout(open, 200);
+      const blocked = document.getElementById("splash") || loginMode ||
+        document.querySelector("#modalRoot .modal-backdrop") || document.querySelector(".guide");
+      if (blocked) { if (tries++ < 100) setTimeout(open, 200); return; }
+      localStorage.setItem(KEY, APP_VERSION);
+      openChangelog(fresh, { whatsNew: true });
     };
     setTimeout(open, 400);
   } catch (e) { /* ignora */ }

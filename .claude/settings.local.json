@@ -92,7 +92,11 @@
       "Bash(echo \"### import-ability di una ricetta bimby \\(worker live\\) ###\")",
       "Bash(curl -s -o /tmp/bi.json -w 'HTTP %{http_code}\\\\n' --max-time 35 __TRACKED_VAR__/?url=https://www.ricettario-bimby.it__TRACKED_VAR__)",
       "Bash(grep -oE '\"title\":\"[^\"]*\"' /tmp/bi.json)",
-      "Bash(echo \"titolo: $\\(grep -oE '\"title\":\"[^\"]*\"' /tmp/bi.json)"
+      "Bash(echo \"titolo: $\\(grep -oE '\"title\":\"[^\"]*\"' /tmp/bi.json)",
+      "Bash(echo \"=== #2 Moulinex paginazione \\(pollo, page 0\\) ===\")",
+      "Bash(curl -s -o /tmp/m0.json -w 'HTTP %{http_code}\\\\n' --max-time 35 'https://ricette-import.marcozeta73.workers.dev/searchmoulinex?q=pollo&page=0')",
+      "Bash(grep -o '\"title\"' /tmp/m0.json)",
+      "Bash(echo \"mostrate: $\\(grep -o '\"title\"' /tmp/m0.json)"
     ]
   }
 }
