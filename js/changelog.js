@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    v: "7.3",
+    d: "2026-06-13",
+    items: [
+      "Su tablet e schermi larghi le ricette si dispongono su due colonne.",
+      "Aprendo una ricetta lo schermo resta acceso mentre cucini (non solo in Modalità cucina).",
+      "Comandi vocali in più in Modalità cucina: \"ripeti ingredienti\" e \"quanto manca\"."
+    ]
+  },
+  {
     v: "7.2",
     d: "2026-06-13",
     items: [

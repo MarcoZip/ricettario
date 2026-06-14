@@ -261,7 +261,9 @@ export function mount(rootEl) {
   setupSeasonalDecor();
   checkPrepReminders();
   setInterval(checkPrepReminders, 60000);
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkPrepReminders(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") { checkPrepReminders(); if (currentRoute === "strumenti" && currentRecipeId) acquireDetailWake(); }
+  });
 }
 
 // Onda "ripple" sui pulsanti al tocco.
@@ -911,10 +913,18 @@ function openRecipe(recipeId) {
   window.scrollTo(0, 0);
 }
 
+// Tieni acceso lo schermo mentre si guarda una ricetta (oltre alla Modalità cucina).
+let detailWake = null;
+async function acquireDetailWake() {
+  try { if (navigator.wakeLock && !detailWake) { detailWake = await navigator.wakeLock.request("screen"); if (detailWake) detailWake.addEventListener("release", () => { detailWake = null; }); } } catch (e) { /* non supportato */ }
+}
+function releaseDetailWake() { try { if (detailWake) { detailWake.release(); detailWake = null; } } catch (e) {} }
+
 export function render() {
   if (!root) return;
   // Schermata di login (gestita da app.js tramite renderLogin)
   if (loginMode) return; // login viene renderizzato a parte
+  if (!(currentRoute === "strumenti" && currentRecipeId)) releaseDetailWake();
   if (currentRoute === "strumenti") {
     if (currentRecipeId) renderRecipeDetail();
     else if (currentToolId) renderToolDetail();
@@ -988,7 +998,7 @@ function renderHomeBody() {
       emptyMsg = homeFilter ? `Nessuna ricetta con "${escapeHtml(homeQuery.trim())}" in questa categoria.` : "Nessuna ricetta trovata.";
     }
     body.innerHTML = results.length
-      ? results.map((r, i) => recipeResultRow(r, i)).join("")
+      ? `<div class="result-grid">${results.map((r, i) => recipeResultRow(r, i)).join("")}</div>`
       : `<div class="empty">${emptyArt(emptyIcon === "heart" ? "heart" : "pot")}<div style="margin-top:6px">${emptyMsg}</div></div>`;
     body.querySelectorAll(".pick-row").forEach((b) => b.addEventListener("click", () => openRecipe(b.dataset.id)));
     return;
@@ -1285,7 +1295,7 @@ function renderToolDetail() {
       <button class="btn btn--ghost" id="editTool">${iconHtml("pencil-simple")} Rinomina</button>
       <button class="btn btn--ghost" id="delTool" style="color:var(--danger)">${iconHtml("trash")} Elimina strumento</button>
     </div>
-    <div>${list}</div>
+    <div class="${recipes.length ? "result-grid" : ""}">${list}</div>
     <button class="fab" id="addRecipe">${iconHtml("plus")} Aggiungi ricetta</button>
   `;
 
@@ -1398,6 +1408,7 @@ function prepAheadLabel(r) {
 function renderRecipeDetail() {
   const r = store.getRecipe(currentRecipeId);
   if (!r) { currentRecipeId = null; return render(); }
+  acquireDetailWake();
   const tool = store.getTool(r.toolId);
   const ingredients = Array.isArray(r.ingredients) ? r.ingredients : [];
   const steps = Array.isArray(r.steps) ? r.steps : [];
@@ -2170,6 +2181,16 @@ function openCookingMode(recipe) {
   const NUMWORDS = { uno: 1, una: 1, un: 1, due: 2, tre: 3, quattro: 4, cinque: 5, sei: 6, sette: 7, otto: 8, nove: 9, dieci: 10, undici: 11, dodici: 12, quindici: 15, venti: 20, venticinque: 25, trenta: 30, quaranta: 40, quarantacinque: 45, sessanta: 60 };
   function handleVoiceCommand(text) {
     const t = (text || "").toLowerCase();
+    if (/ingredient/.test(t)) {
+      const lines = (recipe.ingredients || []).map((it) => ingredientText(it)).filter(Boolean);
+      speakText(lines.length ? "Ingredienti. " + lines.join(", ") : "Nessun ingrediente nella ricetta");
+      return;
+    }
+    if (/quanto manca|quanto tempo|tempo rimast/.test(t)) {
+      const running = timers.filter((x) => x.running && x.remaining > 0);
+      speakText(running.length ? running.map((x) => `${x.label}: ${Math.ceil(x.remaining / 60)} ${Math.ceil(x.remaining / 60) === 1 ? "minuto" : "minuti"}`).join(". ") : "Nessun timer attivo");
+      return;
+    }
     if (/\b(avanti|prossim|continua|vai)\b/.test(t)) { goNext(); return; }
     if (/\b(indietro|precedent|torna)\b/.test(t)) { goPrev(); return; }
     if (/\b(leggi|ripeti)\b/.test(t)) { speak = true; speakStep(); return; }
@@ -2195,7 +2216,7 @@ function openCookingMode(recipe) {
   function stopVoice() { voiceOn = false; if (vrec) { try { vrec.stop(); } catch (e) {} vrec = null; } }
   function toggleVoice() {
     voiceOn = !voiceOn;
-    if (voiceOn) { startVoice(); toast("Comandi vocali attivi: \"avanti\", \"indietro\", \"timer 10 minuti\"", "success"); }
+    if (voiceOn) { startVoice(); toast("Comandi vocali: \"avanti\", \"indietro\", \"timer 10 minuti\", \"ripeti ingredienti\", \"quanto manca\"", "success"); }
     else stopVoice();
     draw();
   }
@@ -2210,6 +2231,7 @@ function openCookingMode(recipe) {
     } catch {}
   }
   function stopSpeak() { try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch {} }
+  function speakText(txt) { if (!window.speechSynthesis || !txt) return; try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(txt); u.lang = "it-IT"; window.speechSynthesis.speak(u); } catch {} }
 
   // Tieni acceso lo schermo, se supportato.
   async function lock() {

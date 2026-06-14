@@ -132,6 +132,13 @@ a { color: var(--primary-2); }
   margin: 0 auto;
   min-height: 100vh;
 }
+/* Tablet / schermi larghi: più spazio e liste a due colonne. */
+@media (min-width: 820px) {
+  .view { max-width: 900px; }
+  .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+  .result-grid .pick-row, .result-grid .recipe-item { margin-bottom: 0; }
+  #mealResults .meal-card { width: auto; }
+}
 
 .page-title { font-size: 1.5rem; font-weight: 800; margin: 4px 0 4px; letter-spacing: -0.5px; }
 .page-sub { color: var(--text-soft); margin: 0 0 18px; font-size: 0.92rem; }
