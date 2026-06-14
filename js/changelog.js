@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.6",
+    d: "2026-06-14",
+    minor: true,
+    items: [
+      "Corretto il tasto \"Cerca\" che su alcuni telefoni finiva fuori dallo schermo dopo l'aggiunta del microfono."
+    ]
+  },
+  {
     v: "7.5",
     d: "2026-06-14",
     minor: true,
