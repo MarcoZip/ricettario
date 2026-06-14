@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "6.2",
+    d: "2026-06-13",
+    items: [
+      "Bimby ora cerca tra le ricette ufficiali Cookidoo (per parola, con foto e a pagine): l'import porta titolo e ingredienti; i passaggi guidati si seguono nell'app Cookidoo col tuo abbonamento."
+    ]
+  },
+  {
     v: "6.1",
     d: "2026-06-13",
     items: [

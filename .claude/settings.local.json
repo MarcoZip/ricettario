@@ -109,7 +109,28 @@
       "Bash(echo 'URL: https://www.ricettario-bimby.it/cerca?filter%5Bingredients_incl%5D%5B%5D=pollo&rows=12&page=1')",
       "Bash(curl -s -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/124 Safari/537.36' --max-time 25 'https://www.ricettario-bimby.it/cerca?filter%5Bingredients_incl%5D%5B%5D=pollo&rows=12&page=1' -o /tmp/f.html)",
       "Bash(echo \"titoli \\(devono essere pollo\\):\")",
-      "Bash(grep -oE 'title=\"[^\"]+\" class=\"[^\"]*recipe-link' /tmp/f1.html)"
+      "Bash(grep -oE 'title=\"[^\"]+\" class=\"[^\"]*recipe-link' /tmp/f1.html)",
+      "Bash(curl -s -o /tmp/ck.html -w '%{http_code}' -L -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/124 Safari/537.36' -H 'Accept-Language: it-IT,it;q=0.9' --max-time 30 'https://cookidoo.it/search/it-IT?countries=it&languages=it&query=pollo')",
+      "Bash(curl -s -o /dev/null -w '%{url_effective}' -L -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/124 Safari/537.36' --max-time 20 'https://cookidoo.it/search/it-IT?countries=it&languages=it&query=pollo')",
+      "Bash(echo 'HTTP __CMDSUB_OUTPUT__ · size __CMDSUB_OUTPUT__ · final __CMDSUB_OUTPUT__')",
+      "Bash(echo \"### link ricetta + struttura ###\")",
+      "Bash(grep -oE 'href=\"[^\"]*/recipes?/recipe/[^\"]*\"' /tmp/ck1.html)",
+      "Bash(grep -oE 'r[0-9]{5,}' /tmp/ck1.html)",
+      "Bash(grep -oE 'alt=\"[^\"]{3,60}\"' /tmp/ck1.html)",
+      "Bash(grep -oE '\"title\":\"[^\"]{3,70}\"' /tmp/nd.json)",
+      "Bash(grep -oE 'r[0-9]{6,}' /tmp/nd.json)",
+      "Bash(grep -oiE '\\(\"?\\(algolia\\)?app_?id\"?\\\\s*[:=]\\\\s*\"[A-Z0-9]{6,}\"|\"?\\(api_?key|search_?key|apiKey\\)\"?\\\\s*[:=]\\\\s*\"[a-z0-9]{20,}\"|algolia[a-z.]*\\\\.net|x-algolia-[a-z-]+\\)' /tmp/ck1.html)",
+      "Bash(grep -oiE 'algolia[a-zA-Z0-9_.:/-]{0,40}' /tmp/ck1.html)",
+      "Bash(grep -oE '\"[a-zA-Z0-9+/=]{40,}\"' /tmp/nd.json)",
+      "Bash(grep -oP '\"hits\":\\\\[\\\\K\\\\{.*?\\\\}\\(?=,\\\\{|\\\\]\\)' /tmp/al.json)",
+      "Bash(grep -oiE '\\(assethost|tmecosys|assets\\\\.[a-z.]+|transformation\\)[^\"]{0,50}' /tmp/ck1.html)",
+      "Bash(grep -oiE '\\(facetFilters|\"language\"|\"country\"|\"countries\"|\"languages\"|language:|country:\\)[^,}]{0,40}' /tmp/ck1.html)",
+      "Bash(grep -oE '\"[a-zA-Z0-9+/=]{200,}\"' /tmp/nd.json)",
+      "Bash(grep -oE 'image/upload/[^\"{}]{2,40}' /tmp/ck1.html)",
+      "Bash(curl -s -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/124 Safari/537.36' --max-time 30 https://cookidoo.it/recipes/recipe/it-IT/r412654 -o /tmp/cd.html)",
+      "Bash(echo \"size: $\\(wc -c </tmp/cd.html\\)\")",
+      "Bash(echo \"### og:image ###\")",
+      "Bash(grep -oE '<meta property=\"og:image\"[^>]+content=\"[^\"]+\"' /tmp/cd.html)"
     ]
   }
 }

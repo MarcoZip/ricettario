@@ -352,33 +352,42 @@ async function handleMoulinexImg(target) {
   } catch (e) { return new Response("error", { status: 502, headers: CORS }); }
 }
 
-// Ricettario Bimby (italiano): SFOGLIA il catalogo (ordinato per popolari), paginato.
-// La ricerca per parola del sito è solo lato JS, non raggiungibile da fuori, quindi
-// qui si sfoglia soltanto. Ritorna titolo + link + foto + total (per la paginazione).
-async function handleSearchBimby(pageStr) {
+// Ricerca ricette Bimby su Cookidoo (la piattaforma ufficiale). La ricerca passa da
+// Algolia con una chiave pubblica che il sito rigenera a ogni caricamento (scade in
+// ~1 settimana): la preleviamo al volo dalla pagina (cache 1h). I risultati pubblici
+// danno titolo, foto e link; l'import porta titolo + ingredienti (i passaggi sono
+// contenuto in abbonamento e non vengono inclusi).
+const COOKIDOO_ALGOLIA_APP = "3TA8NT85XJ";
+async function getCookidooKey() {
+  const res = await fetch("https://cookidoo.it/search/it-IT", { headers: BROWSER_HEADERS, cf: { cacheTtl: 3600, cacheEverything: true } });
+  if (!res.ok) return null;
+  const html = await res.text();
+  const m = html.match(/"algoliaApiKeyData":\{"apiKey":"([^"]+)"/);
+  return m ? m[1] : null;
+}
+async function handleSearchBimby(q, pageStr) {
+  const query = (q || "").trim();
+  if (!query) return json({ results: [], total: 0 }, 200);
   try {
-    const PAGE = 12;
-    const page0 = Math.max(0, parseInt(pageStr, 10) || 0); // 0-based dal client
-    const u = "https://www.ricettario-bimby.it/cerca?sort=trending&rows=" + PAGE + "&page=" + (page0 + 1);
-    const res = await fetch(u, { headers: BROWSER_HEADERS, cf: { cacheTtl: 1800, cacheEverything: true } });
+    const key = await getCookidooKey();
+    if (!key) return json({ error: "unreachable", results: [] }, 200);
+    const page = Math.max(0, parseInt(pageStr, 10) || 0);
+    const res = await fetch(`https://${COOKIDOO_ALGOLIA_APP}-dsn.algolia.net/1/indexes/recipes-production/query`, {
+      method: "POST",
+      headers: { "X-Algolia-Application-Id": COOKIDOO_ALGOLIA_APP, "X-Algolia-API-Key": key, "Content-Type": "application/json" },
+      body: JSON.stringify({ query, hitsPerPage: 12, page, facetFilters: [["language:it"]] })
+    });
     if (!res.ok) return json({ error: "unreachable", results: [] }, 200);
-    const html = await res.text();
-    const results = [];
-    const seen = new Set();
-    const re = /<a href="(\/[A-Za-z0-9%-]+-ricette\/[^"]+)"[^>]*title="([^"]*)"[^>]*class="[^"]*recipe-link[^"]*"[^>]*>\s*<img[^>]+src="([^"]+)"/gi;
-    let m;
-    while ((m = re.exec(html)) && results.length < PAGE) {
-      const link = "https://www.ricettario-bimby.it" + m[1];
-      if (seen.has(link)) continue;
-      seen.add(link);
-      const title = clean(m[2]);
-      if (!title) continue;
-      results.push({ title, url: link, image: m[3] || "" });
-    }
-    // Ultima pagina dai link di paginazione → totale approssimato.
-    let maxPage = page0 + 1;
-    for (const pm of html.matchAll(/[?&]page=(\d+)/g)) { const n = +pm[1]; if (n > maxPage) maxPage = n; }
-    return json({ results, total: maxPage * PAGE, page: page0, pageSize: PAGE }, 200);
+    const data = await res.json();
+    const results = (data.hits || []).map((h) => {
+      let image = h.image || "";
+      if (image) {
+        image = image.replace("{assethost}", "assets.tmecosys.com").replace("{transformation}", "t_web_rdp_recipe_584x480");
+        if (!/\.(jpg|jpeg|png|webp)$/i.test(image)) image += ".jpg";
+      }
+      return { title: clean(h.title || ""), url: "https://cookidoo.it/recipes/recipe/it-IT/" + (h.id || h.objectID), image };
+    }).filter((r) => r.title);
+    return json({ results, total: data.nbHits || results.length, page: data.page || page, pageSize: 12 }, 200);
   } catch (e) { return json({ error: "unreachable", results: [] }, 200); }
 }
 
@@ -389,7 +398,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/img") return handleImageProxy(url.searchParams.get("u"));
     if (url.pathname === "/moulinex-img") return handleMoulinexImg(url.searchParams.get("u"));
-    if (url.pathname === "/searchbimby") return handleSearchBimby(url.searchParams.get("page"));
+    if (url.pathname === "/searchbimby") return handleSearchBimby(url.searchParams.get("q"), url.searchParams.get("page"));
     if (url.pathname === "/searchgz") return handleSearchGz(url.searchParams.get("q"));
     if (url.pathname === "/searchmisya") return handleSearchMisya(url.searchParams.get("q"));
     if (url.pathname === "/searchcookist") return handleSearchCookist(url.searchParams.get("q"));

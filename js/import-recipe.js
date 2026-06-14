@@ -77,15 +77,18 @@ export async function searchMoulinex(query) {
   return (await searchMoulinexFull(query)).results;
 }
 
-// Ricettario Bimby (italiano): si SFOGLIA il catalogo (popolari), paginato.
-// Ritorna { results, total } per la paginazione.
-export async function searchBimbyFull(page = 0) {
-  if (!WORKER_URL) return { results: [], total: 0 };
-  const res = await fetch(`${WORKER_URL}/searchbimby?page=${page}`);
+// Ricerca ricette Bimby su Cookidoo (catalogo ufficiale), paginata.
+// Ritorna { results, total }. L'import porta titolo + ingredienti (non i passaggi).
+export async function searchBimbyFull(query, page = 0) {
+  if (!WORKER_URL || !query.trim()) return { results: [], total: 0 };
+  const res = await fetch(`${WORKER_URL}/searchbimby?q=${encodeURIComponent(query.trim())}&page=${page}`);
   if (!res.ok) throw new Error("Servizio non raggiungibile.");
   const d = await res.json().catch(() => ({}));
   const results = Array.isArray(d.results) ? d.results : [];
   return { results, total: typeof d.total === "number" ? d.total : results.length };
+}
+export async function searchBimby(query) {
+  return (await searchBimbyFull(query, 0)).results;
 }
 
 // Ricerca su Edamam (inglese, richiede le chiavi sul worker).
