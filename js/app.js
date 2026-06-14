@@ -3,7 +3,7 @@
 import * as store from "./store.js";
 import * as ui from "./ui.js";
 import { isCloudConfigured } from "./config.js";
-import { applyTheme, applyAccent, applyTextScale } from "./theme.js";
+import { applyTheme, applyAccent, applyTextScale, applyContrast } from "./theme.js";
 import { runDailyReminders } from "./notify.js";
 import { isPushSubscribed, refreshReminders } from "./push.js";
 import { getNickname, setNickname } from "./profile.js";
@@ -24,6 +24,7 @@ function scheduleReminders() {
 applyTheme();
 applyAccent();
 applyTextScale();
+applyContrast();
 
 const root = document.getElementById("view");
 let mounted = false;

@@ -6,6 +6,16 @@
 
 export const CHANGELOG = [
   {
+    v: "7.8",
+    d: "2026-06-14",
+    items: [
+      "Preferenze alimentari (vegetariano, senza glutine, senza lattosio): in Home appare il filtro \"Per me\".",
+      "Porzioni predefinite: apri le ricette già regolate sul numero di persone che scegli.",
+      "Modalità alto contrasto per leggere meglio (Opzioni → Alto contrasto).",
+      "Home personalizzabile: scegli quali sezioni mostrare nella schermata iniziale."
+    ]
+  },
+  {
     v: "7.7",
     d: "2026-06-14",
     items: [

@@ -29,6 +29,12 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* Alto contrasto (accessibilità): testi e bordi più marcati. */
+html.high-contrast { --text-soft: #d8d2c8; --border: #7c7d8a; --surface-3: #4c4d59; --hairline: rgba(255, 255, 255, 0.3); }
+html.high-contrast[data-theme="light"] { --text-soft: #2c2620; --border: #8c8174; --surface-3: #c7bcab; --hairline: rgba(0, 0, 0, 0.32); }
+html.high-contrast body { font-weight: 500; }
+html.high-contrast .hint, html.high-contrast .tool-card__count, html.high-contrast .meal-card__meta { color: var(--text-soft); }
+
 /* Tema chiaro */
 html[data-theme="light"] {
   --bg: #fbf7f2;

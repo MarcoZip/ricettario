@@ -18,7 +18,7 @@ import { getNickname, setNickname } from "./profile.js";
 import { isImportConfigured, APP_VERSION, PUSH_WORKER_URL, SPOONACULAR_ENABLED, EDAMAM_ENABLED, WORKER_URL } from "./config.js";
 import { CHANGELOG } from "./changelog.js";
 import { fileToDataUrl } from "./image.js";
-import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS, getTextScale, setTextScale } from "./theme.js";
+import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS, getTextScale, setTextScale, getContrast, setContrast } from "./theme.js";
 
 // Tag suggeriti nel form ricetta.
 const TAG_SUGGESTIONS = ["Primi", "Secondi", "Contorni", "Antipasti", "Dolci", "Colazione", "Merenda", "Zuppe", "Insalate", "Lievitati", "Veloce", "Vegetariano", "Vegano", "Pesce", "Carne", "Senza glutine", "Per ospiti", "Bambini"];
@@ -192,6 +192,24 @@ function safeUrl(url) {
 
 // Alcuni siti (es. Misya) bloccano il caricamento delle immagini dal telefono:
 // le facciamo passare dal worker (le scarica lato server e le riserve).
+// Preferenze utente (localStorage): diete, porzioni predefinite, sezioni home.
+function prefBool(key, def = false) { try { const v = localStorage.getItem("ricettario.pref." + key); return v == null ? def : v === "1"; } catch (e) { return def; } }
+function setPrefBool(key, val) { try { localStorage.setItem("ricettario.pref." + key, val ? "1" : "0"); } catch (e) {} }
+function prefNum(key, def) { const v = parseInt(localStorage.getItem("ricettario.pref." + key), 10); return isNaN(v) ? def : v; }
+function setPrefNum(key, val) { try { localStorage.setItem("ricettario.pref." + key, String(val)); } catch (e) {} }
+// Una ricetta è adatta alle preferenze alimentari impostate?
+const MEAT_FISH = /pollo|manzo|maial|vitell|tacchin|salsicc|prosciutt|pancett|guancial|speck|wurstel|würstel|bresaol|salame|mortadell|bacon|carne|macinat|hamburger|polpett|spezzatin|arrosto|cotolett|scaloppin|bistecc|agnello|coniglio|anatra|tonno|salmon|merluzz|baccal|gamber|gambero|vongol|cozze|calamar|seppi|pesce|acciug|sgombro|orata|branzino|polpo|frutti di mare|prosciutto|speck/i;
+function matchesDiet(r) {
+  if (prefBool("dietNg") && (r.allergens || []).includes("Glutine")) return false;
+  if (prefBool("dietNl") && (r.allergens || []).includes("Lattosio")) return false;
+  if (prefBool("dietVeg")) {
+    const txt = ((r.ingredients || []).map((i) => i.name).join(" ") + " " + (r.title || "")).toLowerCase();
+    if (MEAT_FISH.test(txt)) return false;
+  }
+  return true;
+}
+function anyDietPref() { return prefBool("dietVeg") || prefBool("dietNg") || prefBool("dietNl"); }
+
 const PROXY_IMG_HOSTS = /(^|\.)misya\.info$/i;
 function proxiedImg(url) {
   if (!url || !WORKER_URL) return url || "";
@@ -917,7 +935,9 @@ function openRecipe(recipeId) {
   const r = store.getRecipe(recipeId);
   currentRecipeId = recipeId;
   currentToolId = r ? r.toolId : currentToolId;
-  detailServings = r && r.servings ? r.servings : null;
+  // Porzioni predefinite: se impostate e la ricetta ha le porzioni, apri già scalato.
+  const defServ = prefNum("defServings", 0);
+  detailServings = r && r.servings ? (defServ > 0 ? defServ : r.servings) : null;
   ingChecks = new Set(); convertUnits = false; // azzera spunte/conversione per la nuova ricetta
   // la schermata ricetta vive nella sezione "Strumenti"
   currentRoute = "strumenti";
@@ -995,7 +1015,8 @@ function renderHomeBody() {
     let emptyIcon = "magnifying-glass", emptyMsg = "Nessuna ricetta trovata.";
     // 1) Base in funzione del filtro/categoria scelto (o tutte le ricette).
     let base;
-    if (homeFilter === "fav") { base = store.getFavorites(); emptyIcon = "heart"; emptyMsg = "Nessun preferito: tocca il cuore in una ricetta."; }
+    if (homeFilter === "permeo") { base = store.getAllRecipes().filter(matchesDiet); emptyIcon = "heart"; emptyMsg = "Nessuna ricetta adatta alle tue preferenze alimentari (impostale in Opzioni)."; }
+    else if (homeFilter === "fav") { base = store.getFavorites(); emptyIcon = "heart"; emptyMsg = "Nessun preferito: tocca il cuore in una ricetta."; }
     else if (homeFilter === "cooked") { base = store.getMostCooked(); emptyIcon = "fire"; emptyMsg = "Nessuna ricetta ancora segnata come cucinata."; }
     else if (homeFilter === "recent") { base = store.getRecentCooked(); emptyIcon = "timer"; emptyMsg = "Niente cucinato di recente."; }
     else if (homeFilter === "season") { const m = currentMonth(); base = store.getAllRecipes().filter((r) => recipeSeasonalMatches(r, m).length); emptyIcon = "carrot"; emptyMsg = `Nessuna ricetta con ingredienti di stagione a ${monthName(m)}.`; }
@@ -1096,7 +1117,7 @@ function renderStrumenti() {
   // Ricetta del giorno: stabile nell'arco della giornata (cambia ogni giorno).
   const allR = store.getAllRecipes();
   let rotdCard = "";
-  if (allR.length) {
+  if (allR.length && prefBool("homeRotd", true)) {
     const n = new Date();
     const seed = n.getFullYear() * 1000 + (n.getMonth() * 31 + n.getDate());
     const rotd = allR[seed % allR.length];
@@ -1109,7 +1130,7 @@ function renderStrumenti() {
 
   // Oggi si mangia
   const today = store.getPlanByDate(todayStr()).filter((e) => store.getRecipe(e.recipeId));
-  const todayCard = today.length
+  const todayCard = today.length && prefBool("homeToday", true)
     ? `<div class="today-card">
         <div class="today__h">${iconHtml("calendar-dots")} Oggi si mangia</div>
         ${today.map((e) => {
@@ -1139,7 +1160,7 @@ function renderStrumenti() {
   // Di stagione: prodotti del mese corrente (sezione informativa + filtro).
   const sMonth = currentMonth();
   const produce = seasonalProduce(sMonth);
-  const seasonCard = produce.length
+  const seasonCard = produce.length && prefBool("homeSeason", true)
     ? `<div class="today-card season-card">
         <div class="today__h">${iconHtml("carrot")} Di stagione a ${monthName(sMonth)}</div>
         <div class="season-row">${produce.map((p) => `<span class="season-chip">${p.emoji} ${escapeHtml(p.name)}</span>`).join("")}</div>
@@ -1152,7 +1173,7 @@ function renderStrumenti() {
     .filter((r) => r.favorite && r.lastCooked && new Date(r.lastCooked).getTime() < neglCutoff)
     .sort((a, b) => (a.lastCooked || "").localeCompare(b.lastCooked || ""))
     .slice(0, 4);
-  const neglectedCard = neglected.length
+  const neglectedCard = neglected.length && prefBool("homeNeglect", true)
     ? `<div class="today-card">
         <div class="today__h">${iconHtml("timer")} Non lo cucini da un po'</div>
         ${neglected.map((r) => `<button class="today__item" data-recipe="${r.id}"><span class="today__name">${escapeHtml(r.title)}</span>${iconHtml("caret-right")}</button>`).join("")}
@@ -1160,6 +1181,7 @@ function renderStrumenti() {
     : "";
 
   const specials = [
+    ...(anyDietPref() ? [{ k: "permeo", label: "Per me", icon: "heart" }] : []),
     { k: "season", label: "Di stagione", icon: "carrot" },
     { k: "fav", label: "Preferiti", icon: "heart" },
     { k: "cooked", label: "Più cucinate", icon: "fire" },
@@ -4326,6 +4348,62 @@ function renderImpostazioni() {
           <option value="20">Molto grande</option>
         </select>
       </div>
+      <label class="setting-row" style="cursor:pointer">
+        <div>
+          <div class="setting-row__label">Alto contrasto</div>
+          <div class="setting-row__desc">Testi e bordi più marcati, per leggere meglio.</div>
+        </div>
+        <input type="checkbox" id="contrastChk" class="mini-check" ${getContrast() ? "checked" : ""} />
+      </label>
+    </div>
+    <div class="setting-group">
+      <div class="setting-row" style="display:block">
+        <div class="setting-row__label">Preferenze alimentari</div>
+        <div class="setting-row__desc">Aggiunge il filtro "Per me" in Home e nasconde le ricette non adatte.</div>
+      </div>
+      <label class="setting-row" style="cursor:pointer">
+        <div class="setting-row__label">🥗 Vegetariano (niente carne/pesce)</div>
+        <input type="checkbox" class="mini-check" data-pref="dietVeg" ${prefBool("dietVeg") ? "checked" : ""} />
+      </label>
+      <label class="setting-row" style="cursor:pointer">
+        <div class="setting-row__label">🌾 Senza glutine</div>
+        <input type="checkbox" class="mini-check" data-pref="dietNg" ${prefBool("dietNg") ? "checked" : ""} />
+      </label>
+      <label class="setting-row" style="cursor:pointer">
+        <div class="setting-row__label">🥛 Senza lattosio</div>
+        <input type="checkbox" class="mini-check" data-pref="dietNl" ${prefBool("dietNl") ? "checked" : ""} />
+      </label>
+      <div class="setting-row">
+        <div>
+          <div class="setting-row__label">Porzioni predefinite</div>
+          <div class="setting-row__desc">Apri le ricette già regolate sul numero di persone.</div>
+        </div>
+        <select id="defServSel" class="mini-select">
+          ${[0, 1, 2, 3, 4, 5, 6, 8].map((n) => `<option value="${n}">${n === 0 ? "Come la ricetta" : n + (n === 1 ? " persona" : " persone")}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-row" style="display:block">
+        <div class="setting-row__label">Sezioni della Home</div>
+        <div class="setting-row__desc">Scegli cosa mostrare nella schermata iniziale.</div>
+      </div>
+      <label class="setting-row" style="cursor:pointer">
+        <div class="setting-row__label">✨ Ricetta del giorno</div>
+        <input type="checkbox" class="mini-check" data-pref="homeRotd" ${prefBool("homeRotd", true) ? "checked" : ""} />
+      </label>
+      <label class="setting-row" style="cursor:pointer">
+        <div class="setting-row__label">📅 Oggi si mangia</div>
+        <input type="checkbox" class="mini-check" data-pref="homeToday" ${prefBool("homeToday", true) ? "checked" : ""} />
+      </label>
+      <label class="setting-row" style="cursor:pointer">
+        <div class="setting-row__label">🥕 Di stagione</div>
+        <input type="checkbox" class="mini-check" data-pref="homeSeason" ${prefBool("homeSeason", true) ? "checked" : ""} />
+      </label>
+      <label class="setting-row" style="cursor:pointer">
+        <div class="setting-row__label">⏳ Non lo cucini da un po'</div>
+        <input type="checkbox" class="mini-check" data-pref="homeNeglect" ${prefBool("homeNeglect", true) ? "checked" : ""} />
+      </label>
     </div>
     ${notifyGroupHtml()}
     <div class="setting-group">
@@ -4391,6 +4469,11 @@ function renderImpostazioni() {
   themeSel.addEventListener("change", () => setTheme(themeSel.value));
   const textSizeSel = root.querySelector("#textSizeSel");
   if (textSizeSel) { textSizeSel.value = String(getTextScale()); textSizeSel.addEventListener("change", () => setTextScale(parseInt(textSizeSel.value, 10))); }
+  const contrastChk = root.querySelector("#contrastChk");
+  if (contrastChk) contrastChk.addEventListener("change", () => setContrast(contrastChk.checked));
+  const defServSel = root.querySelector("#defServSel");
+  if (defServSel) { defServSel.value = String(prefNum("defServings", 0)); defServSel.addEventListener("change", () => setPrefNum("defServings", parseInt(defServSel.value, 10))); }
+  root.querySelectorAll("[data-pref]").forEach((cb) => cb.addEventListener("change", () => setPrefBool(cb.dataset.pref, cb.checked)));
   root.querySelectorAll(".accent-sw").forEach((b) => b.addEventListener("click", () => {
     setAccent(b.dataset.accent);
     renderImpostazioni();

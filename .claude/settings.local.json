@@ -130,7 +130,8 @@
       "Bash(curl -s -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/124 Safari/537.36' --max-time 30 https://cookidoo.it/recipes/recipe/it-IT/r412654 -o /tmp/cd.html)",
       "Bash(echo \"size: $\\(wc -c </tmp/cd.html\\)\")",
       "Bash(echo \"### og:image ###\")",
-      "Bash(grep -oE '<meta property=\"og:image\"[^>]+content=\"[^\"]+\"' /tmp/cd.html)"
+      "Bash(grep -oE '<meta property=\"og:image\"[^>]+content=\"[^\"]+\"' /tmp/cd.html)",
+      "PowerShell(git push)"
     ]
   }
 }

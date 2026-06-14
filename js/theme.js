@@ -68,3 +68,15 @@ export function setTextScale(px) {
   try { localStorage.setItem(TEXT_SCALE_KEY, String(px)); } catch {}
   applyTextScale(px);
 }
+
+// ---- Alto contrasto (accessibilità) ----
+const CONTRAST_KEY = "ricettario.contrast";
+export function getContrast() { try { return localStorage.getItem(CONTRAST_KEY) === "1"; } catch { return false; } }
+export function applyContrast(on) {
+  const v = on == null ? getContrast() : on;
+  document.documentElement.classList.toggle("high-contrast", !!v);
+}
+export function setContrast(on) {
+  try { localStorage.setItem(CONTRAST_KEY, on ? "1" : "0"); } catch {}
+  applyContrast(on);
+}
