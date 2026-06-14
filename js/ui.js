@@ -90,6 +90,8 @@ let currentRoute = "strumenti";
 let currentToolId = null;
 let currentRecipeId = null;
 let detailServings = null; // porzioni scelte nella schermata ricetta
+let ingChecks = new Set(); // ingredienti spuntati mentre si cucina (per ricetta aperta)
+let convertUnits = false; // mostra le misure estere convertite in metrico
 let planYear = null; // anno mostrato nel calendario
 let planMonth = null; // mese (0-11) mostrato nel calendario
 let homeQuery = ""; // ricerca nella home
@@ -916,6 +918,7 @@ function openRecipe(recipeId) {
   currentRecipeId = recipeId;
   currentToolId = r ? r.toolId : currentToolId;
   detailServings = r && r.servings ? r.servings : null;
+  ingChecks = new Set(); convertUnits = false; // azzera spunte/conversione per la nuova ricetta
   // la schermata ricetta vive nella sezione "Strumenti"
   currentRoute = "strumenti";
   document.querySelectorAll(".bottom-nav__btn").forEach((b) => {
@@ -1111,7 +1114,7 @@ function renderStrumenti() {
         <div class="today__h">${iconHtml("calendar-dots")} Oggi si mangia</div>
         ${today.map((e) => {
           const r = store.getRecipe(e.recipeId);
-          const slot = e.slot ? `<span class="today__slot">${e.slot === "pranzo" ? "Pranzo" : "Cena"}</span>` : "";
+          const slot = e.slot ? `<span class="today__slot">${SLOT_LABEL[e.slot] || ""}</span>` : "";
           return `<button class="today__item" data-recipe="${r.id}">${slot}<span class="today__name">${escapeHtml(r.title)}</span>${iconHtml("caret-right")}</button>`;
         }).join("")}
       </div>`
@@ -1457,13 +1460,19 @@ function renderRecipeDetail() {
 
   const pantryActive = store.getPantry().length > 0;
   const missingCount = pantryActive ? ingredients.filter((it) => !store.inPantry(it.name)).length : 0;
+  const hasForeign = ingredients.some((it) => { const t = ingredientText(it); return convertMeasures(t) !== t; });
   const ingList = ingredients.length
     ? `<div class="ing-list">${ingredients
         .map((it, i) => {
           const miss = pantryActive && !store.inPantry(it.name);
-          return `<div class="ing-row${miss ? " ing-row--missing" : ""}"><span class="ing-dot" style="--ac:${ACCENTS[i % ACCENTS.length]}"></span><span class="ing-row__txt">${escapeHtml(ingredientText(it, factor))}</span>${miss ? `<span class="ing-miss">manca</span>` : ""}</div>`;
+          const done = ingChecks.has(i);
+          const t0 = ingredientText(it, factor);
+          const txt = convertUnits ? convertMeasures(t0) : t0;
+          return `<div class="ing-row${miss ? " ing-row--missing" : ""}${done ? " ing-row--done" : ""}" data-ix="${i}"><span class="ing-dot" style="--ac:${ACCENTS[i % ACCENTS.length]}"></span><span class="ing-row__txt">${escapeHtml(txt)}</span>${miss ? `<span class="ing-miss">manca</span>` : ""}</div>`;
         })
         .join("")}</div>
+       <div class="hint" style="margin-top:6px">Tocca un ingrediente per spuntarlo mentre cucini.</div>
+       ${hasForeign ? `<button class="btn btn--ghost btn--block" id="convUnits" style="margin-top:8px">${iconHtml("shuffle")} ${convertUnits ? "Mostra misure originali" : "Converti misure (cup/oz/°F)"}</button>` : ""}
        <button class="btn btn--primary btn--block" id="addToCart" style="margin-top:14px">${iconHtml("shopping-cart-simple")} Aggiungi alla lista della spesa</button>
        ${missingCount ? `<button class="btn btn--block" id="addMissing" style="margin-top:8px">${iconHtml("basket")} Aggiungi solo i ${missingCount} mancanti</button>` : ""}
        <button class="btn btn--block" id="guestMode" style="margin-top:8px">${iconHtml("users-three")} Modalità ospiti</button>`
@@ -1602,6 +1611,14 @@ function renderRecipeDetail() {
     const v = parseInt(st.dataset.v, 10);
     store.updateRecipe(r.id, { rating: v === r.rating ? 0 : v });
   }));
+
+  root.querySelectorAll(".ing-row[data-ix]").forEach((row) => row.addEventListener("click", () => {
+    const ix = parseInt(row.dataset.ix, 10);
+    if (ingChecks.has(ix)) ingChecks.delete(ix); else ingChecks.add(ix);
+    row.classList.toggle("ing-row--done");
+  }));
+  const convUnits = root.querySelector("#convUnits");
+  if (convUnits) convUnits.addEventListener("click", () => { convertUnits = !convertUnits; render(); });
 
   const addToCart = root.querySelector("#addToCart");
   if (addToCart) addToCart.addEventListener("click", async () => {
@@ -2215,8 +2232,9 @@ function openCookingMode(recipe) {
   if (!steps.length) return;
   let idx = 0;
   let wakeLock = null;
-  let timers = []; // { id, label, remaining, running }
+  let timers = []; // { id, label, remaining, running, alarming }
   let ticker = null;
+  let alarmTicker = null;
   let tseq = 0;
   let speak = false; // lettura vocale
   let xl = localStorage.getItem("ricettario.cookXL") === "1"; // testo grande
@@ -2312,10 +2330,17 @@ function openCookingMode(recipe) {
     for (const t of timers) {
       if (!t.running) continue;
       t.remaining--;
-      if (t.remaining <= 0) { t.remaining = 0; t.running = false; beep(); toast(`⏰ ${t.label} finito!`, "success"); }
+      if (t.remaining <= 0) { t.remaining = 0; t.running = false; t.alarming = true; beep(); try { navigator.vibrate && navigator.vibrate([300, 120, 300]); } catch (e) {} toast(`⏰ ${t.label} finito!`, "success"); }
     }
     ensureTicker();
+    ensureAlarm();
     paintTimers();
+  }
+  // Allarme ripetuto (suono + vibrazione) finché non lo si ferma toccando il timer.
+  function ensureAlarm() {
+    const any = timers.some((t) => t.alarming);
+    if (any && !alarmTicker) alarmTicker = setInterval(() => { beep(); try { navigator.vibrate && navigator.vibrate([300, 120, 300]); } catch (e) {} }, 1700);
+    else if (!any && alarmTicker) { clearInterval(alarmTicker); alarmTicker = null; }
   }
   function addTimer(mins, label) {
     const m = Math.max(1, parseInt(mins, 10) || 0);
@@ -2327,17 +2352,17 @@ function openCookingMode(recipe) {
     const box = el.querySelector("#ckTimers");
     if (!box) return;
     if (!timers.length) { box.innerHTML = `<div class="cook__notim">Nessun timer attivo</div>`; return; }
-    box.innerHTML = timers.map((t) => `<div class="ctimer ${t.remaining <= 0 ? "is-done" : ""}" data-id="${t.id}">
+    box.innerHTML = timers.map((t) => `<div class="ctimer ${t.remaining <= 0 ? "is-done" : ""}${t.alarming ? " is-alarm" : ""}" data-id="${t.id}">
       <span class="ctimer__lbl">${escapeHtml(t.label)}</span>
-      <span class="ctimer__time">${fmt(t.remaining)}</span>
-      <button class="ctimer__btn" data-act="toggle">${t.running ? "⏸" : "▶"}</button>
+      <span class="ctimer__time">${t.alarming ? "Finito!" : fmt(t.remaining)}</span>
+      <button class="ctimer__btn" data-act="toggle">${t.alarming ? "🔕 OK" : (t.running ? "⏸" : "▶")}</button>
       <button class="ctimer__btn" data-act="del">✕</button>
     </div>`).join("");
     box.querySelectorAll(".ctimer").forEach((row) => {
       const id = parseInt(row.dataset.id, 10);
       const t = timers.find((x) => x.id === id);
-      row.querySelector('[data-act="toggle"]').onclick = () => { if (t.remaining <= 0) return; t.running = !t.running; ensureTicker(); paintTimers(); };
-      row.querySelector('[data-act="del"]').onclick = () => { timers = timers.filter((x) => x.id !== id); ensureTicker(); paintTimers(); };
+      row.querySelector('[data-act="toggle"]').onclick = () => { if (t.alarming) { t.alarming = false; ensureAlarm(); paintTimers(); return; } if (t.remaining <= 0) return; t.running = !t.running; ensureTicker(); paintTimers(); };
+      row.querySelector('[data-act="del"]').onclick = () => { timers = timers.filter((x) => x.id !== id); ensureTicker(); ensureAlarm(); paintTimers(); };
     });
   }
   function beep() {
@@ -2388,6 +2413,7 @@ function openCookingMode(recipe) {
 
   function close() {
     if (ticker) clearInterval(ticker);
+    if (alarmTicker) clearInterval(alarmTicker);
     release();
     stopSpeak();
     stopVoice();
@@ -3698,7 +3724,7 @@ function renderPlanWeek() {
     const meals = entries.length
       ? entries.map((e) => {
           const r = store.getRecipe(e.recipeId);
-          const slot = e.slot ? `<b>${e.slot === "pranzo" ? "P" : "C"}</b> ` : "";
+          const slot = e.slot ? `<b>${SLOT_SHORT[e.slot] || ""}</b> ` : "";
           return `<button class="week-meal" data-recipe="${r ? r.id : ""}">${slot}${escapeHtml(r ? r.title : "(eliminata)")}</button>`;
         }).join("")
       : `<span class="week-empty">Niente in programma</span>`;
@@ -3832,7 +3858,9 @@ function collectIngredients(entries) {
   return items;
 }
 
-const SLOTS = [{ key: "pranzo", label: "Pranzo", icon: "sparkle" }, { key: "cena", label: "Cena", icon: "sparkle" }, { key: null, label: "Altro", icon: "fork-knife" }];
+const SLOTS = [{ key: "colazione", label: "Colazione", icon: "coffee" }, { key: "pranzo", label: "Pranzo", icon: "sparkle" }, { key: "spuntino", label: "Spuntino", icon: "cookie" }, { key: "cena", label: "Cena", icon: "sparkle" }, { key: null, label: "Altro", icon: "fork-knife" }];
+const SLOT_LABEL = { colazione: "Colazione", pranzo: "Pranzo", spuntino: "Spuntino", cena: "Cena" };
+const SLOT_SHORT = { colazione: "Col", pranzo: "Pr", spuntino: "Sp", cena: "Ce" };
 
 function dayRowHtml(e) {
   const r = store.getRecipe(e.recipeId);
@@ -3886,9 +3914,11 @@ function openDaySheet(date) {
     <h3 class="modal__title">${formatDateLong(date)}</h3>
     <div id="dayRows">${groupsHtml}</div>
     ${nutriHtml}
-    <div style="display:flex;gap:8px;margin-top:14px">
-      <button class="btn btn--primary" style="flex:1" data-slot="pranzo">${iconHtml("plus")} Pranzo</button>
-      <button class="btn btn--primary" style="flex:1" data-slot="cena">${iconHtml("plus")} Cena</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
+      <button class="btn btn--ghost" data-slot="colazione">${iconHtml("coffee")} Colazione</button>
+      <button class="btn btn--primary" data-slot="pranzo">${iconHtml("plus")} Pranzo</button>
+      <button class="btn btn--ghost" data-slot="spuntino">${iconHtml("cookie")} Spuntino</button>
+      <button class="btn btn--primary" data-slot="cena">${iconHtml("plus")} Cena</button>
     </div>
     ${entries.length ? `<button class="btn btn--block" data-act="toshop" style="margin-top:8px">${iconHtml("shopping-cart-simple")} Aggiungi ingredienti alla spesa</button>` : ""}
   `);

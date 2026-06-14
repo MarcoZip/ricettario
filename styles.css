@@ -816,7 +816,9 @@ a { color: var(--primary-2); }
 .stepper__val { min-width: 42px; text-align: center; font-weight: 800; font-size: 1.1rem; }
 
 .ing-list { display: flex; flex-direction: column; }
-.ing-row { display: flex; align-items: center; gap: 11px; padding: 9px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.04); font-size: 0.96rem; }
+.ing-row { display: flex; align-items: center; gap: 11px; padding: 9px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.04); font-size: 0.96rem; cursor: pointer; }
+.ing-row--done .ing-row__txt { text-decoration: line-through; color: var(--text-soft); opacity: 0.6; }
+.ing-row--done .ing-dot { opacity: 0.3; }
 .ing-row:last-child { border-bottom: none; }
 .ing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ac, var(--primary)); flex-shrink: 0; box-shadow: 0 0 10px -2px var(--ac, var(--primary)); }
 
@@ -1134,6 +1136,8 @@ html[data-theme="dark"] .alert-banner { color: #ffcf94; }
 .cook__notim { color: #8b8478; text-align: center; font-size: 0.85rem; padding: 6px; }
 .ctimer { display: flex; align-items: center; gap: 10px; background: #1b1c22; border: 1px solid #2c2d36; border-radius: 12px; padding: 8px 12px; color: #ece7df; }
 .ctimer.is-done { border-color: var(--primary); animation: pulse 1s infinite; }
+.ctimer.is-alarm { border-color: #ff5a5a; background: rgba(255, 90, 90, 0.16); animation: alarmFlash 0.7s steps(1) infinite; }
+@keyframes alarmFlash { 50% { background: rgba(255, 90, 90, 0.42); } }
 .ctimer__lbl { flex: 1; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ctimer__time { font-variant-numeric: tabular-nums; font-weight: 800; font-size: 1.1rem; min-width: 58px; text-align: right; }
 .ctimer__btn { background: #2c2d36; border: none; color: #fff; width: 34px; height: 34px; border-radius: 9px; font-size: 0.95rem; flex-shrink: 0; }

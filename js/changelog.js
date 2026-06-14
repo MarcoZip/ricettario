@@ -6,6 +6,16 @@
 
 export const CHANGELOG = [
   {
+    v: "7.7",
+    d: "2026-06-14",
+    items: [
+      "Spunta gli ingredienti toccandoli mentre cucini.",
+      "Allarme timer più evidente in Modalità cucina: suona e vibra finché non lo fermi.",
+      "Nel Piano puoi aggiungere anche colazione e spuntino (oltre a pranzo e cena).",
+      "Converti al volo le misure estere in una ricetta (cup/oz/°F)."
+    ]
+  },
+  {
     v: "7.6",
     d: "2026-06-14",
     minor: true,
