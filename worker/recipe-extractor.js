@@ -134,19 +134,22 @@ async function handleSearchRicettenonna(q) {
 // il robot Companion dal sito Moulinex. La ricerca testuale non è esposta dal
 // sito (è via JS), quindi qui si restituisce la lista curata; le foto e i
 // dettagli arrivano all'import della singola ricetta (hanno JSON-LD Recipe).
-async function handleSearchMoulinex(q) {
+async function handleSearchMoulinex(q, pageStr) {
   const query = (q || "").trim();
   // Con una ricerca: filtra l'intero catalogo ricette Moulinex (sitemap), il cui
-  // slug contiene il nome del piatto. Senza ricerca: la selezione curata Companion.
+  // slug contiene il nome del piatto, con paginazione. Senza ricerca: selezione curata.
   if (query) {
     try {
       const res = await fetch("https://www.moulinex.it/Recipe-it-EUR.xml", { headers: BROWSER_HEADERS, cf: { cacheTtl: 86400, cacheEverything: true } });
       if (!res.ok) return json({ error: "unreachable", results: [] }, 200);
       const xml = await res.text();
       const terms = query.toLowerCase().split(/\s*,\s*|\s+/).filter(Boolean);
+      const PAGE = 12;
+      const page = Math.max(0, parseInt(pageStr, 10) || 0);
+      const start = page * PAGE, end = start + PAGE;
       const results = [];
       const seen = new Set();
-      let total = 0; // quante combaciano in tutto (anche oltre le 30 mostrate)
+      let total = 0; // quante combaciano in tutto
       const re = /<loc>(https:\/\/www\.moulinex\.it\/ricette\/detail\/PRO\/([^/<]+)\/[^<]+)<\/loc>/g;
       let m;
       while ((m = re.exec(xml))) {
@@ -154,13 +157,14 @@ async function handleSearchMoulinex(q) {
         if (terms.length && !terms.every((t) => slug.includes(t))) continue;
         if (seen.has(slug)) continue;
         seen.add(slug);
+        const idx = total;
         total++;
-        if (results.length < 30) {
+        if (idx >= start && idx < end) {
           const name = m[2].replace(/-/g, " ");
           results.push({ title: name.charAt(0).toUpperCase() + name.slice(1), url: link, image: "" });
         }
       }
-      return json({ results, total }, 200);
+      return json({ results, total, page, pageSize: PAGE }, 200);
     } catch (e) { return json({ error: "unreachable", results: [] }, 200); }
   }
   try {
@@ -329,17 +333,63 @@ async function handleImageProxy(target) {
   } catch (e) { return new Response("error", { status: 502, headers: CORS }); }
 }
 
+// Miniatura di una ricetta Moulinex: la foto sta nel JSON-LD della pagina. Qui
+// risolviamo l'URL dell'immagine e la riserviamo (proxy) dal dominio del worker.
+async function handleMoulinexImg(target) {
+  if (!target) return new Response("missing", { status: 400, headers: CORS });
+  try { if (!/(^|\.)moulinex\.it$/i.test(new URL(target).host)) return new Response("forbidden", { status: 403, headers: CORS }); }
+  catch (e) { return new Response("bad url", { status: 400, headers: CORS }); }
+  try {
+    const page = await fetch(target, { headers: BROWSER_HEADERS, cf: { cacheTtl: 86400, cacheEverything: true } });
+    if (!page.ok) return new Response("no page", { status: 502, headers: CORS });
+    const html = await page.text();
+    const m = html.match(/"image":\s*\[\s*"([^"]+)"/) || html.match(/property="og:image"[^>]+content="([^"]+)"/i);
+    if (!m) return new Response("no image", { status: 404, headers: CORS });
+    const img = await fetch(m[1].replace(/\\u002F/g, "/"), { headers: BROWSER_HEADERS, cf: { cacheTtl: 86400, cacheEverything: true } });
+    if (!img.ok) return new Response("img fail", { status: 502, headers: CORS });
+    const ct = img.headers.get("content-type") || "image/jpeg";
+    return new Response(img.body, { status: 200, headers: { ...CORS, "Content-Type": ct, "Cache-Control": "public, max-age=86400" } });
+  } catch (e) { return new Response("error", { status: 502, headers: CORS }); }
+}
+
+// Ricerca su Ricettario Bimby (italiano): titolo + link + foto dalla pagina /cerca.
+async function handleSearchBimby(q) {
+  if (!q || !q.trim()) return json({ results: [] }, 200);
+  try {
+    const u = "https://www.ricettario-bimby.it/cerca?q=" + encodeURIComponent(q.trim());
+    const res = await fetch(u, { headers: BROWSER_HEADERS, cf: { cacheTtl: 1800, cacheEverything: true } });
+    if (!res.ok) return json({ error: "unreachable", results: [] }, 200);
+    const html = await res.text();
+    const results = [];
+    const seen = new Set();
+    // <a href="/Cat-ricette/Slug/id" title="Titolo" class="…recipe-link…"><img src="img">
+    const re = /<a href="(\/[A-Za-z0-9%-]+-ricette\/[^"]+)"[^>]*title="([^"]*)"[^>]*class="[^"]*recipe-link[^"]*"[^>]*>\s*<img[^>]+src="([^"]+)"/gi;
+    let m;
+    while ((m = re.exec(html)) && results.length < 24) {
+      const link = "https://www.ricettario-bimby.it" + m[1];
+      if (seen.has(link)) continue;
+      seen.add(link);
+      const title = clean(m[2]);
+      if (!title) continue;
+      results.push({ title, url: link, image: m[3] || "" });
+    }
+    return json({ results }, 200);
+  } catch (e) { return json({ error: "unreachable", results: [] }, 200); }
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
 
     const url = new URL(request.url);
     if (url.pathname === "/img") return handleImageProxy(url.searchParams.get("u"));
+    if (url.pathname === "/moulinex-img") return handleMoulinexImg(url.searchParams.get("u"));
+    if (url.pathname === "/searchbimby") return handleSearchBimby(url.searchParams.get("q"));
     if (url.pathname === "/searchgz") return handleSearchGz(url.searchParams.get("q"));
     if (url.pathname === "/searchmisya") return handleSearchMisya(url.searchParams.get("q"));
     if (url.pathname === "/searchcookist") return handleSearchCookist(url.searchParams.get("q"));
     if (url.pathname === "/searchricettenonna") return handleSearchRicettenonna(url.searchParams.get("q"));
-    if (url.pathname === "/searchmoulinex") return handleSearchMoulinex(url.searchParams.get("q"));
+    if (url.pathname === "/searchmoulinex") return handleSearchMoulinex(url.searchParams.get("q"), url.searchParams.get("page"));
     if (url.pathname === "/edamam") return handleEdamam(url.searchParams.get("q"), env);
     if (url.pathname === "/spoon") return handleSpoon(url.searchParams.get("q"), env);
     if (url.pathname === "/spoon-info") return handleSpoonInfo(url.searchParams.get("id"), env);

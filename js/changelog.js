@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    v: "5.8",
+    d: "2026-06-13",
+    items: [
+      "Le ricette Moulinex ora mostrano la foto anche nell'elenco dei risultati.",
+      "Risultati a pagine: la barra di ricerca resta in alto e sfogli 12 ricette per volta con Prec./Succ.",
+      "Nuova fonte: Ricettario Bimby — cerca e importa le ricette del Bimby (con foto)."
+    ]
+  },
+  {
     v: "5.7",
     d: "2026-06-13",
     minor: true,

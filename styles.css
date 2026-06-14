@@ -516,6 +516,10 @@ a { color: var(--primary-2); }
 .meal-src--edamam { background: #d8d2ff; color: #2e2070; }
 .meal-src--ricettenonna { background: #ffe6c2; color: #7a5210; }
 .meal-src--moulinex { background: #d2ecff; color: #0a4a6e; }
+.meal-src--bimby { background: #e6dcff; color: #3a1f7a; }
+.meal-controls { position: sticky; top: calc(var(--header-h, 56px) + var(--safe-top, 0px)); z-index: 6; background: var(--bg, #15161b); padding: 8px 0 6px; margin: -4px 0 4px; }
+.pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 18px 0 4px; }
+.pager__info { font-weight: 800; color: var(--text-soft); }
 .meal-card__body { padding: 10px 12px 10px 0; flex: 1; min-width: 0; }
 .meal-card__title { font-weight: 700; font-size: 1rem; margin: 0 0 4px; }
 .meal-card__meta { color: var(--text-soft); font-size: 0.78rem; }

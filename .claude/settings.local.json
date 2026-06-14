@@ -72,7 +72,27 @@
       "Bash(curl -s -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/124 Safari/537.36' --max-time 40 https://www.moulinex.it/Recipe-it-EUR.xml -o /tmp/rsm.xml)",
       "Bash(echo \"size: $\\(wc -c </tmp/rsm.xml\\)\")",
       "Bash(echo \"### numero ricette ###\")",
-      "Bash(grep -oE '<loc>[^<]+</loc>' /tmp/rsm.xml)"
+      "Bash(grep -oE '<loc>[^<]+</loc>' /tmp/rsm.xml)",
+      "Bash(echo \"### #1 og:image su una ricetta Moulinex ###\")",
+      "Bash(curl -s -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/124 Safari/537.36' --max-time 25 https://www.moulinex.it/ricette/detail/PRO/pollo-al-curry/1125)",
+      "Bash(curl -s -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/124 Safari/537.36' --max-time 25 https://www.moulinex.it/ricette/detail/PRO/pollo-al-curry/1125 -o /tmp/det.html)",
+      "Bash(echo \"### #1 URL immagine nella pagina Moulinex \\(statics/twicpics/jpg\\) ###\")",
+      "Bash(grep -oE 'https://[a-z0-9.-]*\\(sebplatform|groupe-seb|twicpics|akamaized\\)[^\"]*\\\\.\\(jpg|jpeg|png|webp\\)' /tmp/det.html)",
+      "Bash(curl -s -A 'Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 Chrome/124 Safari/537.36' -H 'Accept-Language: it-IT' --max-time 25 https://www.ricettario-bimby.it/cerca?q=pollo -o /tmp/bc.html)",
+      "Bash(tr '\\\\n' ' ')",
+      "Bash(echo \"### card: contesto attorno a un recipe-link ###\")",
+      "Bash(grep -oE '<a href=\"/[^\"]+\" class=\"[^\"]*recipe-link[^\"]*\"[^>]*>[^<]+' /tmp/bc1.html)",
+      "Bash(head -4)",
+      "Bash(echo)",
+      "Bash(echo \"### una ricetta: JSON-LD Recipe? prendo un url e provo import via worker ###\")",
+      "Bash(grep -oE '/[A-Za-z0-9-]+-ricette/[^\"]+' /tmp/bc1.html)",
+      "Bash(echo \"### card: blocco attorno a un'immagine cloudfront \\(link+titolo\\) ###\")",
+      "Bash(grep -oE '.{0,320}dweetkxm5k0ux\\\\.cloudfront\\\\.net/recipeimage/[^\"]+meringhe\\\\.jpg.{0,260}' /tmp/bc1.html)",
+      "Bash(head -c 760)",
+      "Bash(echo \"### import-ability di una ricetta bimby \\(worker live\\) ###\")",
+      "Bash(curl -s -o /tmp/bi.json -w 'HTTP %{http_code}\\\\n' --max-time 35 __TRACKED_VAR__/?url=https://www.ricettario-bimby.it__TRACKED_VAR__)",
+      "Bash(grep -oE '\"title\":\"[^\"]*\"' /tmp/bi.json)",
+      "Bash(echo \"titolo: $\\(grep -oE '\"title\":\"[^\"]*\"' /tmp/bi.json)"
     ]
   }
 }

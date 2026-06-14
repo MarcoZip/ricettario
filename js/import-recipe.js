@@ -63,17 +63,27 @@ export async function searchRicettenonna(query) {
 // Ricettario Moulinex (italiano): con una query cerca nell'intero catalogo ricette
 // (sitemap); senza query mostra la selezione curata per il Companion.
 // Ritorna { results, total } dove total è quante combaciano in tutto.
-export async function searchMoulinexFull(query) {
-  if (!WORKER_URL) return { results: [], total: 0 };
+export async function searchMoulinexFull(query, page = 0) {
+  if (!WORKER_URL) return { results: [], total: 0, page: 0 };
   const q = (query || "").trim();
-  const res = await fetch(`${WORKER_URL}/searchmoulinex${q ? "?q=" + encodeURIComponent(q) : ""}`);
+  const params = q ? `?q=${encodeURIComponent(q)}&page=${page}` : "";
+  const res = await fetch(`${WORKER_URL}/searchmoulinex${params}`);
   if (!res.ok) throw new Error("Servizio non raggiungibile.");
   const d = await res.json().catch(() => ({}));
   const results = Array.isArray(d.results) ? d.results : [];
-  return { results, total: typeof d.total === "number" ? d.total : results.length };
+  return { results, total: typeof d.total === "number" ? d.total : results.length, page: d.page || 0 };
 }
 export async function searchMoulinex(query) {
   return (await searchMoulinexFull(query)).results;
+}
+
+// Ricerca su Ricettario Bimby (italiano): ritorna [{ title, url, image }].
+export async function searchBimby(query) {
+  if (!WORKER_URL || !query.trim()) return [];
+  const res = await fetch(`${WORKER_URL}/searchbimby?q=${encodeURIComponent(query.trim())}`);
+  if (!res.ok) throw new Error("Servizio non raggiungibile.");
+  const d = await res.json().catch(() => ({}));
+  return Array.isArray(d.results) ? d.results : [];
 }
 
 // Ricerca su Edamam (inglese, richiede le chiavi sul worker).

@@ -7,7 +7,7 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchEdamam, searchSpoon, spoonInfo, winePairing } from "./import-recipe.js";
+import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchEdamam, searchSpoon, spoonInfo, winePairing } from "./import-recipe.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage, shareMenuImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
@@ -107,6 +107,7 @@ let mealResults = null;
 let mealLoading = false;
 let mealError = "";
 let mealTotal = null; // totale risultati Moulinex (può superare quelli mostrati)
+let mealPage = 0; // pagina corrente dei risultati online
 
 // Callback impostate da app.js
 export const handlers = {
@@ -2287,7 +2288,7 @@ function renderRicettario() {
   else renderSitiTab();
 }
 
-const SOURCE_LABEL = { mealdb: "TheMealDB", gz: "GialloZafferano", misya: "Misya", cookist: "Cookist", ricettenonna: "Ricette della Nonna", moulinex: "Moulinex Companion", spoon: "Spoonacular", edamam: "Edamam" };
+const SOURCE_LABEL = { mealdb: "TheMealDB", gz: "GialloZafferano", misya: "Misya", cookist: "Cookist", ricettenonna: "Ricette della Nonna", moulinex: "Moulinex Companion", bimby: "Bimby", spoon: "Spoonacular", edamam: "Edamam" };
 function onlineSources() {
   const list = [
     { k: "all", label: "Tutte le fonti" },
@@ -2295,7 +2296,8 @@ function onlineSources() {
     { k: "misya", label: "Misya (IT)" },
     { k: "cookist", label: "Cookist (IT)" },
     { k: "ricettenonna", label: "Ricette della Nonna (IT)" },
-    { k: "moulinex", label: "Moulinex Companion (sfoglia)" },
+    { k: "moulinex", label: "Moulinex (4800+ ricette)" },
+    { k: "bimby", label: "Bimby (IT)" },
     { k: "mealdb", label: "TheMealDB (tradotto)" }
   ];
   if (SPOONACULAR_ENABLED) list.push({ k: "spoon", label: "Spoonacular (tradotto)" });
@@ -2308,7 +2310,8 @@ const mapGz = (r) => ({ source: "gz", title: r.title, title_it: r.title, image: 
 const mapMisya = (r) => ({ source: "misya", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "Misya" });
 const mapCookist = (r) => ({ source: "cookist", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "Cookist" });
 const mapRicettenonna = (r) => ({ source: "ricettenonna", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "Ricette della Nonna" });
-const mapMoulinex = (r) => ({ source: "moulinex", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "Companion" });
+const mapMoulinex = (r) => ({ source: "moulinex", title: r.title, title_it: r.title, image: r.image || (r.url && WORKER_URL ? `${WORKER_URL}/moulinex-img?u=${encodeURIComponent(r.url)}` : ""), link: r.url, meta: "Moulinex" });
+const mapBimby = (r) => ({ source: "bimby", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "Bimby" });
 const mapEdamam = (r) => ({ source: "edamam", title: r.title, image: r.image || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], servings: r.servings || null, time: r.time || null, meta: [r.time ? r.time + " min" : "", r.servings ? "per " + r.servings : ""].filter(Boolean).join(" · ") });
 const mapSpoon = (r) => ({ source: "spoon", id: r.id || null, title: r.title, image: r.image || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], servings: r.servings || null, time: r.time || null, meta: [r.time ? r.time + " min" : "", r.servings ? "per " + r.servings : ""].filter(Boolean).join(" · ") });
 
@@ -2326,7 +2329,8 @@ async function runMealSearch(q) {
   if (mealSource === "misya") { const out = (await searchMisya(q)).map(mapMisya); return out; }
   if (mealSource === "cookist") { const out = (await searchCookist(q)).map(mapCookist); return out; }
   if (mealSource === "ricettenonna") { const out = (await searchRicettenonna(q)).map(mapRicettenonna); return out; }
-  if (mealSource === "moulinex") { const d = await searchMoulinexFull(q); mealTotal = d.total; return d.results.map(mapMoulinex); }
+  if (mealSource === "moulinex") { const d = await searchMoulinexFull(q, mealPage); mealTotal = d.total; return d.results.map(mapMoulinex); }
+  if (mealSource === "bimby") { const out = (await searchBimby(q)).map(mapBimby); return out; }
   if (mealSource === "spoon") {
     const out = (await searchSpoon(await translateToEnglish(q))).map(mapSpoon);
     await translateMealTitles(out);
@@ -2374,9 +2378,13 @@ function emptyArt() {
 // dal "tira-per-aggiornare").
 // Fonti "da sfogliare": non hanno la ricerca testuale, mostrano una lista curata.
 const BROWSE_SOURCES = new Set(["moulinex"]);
-async function performMealSearch(q) {
+// Fonti paginate dal server (la pagina si rifà sul worker a ogni cambio pagina).
+const SERVER_PAGINATED = new Set(["moulinex"]);
+const MEAL_PAGE_SIZE = 12;
+async function performMealSearch(q, keepPage = false) {
   q = (q || "").trim();
   if (!q && !BROWSE_SOURCES.has(mealSource)) return;
+  if (!keepPage) mealPage = 0;
   mealQuery = q; mealLoading = true; mealError = ""; mealTotal = null; renderOnlineTab();
   try {
     mealResults = await runMealSearch(q);
@@ -2385,6 +2393,14 @@ async function performMealSearch(q) {
     mealResults = null;
   }
   mealLoading = false; renderOnlineTab();
+}
+// Cambia pagina dei risultati: rifà la ricerca (fonti server-paginate) o slice locale.
+function changeMealPage(delta) {
+  const next = mealPage + delta;
+  if (next < 0) return;
+  mealPage = next;
+  if (SERVER_PAGINATED.has(mealSource)) performMealSearch(mealQuery, true);
+  else { renderOnlineTab(); try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) {} }
 }
 async function performMealRandom() {
   mealLoading = true; mealError = ""; mealQuery = ""; renderOnlineTab();
@@ -2449,33 +2465,42 @@ function renderOnlineTab() {
   } else if (mealResults && mealResults.length === 0) {
     resultsHtml = `<div class="empty"><span class="empty__emoji">${iconHtml("magnifying-glass")}</span>Nessun risultato. Prova un altro termine (es. "pasta", "torta", "zuppa").</div>`;
   } else if (mealResults) {
-    const shown = mealResults.length;
-    const tot = (mealTotal != null && mealTotal > shown) ? mealTotal : shown;
-    const countLine = `<div class="result-count">${iconHtml("magnifying-glass")} Trovate <b>${tot}</b> ${tot === 1 ? "ricetta" : "ricette"}${tot > shown ? ` · mostrate le prime ${shown}` : ""}</div>`;
-    resultsHtml = countLine + mealResults.map(mealCardHtml).join("");
+    const serverPaged = SERVER_PAGINATED.has(mealSource);
+    const totalItems = serverPaged ? (mealTotal != null ? mealTotal : mealResults.length) : mealResults.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / MEAL_PAGE_SIZE));
+    const pageItems = serverPaged ? mealResults : mealResults.slice(mealPage * MEAL_PAGE_SIZE, mealPage * MEAL_PAGE_SIZE + MEAL_PAGE_SIZE);
+    const countLine = `<div class="result-count">${iconHtml("magnifying-glass")} Trovate <b>${totalItems}</b> ${totalItems === 1 ? "ricetta" : "ricette"}${totalPages > 1 ? ` · pagina ${mealPage + 1} di ${totalPages}` : ""}</div>`;
+    const pager = totalPages > 1 ? `<div class="pager">
+        <button class="btn btn--ghost" id="pagePrev" ${mealPage === 0 ? "disabled" : ""}>${iconHtml("caret-left")} Prec.</button>
+        <span class="pager__info">${mealPage + 1} / ${totalPages}</span>
+        <button class="btn btn--ghost" id="pageNext" ${mealPage >= totalPages - 1 ? "disabled" : ""}>Succ. ${iconHtml("caret-right")}</button>
+      </div>` : "";
+    resultsHtml = countLine + pageItems.map(mealCardHtml).join("") + pager;
   } else {
-    resultsHtml = `<div class="empty">${emptyArt()}<div style="margin-top:6px">Cerca una ricetta in italiano.<br><small>Scegli la fonte qui sopra, o lasciati sorprendere dal Companion.</small></div></div>`;
+    resultsHtml = `<div class="empty">${emptyArt()}<div style="margin-top:6px">Cerca una ricetta in italiano.<br><small>Scegli la fonte qui sopra, o lasciati sorprendere.</small></div></div>`;
   }
   const srcOpts = onlineSources().map((s) => `<option value="${s.k}" ${mealSource === s.k ? "selected" : ""}>${s.label}</option>`).join("");
   const browse = BROWSE_SOURCES.has(mealSource);
   if (browse && !mealResults && !mealLoading && !mealError) {
-    resultsHtml = `<div class="empty"><span class="empty__emoji">${iconHtml("cooking-pot")}</span>Carico il ricettario Companion…</div>`;
+    resultsHtml = `<div class="empty"><span class="empty__emoji">${iconHtml("cooking-pot")}</span>Carico le ricette…</div>`;
   }
 
   body.innerHTML = `
-    <div class="field" style="margin-bottom:10px"><select id="mealSource">${srcOpts}</select></div>
-    <button class="btn btn--ghost btn--block" id="companionRandom" style="margin-bottom:12px">🎲 Sorprendimi col Companion</button>
-    ${browse ? `<div class="banner" style="margin-bottom:12px">🤖 <div>Cerca tra le <b>oltre 4800 ricette Moulinex</b> (scrivi un piatto, es. "pollo"), o sfoglia la selezione Companion qui sotto. Tocca <b>Importa</b>: arriva con foto, ingredienti e passaggi.</div></div>` : ""}
-    <div class="search-bar">
-      <input type="search" id="mealSearch" placeholder="Cerca in italiano (es. pollo, torta...)" value="${escapeHtml(mealQuery)}" />
-      <button class="btn btn--primary" id="mealSearchBtn">Cerca</button>
+    <div class="meal-controls">
+      <div class="field" style="margin-bottom:10px"><select id="mealSource">${srcOpts}</select></div>
+      ${mealSource === "moulinex" ? `<button class="btn btn--ghost btn--block" id="companionRandom" style="margin-bottom:12px">🎲 Sorprendimi col Companion</button>` : ""}
+      ${browse ? `<div class="banner" style="margin-bottom:12px">🤖 <div>Cerca tra le <b>oltre 4800 ricette Moulinex</b> (scrivi un piatto, es. "pollo"), o sfoglia la selezione qui sotto. Tocca <b>Importa</b>: arriva con foto, ingredienti e passaggi.</div></div>` : ""}
+      <div class="search-bar">
+        <input type="search" id="mealSearch" placeholder="Cerca in italiano (es. pollo, torta...)" value="${escapeHtml(mealQuery)}" />
+        <button class="btn btn--primary" id="mealSearchBtn">Cerca</button>
+      </div>
+      ${mealSource === "mealdb" ? `<div style="margin-top:10px"><button class="btn btn--ghost" id="mealRandom">${iconHtml("shuffle")} Ispirami</button></div>` : ""}
     </div>
-    ${mealSource === "mealdb" ? `<div style="margin-bottom:16px"><button class="btn btn--ghost" id="mealRandom">${iconHtml("shuffle")} Ispirami</button></div>` : `<div style="margin-bottom:16px"></div>`}
     <div id="mealResults">${resultsHtml}</div>
   `;
 
   body.querySelector("#mealSource").addEventListener("change", (e) => {
-    mealSource = e.target.value; mealResults = null; mealError = ""; mealQuery = "";
+    mealSource = e.target.value; mealResults = null; mealError = ""; mealQuery = ""; mealPage = 0; mealTotal = null;
     renderOnlineTab();
     if (BROWSE_SOURCES.has(mealSource)) performMealSearch(""); // carica subito la lista
   });
@@ -2488,6 +2513,11 @@ function renderOnlineTab() {
   }
   const randomBtn = body.querySelector("#mealRandom");
   if (randomBtn) randomBtn.addEventListener("click", () => performMealRandom());
+
+  const pagePrev = body.querySelector("#pagePrev");
+  if (pagePrev) pagePrev.addEventListener("click", () => changeMealPage(-1));
+  const pageNext = body.querySelector("#pageNext");
+  if (pageNext) pageNext.addEventListener("click", () => changeMealPage(1));
 
   const companionRandom = body.querySelector("#companionRandom");
   if (companionRandom) companionRandom.addEventListener("click", async () => {
@@ -2526,7 +2556,7 @@ function renderOnlineTab() {
     saveBtn.addEventListener("click", async () => {
       const old = saveBtn.innerHTML;
       saveBtn.disabled = true;
-      if (data.source === "gz" || data.source === "misya" || data.source === "cookist" || data.source === "ricettenonna" || data.source === "moulinex") {
+      if (data.source === "gz" || data.source === "misya" || data.source === "cookist" || data.source === "ricettenonna" || data.source === "moulinex" || data.source === "bimby") {
         // Siti italiani: importa la ricetta completa dal link (già in italiano).
         saveBtn.innerHTML = `${iconHtml("download-simple")} Importo...`;
         try {
@@ -2587,7 +2617,7 @@ function mealCardHtml(m, i = 0) {
         <div class="meal-card__meta"><span class="meal-src meal-src--${m.source}">${SOURCE_LABEL[m.source] || ""}</span>${m.meta ? " · " + escapeHtml(m.meta) : ""}</div>
         <div class="meal-card__actions">
           ${m.link ? `<a class="chip" href="${escapeHtml(safeUrl(m.link))}" target="_blank" rel="noopener">${iconHtml("arrow-square-out")} Apri</a>` : ""}
-          <button class="chip" data-act="save">${iconHtml("plus")} ${(m.source === "gz" || m.source === "misya" || m.source === "cookist" || m.source === "ricettenonna" || m.source === "moulinex") ? "Importa" : "Salva"}</button>
+          <button class="chip" data-act="save">${iconHtml("plus")} ${(m.source === "gz" || m.source === "misya" || m.source === "cookist" || m.source === "ricettenonna" || m.source === "moulinex" || m.source === "bimby") ? "Importa" : "Salva"}</button>
         </div>
       </div>
     </div>`;
