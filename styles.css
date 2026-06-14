@@ -497,6 +497,21 @@ a { color: var(--primary-2); }
 .shop-cost { margin-top: 16px; padding: 12px 14px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 14px; font-size: 0.95rem; }
 .shop-cost b { color: var(--primary-2); font-size: 1.1rem; }
 .shop-cost__note { color: var(--text-soft); font-size: 0.8rem; }
+/* Budget di spesa mensile */
+.budget-box { margin-top: 12px; display: block; }
+.budget-box__top { margin-bottom: 8px; }
+.budget-bar { height: 10px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+.budget-bar__fill { display: block; height: 100%; border-radius: 999px; background: var(--primary-grad); transition: width 0.4s ease; }
+.budget-box.is-over { border-color: var(--danger); }
+.budget-box.is-over .budget-bar__fill { background: var(--danger); }
+.budget-box.is-over .shop-cost__note { color: var(--danger); }
+/* Scorta di base in dispensa (stella) */
+.pan-star { background: none; border: none; font-size: 1.15rem; line-height: 1; padding: 2px 4px; cursor: pointer; color: var(--text-soft); }
+.pan-star.is-on { color: #ffc24d; }
+/* Riga in modalità "ordina a mano" */
+.shop-row--reorder { align-items: center; }
+.shop-row--reorder .shop-row__amt-txt { color: var(--text-soft); font-size: 0.85rem; margin-left: 6px; }
+.shop-row--reorder .tool-reorder { margin-top: 0; margin-left: auto; }
 .festive-banner { display: inline-block; font-weight: 800; font-size: 0.9rem; padding: 5px 12px; border-radius: 999px; margin-bottom: 6px; background: rgba(var(--primary-rgb, 255,184,107), 0.16); color: var(--primary-2); border: 1px solid rgba(var(--primary-rgb, 255,184,107), 0.3); }
 .mic-btn.is-listening { color: var(--danger); animation: pulse 1s infinite; }
 .tabs { display: flex; gap: 8px; margin-bottom: 18px; }

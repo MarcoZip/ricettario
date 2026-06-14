@@ -2956,6 +2956,10 @@ function addSpend(amount) {
   try { localStorage.setItem(SPEND_KEY, JSON.stringify(s)); } catch (e) {}
 }
 function currentMonthSpend() { return getSpend()[new Date().toISOString().slice(0, 7)] || 0; }
+// Budget di spesa mensile (facoltativo, locale).
+const BUDGET_KEY = "ricettario.budget";
+function getBudget() { const v = parseFloat(localStorage.getItem(BUDGET_KEY)); return isNaN(v) || v <= 0 ? 0 : v; }
+function setBudget(v) { try { if (v > 0) localStorage.setItem(BUDGET_KEY, String(v)); else localStorage.removeItem(BUDGET_KEY); } catch (e) {} }
 function openSpendHistory() {
   const s = getSpend();
   const MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
@@ -2963,8 +2967,20 @@ function openSpendHistory() {
     const [y, mo] = ym.split("-");
     return `<div class="stat-row"><span>${MESI[+mo - 1]} ${y}</span><b>€ ${(s[ym] || 0).toFixed(2)}</b></div>`;
   }).join("") || `<div class="hint">Ancora nessuna spesa registrata.</div>`;
-  const m = openModal(`<h3 class="modal__title">${iconHtml("basket")} Spesa per mese</h3><div class="cl-scroll">${rows}</div><div class="hint" style="margin-top:8px">Stima indicativa, calcolata quando tocchi "Spesa fatta".</div><div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>`);
-  m.el.querySelector('[data-act="ok"]').addEventListener("click", m.close);
+  const m = openModal(`<h3 class="modal__title">${iconHtml("basket")} Spesa per mese</h3>
+    <div class="field" style="margin-bottom:12px">
+      <label>Budget mensile (€) — facoltativo</label>
+      <input type="number" id="budgetIn" inputmode="decimal" min="0" step="10" placeholder="es. 400" value="${getBudget() || ""}" />
+      <div class="hint" style="margin-top:4px">Lascia vuoto per non usare il budget.</div>
+    </div>
+    <div class="cl-scroll">${rows}</div><div class="hint" style="margin-top:8px">Stima indicativa, calcolata quando tocchi "Spesa fatta".</div>
+    <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Salva</button></div>`);
+  m.el.querySelector('[data-act="ok"]').addEventListener("click", () => {
+    const v = parseFloat((m.el.querySelector("#budgetIn").value || "").replace(",", ".")) || 0;
+    setBudget(v);
+    m.close();
+    if (shopTab === "lista") renderShoppingList();
+  });
 }
 
 // Lista "Da provare": ricette online segnate per importarle più avanti (locale).
@@ -3323,6 +3339,45 @@ function renderShopping() {
 }
 
 let shopGroupBy = "aisle"; // "aisle" (reparto) | "recipe" (ricetta di origine)
+let shopManual = false; // modalità "ordina a mano" (lista piatta riordinabile)
+// Riga "spesa del mese" con barra del budget se impostato.
+function budgetLineHtml() {
+  const spent = currentMonthSpend();
+  const budget = getBudget();
+  if (spent <= 0 && !budget) return "";
+  if (!budget) {
+    return `<button class="shop-cost" id="spendLine" style="width:100%;text-align:left;cursor:pointer">${iconHtml("calendar-dots")} Spesa di questo mese (stima): <b>€ ${spent.toFixed(2)}</b><span class="shop-cost__note"> · tocca per budget e storico</span></button>`;
+  }
+  const pct = Math.min(100, Math.round((spent / budget) * 100));
+  const over = spent > budget;
+  const left = budget - spent;
+  return `<button class="shop-cost budget-box ${over ? "is-over" : ""}" id="spendLine" style="width:100%;text-align:left;cursor:pointer">
+      <div class="budget-box__top">${iconHtml("calendar-dots")} Budget del mese: <b>€ ${spent.toFixed(2)}</b> / € ${budget.toFixed(2)}</div>
+      <div class="budget-bar"><span class="budget-bar__fill" style="width:${pct}%"></span></div>
+      <div class="shop-cost__note">${over ? `Superato di € ${(-left).toFixed(2)}` : `Restano € ${left.toFixed(2)}`} · tocca per modificare</div>
+    </button>`;
+}
+
+// Aggiungi spesa da testo incollato: una riga (o voce separata da virgola) = un articolo.
+function openPasteShopping() {
+  const m = openModal(`
+    <h3 class="modal__title">📋 Incolla una lista</h3>
+    <p class="hint" style="margin-top:-8px;margin-bottom:12px">Incolla o scrivi qui gli articoli: uno per riga (oppure separati da virgola). Es. <i>2 uova, latte, 500 g farina</i>.</p>
+    <div class="field"><textarea id="pasteIn" rows="7" placeholder="2 uova&#10;latte&#10;500 g farina&#10;pane"></textarea></div>
+    <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button><button class="btn btn--primary" data-act="ok">Aggiungi</button></div>
+  `);
+  setTimeout(() => m.el.querySelector("#pasteIn").focus(), 50);
+  m.el.querySelector('[data-act="cancel"]').onclick = m.close;
+  m.el.querySelector('[data-act="ok"]').onclick = async () => {
+    const raw = (m.el.querySelector("#pasteIn").value || "").replace(/,/g, "\n");
+    const parsed = parseList(raw).map((p) => ({ ...p, category: categorize(p.name) }));
+    if (!parsed.length) { toast("Niente da aggiungere", "error"); return; }
+    m.close();
+    const res = await store.addShoppingItems(parsed);
+    toast(res.added ? shoppingToast(res) : "Erano già tutti in dispensa", res.added ? "success" : "error");
+  };
+}
+
 function renderShoppingList() {
   const wrap = root.querySelector("#spesaBody");
   const items = store.getShopping();
@@ -3332,6 +3387,21 @@ function renderShoppingList() {
   let body;
   if (!items.length) {
     body = `<div class="empty">${emptyArt("cart")}<div style="margin-top:6px">La lista è vuota.<br>Aggiungi gli ingredienti da una ricetta o scrivili qui sotto.</div></div>`;
+  } else if (shopManual) {
+    // Ordina a mano: lista piatta nell'ordine personalizzato, con frecce su/giù.
+    const ord = store.shoppingActiveOrdered();
+    const rows = ord.map((it, i) => {
+      const qty = it.qty != null ? formatQty(it.qty) : "";
+      const amount = [qty, it.unit && it.unit !== "q.b." ? it.unit : (it.unit === "q.b." ? "q.b." : "")].filter(Boolean).join(" ");
+      return `<div class="shop-row shop-row--reorder" data-id="${it.id}">
+        <span class="shop-row__name">${escapeHtml(it.name)}${amount ? ` <span class="shop-row__amt-txt">${escapeHtml(amount)}</span>` : ""}</span>
+        <div class="tool-reorder">
+          <button class="stepper__btn" data-up="${it.id}" ${i === 0 ? "disabled" : ""}>↑</button>
+          <button class="stepper__btn" data-down="${it.id}" ${i === ord.length - 1 ? "disabled" : ""}>↓</button>
+        </div>
+      </div>`;
+    }).join("");
+    body = rows || `<div class="hint">Tutto preso! 🎉</div>`;
   } else {
     let groupsHtml;
     if (shopGroupBy === "recipe") {
@@ -3373,15 +3443,18 @@ function renderShoppingList() {
   wrap.innerHTML = `
     <div class="search-bar">
       <input type="text" id="shopAdd" placeholder="Aggiungi un articolo..." />
+      <button class="btn" id="shopPasteBtn" title="Incolla una lista">📋</button>
       <button class="btn btn--primary" id="shopAddBtn">${iconHtml("plus")}</button>
     </div>
+    ${shopManual ? `<div class="hint" style="margin-bottom:8px">Usa le frecce per ordinare. Tocca "Fine" per tornare alla lista.</div>` : ""}
     <div id="shopBody">${body}</div>
     ${(() => { const c = estimateCost(active); return c.counted ? `<div class="shop-cost">${iconHtml("basket")} Costo stimato del carrello: <b>€ ${c.total.toFixed(2)}</b><span class="shop-cost__note"> · stima su ${c.counted} articoli</span></div>` : ""; })()}
-    ${currentMonthSpend() > 0 ? `<button class="shop-cost" id="spendLine" style="width:100%;text-align:left;cursor:pointer">${iconHtml("calendar-dots")} Spesa di questo mese (stima): <b>€ ${currentMonthSpend().toFixed(2)}</b><span class="shop-cost__note"> · tocca per lo storico</span></button>` : ""}
+    ${budgetLineHtml()}
     ${done.length ? `<button class="btn btn--primary btn--block" id="toPantry" style="margin-top:18px">${iconHtml("basket")} Spesa fatta: presi in dispensa</button>` : ""}
     ${items.length ? `<div style="display:flex;gap:8px;margin-top:${done.length ? "8px" : "18px"};flex-wrap:wrap">
       <button class="btn btn--ghost" id="shopShare">${iconHtml("arrow-square-out")} Invia lista</button>
       <button class="btn btn--ghost" id="groupByBtn">${iconHtml("book-open")} ${shopGroupBy === "recipe" ? "Per reparto" : "Per ricetta"}</button>
+      <button class="btn btn--ghost" id="reorderBtn">⇅ ${shopManual ? "Fine ordina" : "Ordina a mano"}</button>
       <button class="btn btn--ghost" id="aisleBtn">${iconHtml("sliders-horizontal")} Reparti</button>
       <button class="btn btn--ghost" id="clearDone">Svuota presi</button>
       <button class="btn btn--ghost" id="clearAll" style="color:var(--danger)">Svuota tutto</button>
@@ -3400,7 +3473,7 @@ function renderShoppingList() {
   wrap.querySelector("#shopAddBtn").addEventListener("click", doAdd);
   addInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdd(); });
 
-  wrap.querySelectorAll(".shop-row").forEach((rowEl) => {
+  wrap.querySelectorAll(".shop-row:not(.shop-row--reorder)").forEach((rowEl) => {
     const id = rowEl.dataset.id;
     const toggle = () => {
       const it = store.getShopping().find((s) => s.id === id);
@@ -3409,7 +3482,8 @@ function renderShoppingList() {
       if (willCheck) haptic(10);
       store.toggleShoppingItem(id, willCheck);
     };
-    rowEl.querySelector('[data-act="check"]').addEventListener("click", toggle);
+    const chk = rowEl.querySelector('[data-act="check"]');
+    if (chk) chk.addEventListener("click", toggle);
     const nameEl = rowEl.querySelector('[data-act="toggle"]');
     if (nameEl) nameEl.addEventListener("click", toggle); // tap sul nome = spunta rapida
     const qtyEl = rowEl.querySelector('[data-act="qty"]');
@@ -3418,8 +3492,16 @@ function renderShoppingList() {
       const it = store.getShopping().find((s) => s.id === id);
       if (it) editShoppingQty(it);
     });
-    rowEl.querySelector('[data-act="del"]').addEventListener("click", (e) => { e.stopPropagation(); store.deleteShoppingItem(id); });
+    const delEl = rowEl.querySelector('[data-act="del"]');
+    if (delEl) delEl.addEventListener("click", (e) => { e.stopPropagation(); store.deleteShoppingItem(id); });
   });
+  // Frecce di riordino (modalità "ordina a mano").
+  wrap.querySelectorAll("[data-up]").forEach((b) => b.addEventListener("click", () => store.moveShoppingItem(b.dataset.up, -1)));
+  wrap.querySelectorAll("[data-down]").forEach((b) => b.addEventListener("click", () => store.moveShoppingItem(b.dataset.down, 1)));
+  const rb = wrap.querySelector("#reorderBtn");
+  if (rb) rb.addEventListener("click", () => { shopManual = !shopManual; renderShoppingList(); });
+  const pasteBtn = wrap.querySelector("#shopPasteBtn");
+  if (pasteBtn) pasteBtn.addEventListener("click", openPasteShopping);
 
   const tp = wrap.querySelector("#toPantry");
   if (tp) tp.addEventListener("click", () => {
@@ -3517,7 +3599,7 @@ function expiryBadge(ds) {
 }
 function pantryRow(p) {
   return `<div class="shop-row" data-id="${p.id}">
-    <span class="day-row__icon">${iconHtml("basket")}</span>
+    <button class="pan-star ${p.base ? "is-on" : ""}" data-act="base" title="${p.base ? "Scorta di base (avvisa quando finisce)" : "Segna come scorta sempre in casa"}">${p.base ? "⭐" : "☆"}</button>
     <span class="shop-row__name">${escapeHtml(p.name)}</span>
     <button class="shop-row__amt" data-act="qty" title="Quantità">${p.qty ? escapeHtml(p.qty) : iconHtml("pencil-simple")}</button>
     ${expiryBadge(p.expiry)}
@@ -3565,7 +3647,7 @@ function renderPantry() {
     : `<div class="empty">${emptyArt("jar")}<div style="margin-top:6px">Dispensa vuota.<br>Aggiungi ciò che hai già in casa: non verrà inserito nella spesa.</div></div>`;
 
   wrap.innerHTML = `
-    <div class="hint" style="margin-bottom:10px">Quello che metti qui non verrà aggiunto alla lista della spesa. La data di scadenza è facoltativa.</div>
+    <div class="hint" style="margin-bottom:10px">Quello che metti qui non verrà aggiunto alla lista della spesa. La data di scadenza è facoltativa. Tocca la ⭐ per segnare una <b>scorta di base</b>: quando la elimini (finita) torna subito nella spesa.</div>
     <button class="btn btn--primary btn--block" id="cookSuggest" style="margin-bottom:14px">${iconHtml("fork-knife")} Cosa posso cucinare con questi?</button>
     <div class="pan-add">
       <input type="text" id="panAdd" placeholder="Aggiungi un alimento..." />
@@ -3593,11 +3675,25 @@ function renderPantry() {
   const scanBtn = wrap.querySelector("#panScan");
   if (scanBtn) scanBtn.addEventListener("click", openBarcodeScanner);
   wrap.querySelectorAll(".shop-row").forEach((rowEl) => {
-    rowEl.querySelector('[data-act="del"]').addEventListener("click", () => store.deletePantryItem(rowEl.dataset.id));
+    const id = rowEl.dataset.id;
+    rowEl.querySelector('[data-act="del"]').addEventListener("click", async () => {
+      const p = store.getPantry().find((x) => x.id === id);
+      await store.deletePantryItem(id);
+      // Scorta di base finita: la rimetto subito in lista della spesa.
+      if (p && p.base) {
+        await store.addShoppingItems([{ name: p.name, category: categorize(p.name), from: "Scorte" }]);
+        toast(`"${p.name}" è finita: aggiunta alla spesa`, "success");
+      }
+    });
+    const star = rowEl.querySelector('[data-act="base"]');
+    if (star) star.addEventListener("click", () => {
+      const p = store.getPantry().find((x) => x.id === id);
+      store.setPantryBase(id, !(p && p.base));
+    });
     const qb = rowEl.querySelector('[data-act="qty"]');
     if (qb) qb.addEventListener("click", () => {
-      const p = store.getPantry().find((x) => x.id === rowEl.dataset.id);
-      openPrompt("Quantità", "Es. 2 kg, 1 confezione…", (val) => store.setPantryQty(rowEl.dataset.id, val), p && p.qty ? p.qty : "");
+      const p = store.getPantry().find((x) => x.id === id);
+      openPrompt("Quantità", "Es. 2 kg, 1 confezione…", (val) => store.setPantryQty(id, val), p && p.qty ? p.qty : "");
     });
   });
 }

@@ -6,6 +6,16 @@
 
 export const CHANGELOG = [
   {
+    v: "7.9",
+    d: "2026-06-14",
+    items: [
+      "Budget di spesa mensile: imposta un tetto e vedi la barra di avanzamento nella lista.",
+      "Scorte di base in dispensa: segna gli alimenti sempre in casa con la ⭐; quando finiscono tornano nella spesa.",
+      "Aggiungi alla spesa incollando una lista (un articolo per riga o separati da virgola).",
+      "Ordina la lista della spesa a mano con le frecce su/giù."
+    ]
+  },
+  {
     v: "7.8",
     d: "2026-06-14",
     items: [

@@ -251,6 +251,7 @@ export async function addShoppingItems(rawItems) {
         category: it.category || categorize(it.name),
         from: it.from || "",
         checked: false,
+        order: state.shopping.filter((s) => !s.checked).length,
         createdAt: now()
       });
     }
@@ -261,6 +262,28 @@ export async function addShoppingItems(rawItems) {
 
 export async function toggleShoppingItem(id, checked) {
   await adapter.updateShopping(id, { checked });
+}
+// Ordine manuale della lista: assicura un campo `order` su tutti gli articoli
+// attivi e scambia due posizioni adiacenti.
+export function shoppingActiveOrdered() {
+  const active = state.shopping.filter((s) => !s.checked);
+  return active.sort((a, b) => {
+    const oa = a.order != null ? a.order : Number.MAX_SAFE_INTEGER;
+    const ob = b.order != null ? b.order : Number.MAX_SAFE_INTEGER;
+    if (oa !== ob) return oa - ob;
+    return (a.createdAt || "").localeCompare(b.createdAt || "");
+  });
+}
+export async function moveShoppingItem(id, dir) {
+  const ord = shoppingActiveOrdered();
+  const i = ord.findIndex((s) => s.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= ord.length) return;
+  [ord[i], ord[j]] = [ord[j], ord[i]];
+  // Riassegna gli indici e salva solo quelli cambiati.
+  for (let k = 0; k < ord.length; k++) {
+    if (ord[k].order !== k) await adapter.updateShopping(ord[k].id, { order: k });
+  }
 }
 export async function updateShoppingItem(id, patch) {
   await adapter.updateShopping(id, patch);
@@ -377,6 +400,10 @@ export async function setPantryExpiry(id, expiry) {
 }
 export async function setPantryQty(id, qty) {
   await adapter.updatePantry(id, { qty: (qty || "").trim() || null });
+}
+// Scorta di base ("sempre in casa"): quando finisce, va proposta per il riacquisto.
+export async function setPantryBase(id, on) {
+  await adapter.updatePantry(id, { base: !!on });
 }
 export async function deletePantryItem(id) {
   await adapter.deletePantry(id);
