@@ -2,7 +2,7 @@
 import * as store from "./store.js";
 import * as mealdb from "./mealdb.js";
 import { ITALIAN_SITES } from "./sites.js";
-import { iconHtml, rawIcon, ICON_PICKER, resolveIcon } from "./icons.js";
+import { iconHtml, rawIcon, ICON_PICKER, EMOJI_PICKER, resolveIcon } from "./icons.js";
 import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from "./ingredients.js";
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
@@ -2277,9 +2277,13 @@ function openCookingMode(recipe) {
 // ---------------- Form: strumento ----------------
 function openToolForm(tool = null) {
   const editing = Boolean(tool);
-  let selected = (editing && resolveIcon(tool.icon)) || "cooking-pot";
+  // Mantieni il valore salvato (icona disegnata o emoji) per evidenziare la scelta.
+  let selected = editing ? (resolveIcon(tool.icon) || tool.icon) : "cooking-pot";
   const iconBtns = ICON_PICKER.map(
     (name) => `<button type="button" data-icon="${name}" class="${name === selected ? "is-selected" : ""}">${iconHtml(name)}</button>`
+  ).join("");
+  const emojiBtns = EMOJI_PICKER.map(
+    (e) => `<button type="button" data-icon="${e}" class="icon-emoji ${e === selected ? "is-selected" : ""}">${e}</button>`
   ).join("");
 
   const m = openModal(`
@@ -2290,7 +2294,7 @@ function openToolForm(tool = null) {
     </div>
     <div class="field">
       <label>Icona</label>
-      <div class="icon-picker" id="iconPicker">${iconBtns}</div>
+      <div class="icon-picker" id="iconPicker">${iconBtns}${emojiBtns}</div>
     </div>
     <div class="modal__actions">
       <button class="btn" data-act="cancel">Annulla</button>

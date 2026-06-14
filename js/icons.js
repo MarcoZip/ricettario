@@ -20,6 +20,16 @@ export const ICON_PICKER = [
   "grains", "coffee", "wine", "beer-stein", "jar", "avocado", "orange-slice", "heart"
 ];
 
+// Emoji extra selezionabili come icona dello strumento (oltre alle icone disegnate).
+// Vengono mostrate così come sono (iconHtml fa da fallback), ampliando molto la scelta.
+export const EMOJI_PICKER = [
+  "🍳", "🥘", "🍲", "🫕", "🍜", "🍝", "🍛", "🍚", "🍱", "🥗", "🌮", "🌯", "🥙", "🥪", "🍔", "🌭",
+  "🥟", "🍤", "🍣", "🍙", "🥡", "🍢", "🍗", "🍖", "🥩", "🥓", "🦐", "🐟", "🥚", "🧀", "🥦", "🥕",
+  "🌽", "🌶️", "🍅", "🍆", "🥔", "🍄", "🧄", "🧅", "🥑", "🍋", "🍊", "🍎", "🍇", "🍓", "🍌", "🍍",
+  "🍰", "🧁", "🎂", "🍮", "🍪", "🍩", "🍫", "🍯", "🥐", "🥨", "🥞", "🧇", "☕", "🍵", "🥤", "🍷",
+  "🍺", "🍸", "🥂", "🍾", "🧊", "🔥", "♨️", "🧂", "🔪", "🥄", "🫙", "🥣", "🍴", "🍽️", "🧑‍🍳", "👩‍🍳"
+];
+
 export function hasIcon(name) {
   return Boolean(name && ICONS[name]);
 }

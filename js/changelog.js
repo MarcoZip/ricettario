@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "6.9",
+    d: "2026-06-13",
+    items: [
+      "Molte più icone per gli strumenti: oltre a quelle disegnate ora puoi scegliere tra tante emoji (piatti, ingredienti, bevande…)."
+    ]
+  },
+  {
     v: "6.8",
     d: "2026-06-13",
     items: [

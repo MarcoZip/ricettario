@@ -635,7 +635,8 @@ a { color: var(--primary-2); }
 }
 
 /* selettore icone strumento */
-.icon-picker { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.icon-picker { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; max-height: 46vh; overflow-y: auto; overflow-x: hidden; padding: 2px; -webkit-overflow-scrolling: touch; }
+.icon-picker button.icon-emoji { font-size: 1.5rem; line-height: 1; }
 .icon-picker button {
   border: 1px solid var(--surface-3); background: var(--input-bg); border-radius: 12px;
   aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
