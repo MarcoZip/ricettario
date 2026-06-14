@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.0",
+    d: "2026-06-13",
+    items: [
+      "Nuova icona \"robot da cucina\" per gli strumenti (perfetta per Bimby, Moulinex Companion e simili), più l'emoji 🤖."
+    ]
+  },
+  {
     v: "6.9",
     d: "2026-06-13",
     items: [
