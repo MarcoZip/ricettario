@@ -7,7 +7,7 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing } from "./import-recipe.js";
+import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto } from "./import-recipe.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage, shareMenuImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
@@ -1607,6 +1607,8 @@ function renderRecipeDetail() {
 
     <button class="btn btn--block" id="cookedBtn" style="margin-bottom:10px">${iconHtml("fire")} Segna come cucinata${r.cookCount ? ` · ${r.cookCount} ${r.cookCount === 1 ? "volta" : "volte"}` : ""}</button>
     <button class="btn btn--block" id="reviewBtn" style="margin-bottom:10px">📝 Com'è venuta? (voto, foto, nota)</button>
+    <button class="btn btn--block" id="checkPhotoBtn" style="margin-bottom:10px">📷 Com'è venuto? Controlla con una foto</button>
+    <input type="file" id="checkPhotoFile" accept="image/*" capture="environment" hidden />
     <button class="btn btn--block" id="collectionsBtn" style="margin-bottom:10px">${iconHtml("book-bookmark")} Aggiungi a una raccolta</button>
     <button class="btn btn--block" id="shareImg" style="margin-bottom:10px">${iconHtml("image")} Condividi come immagine</button>
     <button class="btn btn--block" id="qrBtn" style="margin-bottom:10px">${iconHtml("qr-code")} Mostra codice QR</button>
@@ -1698,6 +1700,15 @@ function renderRecipeDetail() {
   if (prepRemind) prepRemind.addEventListener("click", () => openPrepReminder(r));
 
   // Galleria "Le mie creazioni"
+  const checkPhotoBtn = root.querySelector("#checkPhotoBtn");
+  const checkPhotoFile = root.querySelector("#checkPhotoFile");
+  if (checkPhotoBtn) checkPhotoBtn.addEventListener("click", () => checkPhotoFile.click());
+  if (checkPhotoFile) checkPhotoFile.addEventListener("change", async () => {
+    const f = checkPhotoFile.files[0]; checkPhotoFile.value = "";
+    if (!f) return;
+    openDishCheck(f, r.title);
+  });
+
   const galFile = root.querySelector("#galFile");
   const galAdd = root.querySelector("#galAdd");
   if (galAdd) galAdd.addEventListener("click", () => galFile.click());
@@ -2031,6 +2042,32 @@ function openQr(r) {
 }
 
 // "Com'è venuta?": voto a stelle + nota datata + foto, dopo aver cucinato.
+// "Com'è venuto?": scatta/scegli una foto del piatto e chiede a un'AI di visione
+// un breve parere (cottura, colore, consistenza). Onesto sui limiti: è un parere
+// a colpo d'occhio, non valuta sale/sapore/cottura interna.
+async function openDishCheck(file, title) {
+  let dataUrl;
+  try { dataUrl = await fileToDataUrl(file, 672, 0.6); }
+  catch (e) { toast("Foto non valida", "error"); return; }
+  const m = openModal(`
+    <h3 class="modal__title">📷 Com'è venuto?</h3>
+    <img src="${escapeHtml(dataUrl)}" alt="" style="width:100%;max-height:240px;object-fit:cover;border-radius:14px;display:block;margin-bottom:12px" />
+    <div id="dishCheckBody"><div style="text-align:center;padding:6px 0"><div class="spinner"></div><div class="hint">Sto guardando il piatto…</div></div></div>
+    <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
+  `);
+  m.el.querySelector('[data-act="ok"]').onclick = m.close;
+  const body = m.el.querySelector("#dishCheckBody");
+  try {
+    const feedback = await analyzeDishPhoto(dataUrl, title);
+    if (!body.isConnected) return; // l'utente ha chiuso nel frattempo
+    body.innerHTML = `<div class="dish-feedback">${escapeHtml(feedback).replace(/\n+/g, "<br>")}</div>
+      <div class="hint" style="margin-top:12px">⚠️ È solo un parere "a colpo d'occhio" da una foto: può sbagliare e non valuta sale, sapore o cottura interna.</div>`;
+  } catch (e) {
+    if (!body.isConnected) return;
+    body.innerHTML = `<div class="hint" style="color:var(--danger)">${escapeHtml(e.message || "Analisi non riuscita.")}</div>`;
+  }
+}
+
 function openCookReview(r) {
   let rating = r.rating || 0;
   const stars = () => [1, 2, 3, 4, 5].map((v) => `<button class="star ${v <= rating ? "is-on" : ""}" data-v="${v}">${iconHtml("star")}</button>`).join("");

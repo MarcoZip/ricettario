@@ -131,7 +131,9 @@
       "Bash(echo \"size: $\\(wc -c </tmp/cd.html\\)\")",
       "Bash(echo \"### og:image ###\")",
       "Bash(grep -oE '<meta property=\"og:image\"[^>]+content=\"[^\"]+\"' /tmp/cd.html)",
-      "PowerShell(git push)"
+      "PowerShell(git push)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)"
     ]
   }
 }

@@ -1105,6 +1105,8 @@ a { color: var(--primary-2); }
 .season-chip { font-size: 0.82rem; font-weight: 700; background: rgba(120, 200, 120, 0.14); border: 1px solid rgba(120, 200, 120, 0.3); color: #9be29b; border-radius: 999px; padding: 4px 10px; white-space: nowrap; cursor: pointer; }
 .season-chip:active { transform: scale(0.94); }
 .season-hint { color: var(--text-soft); font-size: 0.75rem; margin-top: 8px; }
+/* Parere "Com'è venuto?" (analisi foto piatto) */
+.dish-feedback { background: var(--input-bg); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; line-height: 1.5; font-size: 1rem; }
 .tagchip--season { background: rgba(120, 200, 120, 0.16); border: 1px solid rgba(120, 200, 120, 0.34); color: #9be29b; }
 .tagchip--ahead { background: rgba(120, 160, 255, 0.16); border: 1px solid rgba(120, 160, 255, 0.34); color: #a9c2ff; }
 .diffdots { display: inline-flex; gap: 3px; vertical-align: middle; }

@@ -13,6 +13,25 @@ export async function searchGz(query) {
   return Array.isArray(d.results) ? d.results : [];
 }
 
+// Analisi della foto del piatto: invia l'immagine (base64) al Worker, che
+// chiede a un'AI di visione un breve parere in italiano su come sembra venuto.
+// `image` è una base64 (con o senza prefisso data:). Ritorna il testo o lancia.
+export async function analyzeDishPhoto(image, title) {
+  if (!WORKER_URL) throw new Error("Funzione non disponibile (worker non configurato).");
+  let res;
+  try {
+    res = await fetch(`${WORKER_URL}/vision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image, title: title || "" })
+    });
+  } catch (e) { throw new Error("Servizio non raggiungibile. Controlla la connessione."); }
+  const d = await res.json().catch(() => ({}));
+  if (d && d.feedback) return d.feedback;
+  if (d && d.error === "noai") throw new Error("La funzione non è ancora attiva sul worker (manca il collegamento all'AI).");
+  throw new Error((d && d.message) || "Analisi non riuscita. Riprova.");
+}
+
 // Abbinamento vino consigliato per un piatto (via Spoonacular).
 export async function winePairing(food) {
   if (!WORKER_URL || !food) return null;

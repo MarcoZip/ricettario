@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.11",
+    d: "2026-06-15",
+    items: [
+      "Nuovo: \"Com'è venuto?\" — scatta una foto del piatto e l'app ti dà un parere a colpo d'occhio su cottura, colore e consistenza.",
+      "È un aiuto, non un giudice: non valuta sale, sapore o cottura interna. Funziona quando il controllo è attivo."
+    ]
+  },
+  {
     v: "7.10",
     d: "2026-06-14",
     items: [

@@ -15,7 +15,7 @@
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "*"
 };
 
@@ -396,6 +396,7 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
 
     const url = new URL(request.url);
+    if (url.pathname === "/vision") return handleVision(request, env);
     if (url.pathname === "/img") return handleImageProxy(url.searchParams.get("u"));
     if (url.pathname === "/moulinex-img") return handleMoulinexImg(url.searchParams.get("u"));
     if (url.pathname === "/searchbimby") return handleSearchBimby(url.searchParams.get("q"), url.searchParams.get("page"));
@@ -490,6 +491,53 @@ function extractHeuristic(html) {
   // Troppi pochi dati: meglio dichiarare "non trovato" che restituire spazzatura.
   if (ingredients.length < 2 && steps.length < 1) return null;
   return { title, image, servings: null, time: null, ingredients, steps, tags: [] };
+}
+
+// ---------- Analisi foto del piatto (Cloudflare Workers AI) ----------
+//  Riceve in POST { image: base64, title } e restituisce un breve parere in
+//  italiano su come sembra venuto il piatto (cottura, colore, consistenza).
+//  Usa il modello di visione gratuito di Cloudflare (entro la quota giornaliera).
+//  RICHIEDE: un binding "Workers AI" chiamato  AI  collegato a questo worker
+//  (Dashboard → Worker → Settings → Bindings → Add → Workers AI → nome: AI).
+async function handleVision(request, env) {
+  if (request.method !== "POST") return json({ error: "method", message: "Usa POST" }, 405);
+  if (!env || !env.AI) return json({ error: "noai", message: "Workers AI non collegato: aggiungi al worker un binding chiamato AI." }, 200);
+
+  let body;
+  try { body = await request.json(); } catch (e) { return json({ error: "badreq", message: "Richiesta non valida" }, 400); }
+  const b64 = String((body && body.image) || "").replace(/^data:[^,]+,/, "");
+  if (!b64) return json({ error: "noimage", message: "Foto mancante" }, 400);
+
+  let bytes;
+  try {
+    const bin = atob(b64);
+    bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  } catch (e) { return json({ error: "badimage", message: "Foto non leggibile" }, 400); }
+
+  const title = String((body && body.title) || "").slice(0, 120);
+  const prompt = [
+    "Sei un aiuto-cuoco gentile ed esperto. Guardi la foto di un piatto fatto in casa" + (title ? ` chiamato "${title}"` : "") + ".",
+    "Rispondi SOLO in italiano, in massimo 3 frasi brevi e semplici.",
+    "Valuta come sembra venuto guardando colore, grado di cottura, doratura, consistenza e impiattamento:",
+    "ad esempio se appare ben cotto, bruciato, poco cotto o pallido, troppo liquido o troppo asciutto.",
+    "Se sembra a posto, dillo con un piccolo complimento. Se vedi un possibile difetto, segnalalo con gentilezza e dai un consiglio pratico per la prossima volta.",
+    "Non inventare ingredienti che non vedi. Non parlare di sale o sapore: dalla foto non si percepiscono."
+  ].join(" ");
+
+  // Prova prima un modello più capace e multilingue; se non disponibile o con
+  // input diverso, ricade su LLaVA (stesso formato { image, prompt, max_tokens }).
+  const models = ["@cf/meta/llama-3.2-11b-vision-instruct", "@cf/llava-hf/llava-1.5-7b-hf"];
+  const input = { image: [...bytes], prompt, max_tokens: 320 };
+  let lastErr = "";
+  for (const model of models) {
+    try {
+      const out = await env.AI.run(model, input);
+      const text = String((out && (out.response || out.description || out.text)) || "").trim();
+      if (text) return json({ feedback: text }, 200);
+    } catch (e) { lastErr = (e && e.message) || String(e); }
+  }
+  return json({ error: "aifail", message: "Analisi non riuscita. Riprova tra poco." + (lastErr ? " (" + lastErr.slice(0, 120) + ")" : "") }, 200);
 }
 
 function json(obj, status) {
