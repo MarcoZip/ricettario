@@ -6,6 +6,16 @@
 
 export const CHANGELOG = [
   {
+    v: "7.12",
+    d: "2026-06-16",
+    items: [
+      "Nuovo: importa una ricetta da un video social (TikTok/Instagram/YouTube) — incolla il link e l'AI ne ricava ingredienti e passi.",
+      "Nuovo: \"Inventa una ricetta\" dagli ingredienti che hai (nel form ricetta).",
+      "Nuovo: \"Chiedi allo chef\" — un aiuto AI per sostituzioni, tempi e dubbi mentre cucini.",
+      "Tutto gratis tramite l'AI di Cloudflare; è un aiuto, non infallibile."
+    ]
+  },
+  {
     v: "7.11",
     d: "2026-06-15",
     items: [

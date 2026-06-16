@@ -133,7 +133,14 @@
       "Bash(grep -oE '<meta property=\"og:image\"[^>]+content=\"[^\"]+\"' /tmp/cd.html)",
       "PowerShell(git push)",
       "Skill(claude-api)",
-      "Skill(claude-api:*)"
+      "Skill(claude-api:*)",
+      "Skill(deep-research)",
+      "Skill(deep-research:*)",
+      "WebFetch(domain:apps.apple.com)",
+      "WebFetch(domain:uxpilot.ai)",
+      "WebFetch(domain:home.organizeat.com)",
+      "WebFetch(domain:nestsync.org)",
+      "WebFetch(domain:techcrunch.com)"
     ]
   }
 }

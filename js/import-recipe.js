@@ -32,6 +32,56 @@ export async function analyzeDishPhoto(image, title) {
   throw new Error((d && d.message) || "Analisi non riuscita. Riprova.");
 }
 
+// "Chiedi allo chef": domanda di cucina → risposta in italiano (Workers AI).
+export async function askChef(question, context) {
+  if (!WORKER_URL) throw new Error("Funzione non disponibile (worker non configurato).");
+  let res;
+  try {
+    res = await fetch(`${WORKER_URL}/ask`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, ...(context || {}) })
+    });
+  } catch (e) { throw new Error("Servizio non raggiungibile. Controlla la connessione."); }
+  const d = await res.json().catch(() => ({}));
+  if (d && d.answer) return d.answer;
+  if (d && d.error === "noai") throw new Error("La funzione non è ancora attiva sul worker (manca il collegamento all'AI).");
+  throw new Error((d && d.message) || "Nessuna risposta. Riprova.");
+}
+
+// "Inventa una ricetta" dagli ingredienti → { title, servings, ingredients[], steps[] }.
+export async function generateRecipe(ingredients, note) {
+  if (!WORKER_URL) throw new Error("Funzione non disponibile (worker non configurato).");
+  let res;
+  try {
+    res = await fetch(`${WORKER_URL}/generate`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ingredients, note: note || "" })
+    });
+  } catch (e) { throw new Error("Servizio non raggiungibile. Controlla la connessione."); }
+  const d = await res.json().catch(() => ({}));
+  if (d && d.title) return d;
+  if (d && d.error === "noai") throw new Error("La funzione non è ancora attiva sul worker (manca il collegamento all'AI).");
+  throw new Error((d && d.message) || "Non sono riuscito a creare la ricetta. Riprova.");
+}
+
+// Import da link video social (o testo incollato) → ricetta strutturata.
+export async function importFromVideo(url, text) {
+  if (!WORKER_URL) throw new Error("Funzione non disponibile (worker non configurato).");
+  let res;
+  try {
+    res = await fetch(`${WORKER_URL}/importvideo`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: url || "", text: text || "" })
+    });
+  } catch (e) { throw new Error("Servizio non raggiungibile. Controlla la connessione."); }
+  const d = await res.json().catch(() => ({}));
+  if (d && d.title) return d;
+  if (d && d.error === "noai") throw new Error("La funzione non è ancora attiva sul worker (manca il collegamento all'AI).");
+  const err = new Error((d && d.message) || "Import non riuscito. Riprova.");
+  err.code = d && d.error;
+  throw err;
+}
+
 // Abbinamento vino consigliato per un piatto (via Spoonacular).
 export async function winePairing(food) {
   if (!WORKER_URL || !food) return null;

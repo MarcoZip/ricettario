@@ -7,7 +7,7 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto } from "./import-recipe.js";
+import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo } from "./import-recipe.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage, shareMenuImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
@@ -272,8 +272,8 @@ export function mount(rootEl) {
   if (help) help.addEventListener("click", () => openGuide());
   // Guida al primo avvio.
   try {
-    if (!localStorage.getItem("ricettario.guide.v7")) {
-      localStorage.setItem("ricettario.guide.v7", "1");
+    if (!localStorage.getItem("ricettario.guide.v8")) {
+      localStorage.setItem("ricettario.guide.v8", "1");
       setTimeout(() => openGuide(true), 500);
     }
   } catch {}
@@ -1609,6 +1609,7 @@ function renderRecipeDetail() {
     <button class="btn btn--block" id="reviewBtn" style="margin-bottom:10px">📝 Com'è venuta? (voto, foto, nota)</button>
     <button class="btn btn--block" id="checkPhotoBtn" style="margin-bottom:10px">📷 Com'è venuto? Controlla con una foto</button>
     <input type="file" id="checkPhotoFile" accept="image/*" capture="environment" hidden />
+    ${isImportConfigured() ? `<button class="btn btn--block" id="askChefBtn" style="margin-bottom:10px">💬 Chiedi allo chef (AI)</button>` : ""}
     <button class="btn btn--block" id="collectionsBtn" style="margin-bottom:10px">${iconHtml("book-bookmark")} Aggiungi a una raccolta</button>
     <button class="btn btn--block" id="shareImg" style="margin-bottom:10px">${iconHtml("image")} Condividi come immagine</button>
     <button class="btn btn--block" id="qrBtn" style="margin-bottom:10px">${iconHtml("qr-code")} Mostra codice QR</button>
@@ -1708,6 +1709,8 @@ function renderRecipeDetail() {
     if (!f) return;
     openDishCheck(f, r.title);
   });
+  const askChefBtn = root.querySelector("#askChefBtn");
+  if (askChefBtn) askChefBtn.addEventListener("click", () => openAskChef(r));
 
   const galFile = root.querySelector("#galFile");
   const galAdd = root.querySelector("#galAdd");
@@ -2066,6 +2069,107 @@ async function openDishCheck(file, title) {
     if (!body.isConnected) return;
     body.innerHTML = `<div class="hint" style="color:var(--danger)">${escapeHtml(e.message || "Analisi non riuscita.")}</div>`;
   }
+}
+
+// Importa una ricetta da un link video social (o da testo incollato), via AI worker.
+function openVideoImport(prefillUrl, onRecipe) {
+  const m = openModal(`
+    <h3 class="modal__title">📱 Importa da video</h3>
+    <p class="hint" style="margin-top:-8px;margin-bottom:12px">Incolla il link di un video (TikTok, Instagram, YouTube): l'AI prova a ricavarne la ricetta. Funziona meglio se la ricetta è scritta nella descrizione del video.</p>
+    <div class="field"><input type="url" id="viUrl" inputmode="url" placeholder="https://..." value="${escapeHtml(prefillUrl || "")}" /></div>
+    <div class="field"><label>Oppure incolla qui la descrizione del video (facoltativo)</label><textarea id="viText" rows="4" placeholder="Incolla il testo della ricetta se il link non basta"></textarea></div>
+    <div id="viBody"></div>
+    <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button><button class="btn btn--primary" data-act="ok">Importa</button></div>
+  `);
+  m.el.querySelector('[data-act="cancel"]').onclick = m.close;
+  const okBtn = m.el.querySelector('[data-act="ok"]');
+  okBtn.onclick = async () => {
+    const url = m.el.querySelector("#viUrl").value.trim();
+    const text = m.el.querySelector("#viText").value.trim();
+    if (!url && !text) { toast("Inserisci un link o incolla la descrizione", "error"); return; }
+    const body = m.el.querySelector("#viBody");
+    body.innerHTML = `<div style="text-align:center;padding:6px 0"><div class="spinner"></div><div class="hint">Leggo la ricetta…</div></div>`;
+    okBtn.disabled = true;
+    try {
+      const data = await importFromVideo(url, text);
+      m.close();
+      onRecipe(data);
+      toast("Ricetta importata! Controllala e salva.", "success");
+    } catch (e) {
+      okBtn.disabled = false;
+      const hint = e.code === "nocaption" ? " Apri il video, copia la descrizione e incollala nel riquadro qui sopra." : "";
+      body.innerHTML = `<div class="hint" style="color:var(--danger)">${escapeHtml(e.message || "Import non riuscito.")}${hint}</div>`;
+    }
+  };
+}
+
+// Inventa una ricetta dagli ingredienti, via AI worker.
+function openGenerateRecipe(prefill, onRecipe) {
+  const m = openModal(`
+    <h3 class="modal__title">✨ Inventa una ricetta</h3>
+    <p class="hint" style="margin-top:-8px;margin-bottom:12px">Scrivi gli ingredienti che hai: l'AI propone una ricetta semplice. Poi puoi modificarla e salvarla.</p>
+    <div class="field"><label>Ingredienti</label><textarea id="grIng" rows="3" placeholder="es. zucchine, uova, pasta, parmigiano">${escapeHtml(prefill || "")}</textarea></div>
+    <div class="field"><label>Nota (facoltativa)</label><input type="text" id="grNote" placeholder="es. veloce, vegetariana, per 2 persone" /></div>
+    <div id="grBody"></div>
+    <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button><button class="btn btn--primary" data-act="ok">Inventa</button></div>
+  `);
+  setTimeout(() => m.el.querySelector("#grIng").focus(), 50);
+  m.el.querySelector('[data-act="cancel"]').onclick = m.close;
+  const okBtn = m.el.querySelector('[data-act="ok"]');
+  okBtn.onclick = async () => {
+    const ing = m.el.querySelector("#grIng").value.trim();
+    if (!ing) { toast("Scrivi qualche ingrediente", "error"); return; }
+    const note = m.el.querySelector("#grNote").value.trim();
+    const body = m.el.querySelector("#grBody");
+    body.innerHTML = `<div style="text-align:center;padding:6px 0"><div class="spinner"></div><div class="hint">Sto inventando…</div></div>`;
+    okBtn.disabled = true;
+    try {
+      const data = await generateRecipe(ing, note);
+      m.close();
+      onRecipe(data);
+      toast("Ricetta creata! Controllala e salva.", "success");
+    } catch (e) {
+      okBtn.disabled = false;
+      body.innerHTML = `<div class="hint" style="color:var(--danger)">${escapeHtml(e.message || "Non riuscito.")}</div>`;
+    }
+  };
+}
+
+// "Chiedi allo chef": mini chat di domande di cucina (AI worker).
+function openAskChef(r) {
+  const ctx = r ? { title: r.title, ingredients: (r.ingredients || []).map((i) => i.name || ingredientText(i)).filter(Boolean).slice(0, 40) } : {};
+  const m = openModal(`
+    <h3 class="modal__title">💬 Chiedi allo chef</h3>
+    <p class="hint" style="margin-top:-8px;margin-bottom:10px">Sostituzioni, tempi di cottura, dubbi in cucina…${r ? ` (stai guardando "${escapeHtml(r.title)}")` : ""}</p>
+    <div id="chefLog" class="chef-log"></div>
+    <div class="search-bar"><input type="text" id="chefQ" placeholder="Es. posso sostituire il burro?" /><button class="btn btn--primary" id="chefSend">Chiedi</button></div>
+    <div class="modal__actions"><button class="btn" data-act="ok">Chiudi</button></div>
+  `);
+  m.el.querySelector('[data-act="ok"]').onclick = m.close;
+  const log = m.el.querySelector("#chefLog");
+  const input = m.el.querySelector("#chefQ");
+  const sendBtn = m.el.querySelector("#chefSend");
+  setTimeout(() => input.focus(), 50);
+  const ask = async () => {
+    const q = input.value.trim(); if (!q) return;
+    input.value = "";
+    log.insertAdjacentHTML("beforeend", `<div class="chef-q">${escapeHtml(q)}</div><div class="chef-a chef-a--load"><span class="spinner spinner--sm"></span></div>`);
+    log.scrollTop = log.scrollHeight;
+    const aEl = log.lastElementChild;
+    sendBtn.disabled = true;
+    try {
+      const ans = await askChef(q, ctx);
+      aEl.classList.remove("chef-a--load");
+      aEl.innerHTML = escapeHtml(ans).replace(/\n+/g, "<br>");
+    } catch (e) {
+      aEl.classList.remove("chef-a--load");
+      aEl.innerHTML = `<span style="color:var(--danger)">${escapeHtml(e.message || "Non riuscito.")}</span>`;
+    }
+    sendBtn.disabled = false;
+    log.scrollTop = log.scrollHeight;
+  };
+  sendBtn.onclick = ask;
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") ask(); });
 }
 
 function openCookReview(r) {
@@ -2622,6 +2726,7 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       <label>Link della ricetta (facoltativo)</label>
       <input type="url" id="rUrl" inputmode="url" placeholder="https://..." value="${escapeHtml(url)}" />
       ${importBtn}
+      ${isImportConfigured() ? `<button type="button" class="btn btn--ghost" id="rImportVideo" style="margin-top:8px">📱 Importa da video social (TikTok/Instagram/YouTube)</button>` : ""}
     </div>
     <div class="field-row">
       <div class="field">
@@ -2647,6 +2752,7 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       <textarea id="rIngredients" rows="6" placeholder="200 g di farina&#10;2 uova&#10;1 bustina di lievito&#10;sale q.b.">${escapeHtml(ingText)}</textarea>
       <button type="button" class="btn btn--ghost" id="rOcr" style="margin-top:8px">${iconHtml("image")} Scansiona da una foto</button>
       <input type="file" id="rOcrFile" accept="image/*" capture="environment" hidden />
+      ${isImportConfigured() ? `<button type="button" class="btn btn--ghost" id="rGenerate" style="margin-top:8px">✨ Inventa una ricetta (AI)</button>` : ""}
     </div>
     <div class="field">
       <label>Preparazione (un passo per riga)</label>
@@ -2759,6 +2865,28 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
     }
     rImport.disabled = false; rImport.innerHTML = old;
   });
+
+  // Riempie i campi del form da una ricetta strutturata (AI / video).
+  const fillForm = (data, { replaceTitle = false } = {}) => {
+    if (data.title && (replaceTitle || !titleInput.value.trim())) titleInput.value = data.title;
+    if (data.servings) m.el.querySelector("#rServings").value = data.servings;
+    if (data.time) m.el.querySelector("#rTime").value = data.time;
+    if (data.ingredients && data.ingredients.length) {
+      const cur = m.el.querySelector("#rIngredients").value.trim();
+      m.el.querySelector("#rIngredients").value = (cur ? cur + "\n" : "") + data.ingredients.join("\n");
+    }
+    if (data.steps && data.steps.length) {
+      const cur = m.el.querySelector("#rSteps").value.trim();
+      m.el.querySelector("#rSteps").value = (cur ? cur + "\n" : "") + data.steps.join("\n");
+    }
+    if (data.image && !photo) { photo = data.image; renderPhoto(); }
+    if (data.sourceUrl && !m.el.querySelector("#rUrl").value.trim()) m.el.querySelector("#rUrl").value = data.sourceUrl;
+    if (data.tags && data.tags.length) data.tags.forEach((tg) => addTag(tg));
+  };
+  const rImportVideo = m.el.querySelector("#rImportVideo");
+  if (rImportVideo) rImportVideo.addEventListener("click", () => openVideoImport(m.el.querySelector("#rUrl").value.trim(), (data) => fillForm(data, { replaceTitle: true })));
+  const rGenerate = m.el.querySelector("#rGenerate");
+  if (rGenerate) rGenerate.addEventListener("click", () => openGenerateRecipe(m.el.querySelector("#rIngredients").value.trim(), (data) => fillForm(data, { replaceTitle: true })));
 
   m.el.querySelector('[data-act="cancel"]').onclick = m.close;
   m.el.querySelector('[data-act="save"]').onclick = async () => {
@@ -3311,7 +3439,8 @@ function renderSitiTab() {
 const GUIDE_SECTIONS = [
   { icon: "cooking-pot", title: "Strumenti & ricette", text: "Organizza le ricette per strumento di cottura. Crea uno strumento (forno, friggitrice ad aria…) e salva sotto le ricette con foto, link, ingredienti, porzioni, passi e categorie." },
   { icon: "calendar-dots", title: "Oggi si mangia", text: "In cima alla schermata Strumenti trovi le ricette che hai pianificato per oggi: toccale per aprirle al volo." },
-  { icon: "image", title: "Aggiungi senza fatica", text: "Tre scorciatoie nel form ricetta: incolla un link e tocca \"Importa\" (ingredienti e passi si compilano da soli), oppure \"Scansiona da una foto\" per leggere una ricetta da un libro o quaderno, o salva dal Ricettario online." },
+  { icon: "image", title: "Aggiungi senza fatica", text: "Nel form ricetta: incolla un link e tocca \"Importa\", \"Scansiona da una foto\" per leggere da un libro o quaderno, \"Importa da video social\" per TikTok/Instagram/YouTube, oppure \"Inventa una ricetta (AI)\" dagli ingredienti che hai. O salva dal Ricettario online." },
+  { icon: "sparkle", title: "Aiuto AI", text: "Tre aiuti intelligenti (gratis): \"Inventa una ricetta\" dagli ingredienti, \"Chiedi allo chef\" per dubbi e sostituzioni mentre cucini, e \"Com'è venuto?\" che dà un parere guardando la foto del tuo piatto. Sono un aiuto, non infallibili." },
   { icon: "book-open", title: "Ricettario", text: "Cerca idee online o tra i siti italiani; tocca \"Salva\" per aggiungerle a uno dei tuoi strumenti. Le ricette online sono in inglese: al salvataggio vengono tradotte in italiano in automatico." },
   { icon: "fork-knife", title: "Porzioni su misura", text: "Apri una ricetta e cambia il numero di persone con + e −: le quantità degli ingredienti si ricalcolano da sole." },
   { icon: "carrot", title: "Valori nutrizionali", text: "In una ricetta tocca \"Calcola\" sotto gli ingredienti: l'app stima calorie e macronutrienti (proteine, carboidrati, grassi) per porzione e totali. Per ciò che non conosce cerca online su Open Food Facts e ti mostra anche cosa non ha conteggiato. È una stima: cambia con il numero di porzioni." },

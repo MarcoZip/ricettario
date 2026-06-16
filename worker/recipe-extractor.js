@@ -397,6 +397,9 @@ export default {
 
     const url = new URL(request.url);
     if (url.pathname === "/vision") return handleVision(request, env);
+    if (url.pathname === "/ask") return handleAsk(request, env);
+    if (url.pathname === "/generate") return handleGenerate(request, env);
+    if (url.pathname === "/importvideo") return handleImportVideo(request, env);
     if (url.pathname === "/img") return handleImageProxy(url.searchParams.get("u"));
     if (url.pathname === "/moulinex-img") return handleMoulinexImg(url.searchParams.get("u"));
     if (url.pathname === "/searchbimby") return handleSearchBimby(url.searchParams.get("q"), url.searchParams.get("page"));
@@ -538,6 +541,133 @@ async function handleVision(request, env) {
     } catch (e) { lastErr = (e && e.message) || String(e); }
   }
   return json({ error: "aifail", message: "Analisi non riuscita. Riprova tra poco." + (lastErr ? " (" + lastErr.slice(0, 120) + ")" : "") }, 200);
+}
+
+// ---------- Funzioni AI testuali (Cloudflare Workers AI, gratis entro quota) ----------
+//  Modello di testo veloce e multilingue. Richiede lo stesso binding "AI".
+const TEXT_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+async function aiText(env, messages, maxTokens) {
+  const out = await env.AI.run(TEXT_MODEL, { messages, max_tokens: maxTokens || 700 });
+  return String((out && (out.response || out.text)) || "").trim();
+}
+// Estrae il primo oggetto JSON da un testo del modello (tollerante a code-fence/prefazioni).
+function extractJson(text) {
+  if (!text) return null;
+  let s = text.replace(/```(?:json)?/gi, "").trim();
+  const i = s.indexOf("{");
+  const j = s.lastIndexOf("}");
+  if (i < 0 || j < 0 || j <= i) return null;
+  try { return JSON.parse(s.slice(i, j + 1)); } catch (e) { return null; }
+}
+
+// "Chiedi allo chef": risposta in italiano a una domanda di cucina, con
+// eventuale contesto della ricetta. POST { question, title?, ingredients?, steps? }.
+async function handleAsk(request, env) {
+  if (request.method !== "POST") return json({ error: "method", message: "Usa POST" }, 405);
+  if (!env || !env.AI) return json({ error: "noai", message: "Workers AI non collegato (binding AI mancante)." }, 200);
+  let body;
+  try { body = await request.json(); } catch (e) { return json({ error: "badreq" }, 400); }
+  const q = String((body && body.question) || "").trim().slice(0, 600);
+  if (!q) return json({ error: "noq", message: "Domanda mancante" }, 400);
+  let ctx = "";
+  if (body.title) ctx += `\nRicetta in corso: ${String(body.title).slice(0, 120)}.`;
+  if (Array.isArray(body.ingredients) && body.ingredients.length) ctx += `\nIngredienti: ${body.ingredients.slice(0, 40).join(", ").slice(0, 600)}.`;
+  const messages = [
+    { role: "system", content: "Sei un aiuto-cuoco esperto, gentile e pratico. Rispondi SEMPRE in italiano, in modo conciso e concreto (massimo 6 frasi). Dai consigli utili e sicuri in cucina. Se la domanda non riguarda la cucina, riportala gentilmente al tema." },
+    { role: "user", content: q + (ctx ? "\n\nContesto:" + ctx : "") }
+  ];
+  try {
+    const answer = await aiText(env, messages, 500);
+    if (!answer) return json({ error: "empty", message: "Nessuna risposta. Riprova." }, 200);
+    return json({ answer }, 200);
+  } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova tra poco." }, 200); }
+}
+
+// "Inventa una ricetta" dagli ingredienti disponibili. POST { ingredients, note? }.
+// Ritorna { title, servings, ingredients:[stringhe], steps:[stringhe] }.
+async function handleGenerate(request, env) {
+  if (request.method !== "POST") return json({ error: "method", message: "Usa POST" }, 405);
+  if (!env || !env.AI) return json({ error: "noai", message: "Workers AI non collegato (binding AI mancante)." }, 200);
+  let body;
+  try { body = await request.json(); } catch (e) { return json({ error: "badreq" }, 400); }
+  const ing = String((body && body.ingredients) || "").trim().slice(0, 600);
+  if (!ing) return json({ error: "noing", message: "Indica almeno qualche ingrediente" }, 400);
+  const note = String((body && body.note) || "").trim().slice(0, 200);
+  const messages = [
+    { role: "system", content: "Sei uno chef di casa. Inventa UNA ricetta semplice, realistica e gustosa, in italiano, usando soprattutto gli ingredienti indicati (puoi assumere sale, olio, acqua, spezie comuni). Rispondi SOLO con un oggetto JSON valido, senza testo extra, in questo formato: {\"title\": string, \"servings\": number, \"ingredients\": [string], \"steps\": [string]}. Gli ingredienti come stringhe del tipo \"200 g di pasta\". I passi chiari e numerabili. Niente markdown." },
+    { role: "user", content: `Ingredienti disponibili: ${ing}.${note ? " Nota: " + note + "." : ""}` }
+  ];
+  try {
+    const raw = await aiText(env, messages, 800);
+    const r = extractJson(raw);
+    if (!r || !r.title) return json({ error: "parse", message: "Non sono riuscito a creare la ricetta. Riprova." }, 200);
+    return json({
+      title: String(r.title).slice(0, 140),
+      servings: Number(r.servings) > 0 ? Math.min(20, Math.round(Number(r.servings))) : null,
+      ingredients: Array.isArray(r.ingredients) ? r.ingredients.map((x) => String(x)).slice(0, 40) : [],
+      steps: Array.isArray(r.steps) ? r.steps.map((x) => String(x)).slice(0, 40) : []
+    }, 200);
+  } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova tra poco." }, 200); }
+}
+
+// Import ricetta da link video social (TikTok/Instagram/YouTube) o da testo
+// incollato. POST { url? , text? }. Legge la didascalia/descrizione e la
+// struttura con l'AI in { title, servings, ingredients[], steps[] }.
+async function fetchCaption(rawUrl) {
+  let host = "";
+  try { host = new URL(rawUrl).hostname.replace(/^www\./, ""); } catch (e) { return ""; }
+  let caption = "";
+  // oEmbed TikTok: dà la didascalia nel campo "title".
+  if (/tiktok\.com$/.test(host) || host.endsWith(".tiktok.com")) {
+    try {
+      const r = await fetch("https://www.tiktok.com/oembed?url=" + encodeURIComponent(rawUrl), { headers: BROWSER_HEADERS });
+      if (r.ok) { const d = await r.json(); caption = clean(d && d.title || ""); }
+    } catch (e) { /* continua */ }
+  }
+  // Fallback generico: leggi og:description / description / og:title dalla pagina.
+  if (caption.length < 40) {
+    try {
+      const r = await fetch(rawUrl, { headers: BROWSER_HEADERS, redirect: "follow", cf: { cacheTtl: 600 } });
+      if (r.ok) {
+        const html = await r.text();
+        const grab = (re) => { const m = html.match(re); return m ? clean(decodeEntities(m[1])) : ""; };
+        const ogd = grab(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i)
+          || grab(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
+        const ogt = grab(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i);
+        if ((ogd || "").length > caption.length) caption = [ogt, ogd].filter(Boolean).join(". ");
+      }
+    } catch (e) { /* niente */ }
+  }
+  return caption;
+}
+async function handleImportVideo(request, env) {
+  if (request.method !== "POST") return json({ error: "method", message: "Usa POST" }, 405);
+  if (!env || !env.AI) return json({ error: "noai", message: "Workers AI non collegato (binding AI mancante)." }, 200);
+  let body;
+  try { body = await request.json(); } catch (e) { return json({ error: "badreq" }, 400); }
+  let text = String((body && body.text) || "").trim();
+  const url = String((body && body.url) || "").trim();
+  if (!text && url) text = await fetchCaption(url);
+  text = text.slice(0, 4000);
+  if (text.replace(/\s/g, "").length < 30) {
+    return json({ error: "nocaption", message: "Non sono riuscito a leggere la ricetta dal link. Apri il video, copia la descrizione e incollala qui." }, 200);
+  }
+  const messages = [
+    { role: "system", content: "Ricevi la didascalia/descrizione di un video di cucina. Estrai la ricetta e traducila/normalizzala in italiano. Rispondi SOLO con un oggetto JSON valido, senza testo extra: {\"title\": string, \"servings\": number|null, \"ingredients\": [string], \"steps\": [string]}. Gli ingredienti come stringhe \"quantità + nome\". I passi a frasi brevi. Se mancano i passi, deducili in modo ragionevole. Niente markdown." },
+    { role: "user", content: text }
+  ];
+  try {
+    const raw = await aiText(env, messages, 900);
+    const r = extractJson(raw);
+    if (!r || !r.title) return json({ error: "parse", message: "Non sono riuscito a strutturare la ricetta. Prova a incollare la descrizione completa." }, 200);
+    return json({
+      title: String(r.title).slice(0, 140),
+      servings: Number(r.servings) > 0 ? Math.min(20, Math.round(Number(r.servings))) : null,
+      ingredients: Array.isArray(r.ingredients) ? r.ingredients.map((x) => String(x)).slice(0, 50) : [],
+      steps: Array.isArray(r.steps) ? r.steps.map((x) => String(x)).slice(0, 50) : [],
+      sourceUrl: url || ""
+    }, 200);
+  } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova tra poco." }, 200); }
 }
 
 function json(obj, status) {

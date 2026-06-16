@@ -1107,6 +1107,13 @@ a { color: var(--primary-2); }
 .season-hint { color: var(--text-soft); font-size: 0.75rem; margin-top: 8px; }
 /* Parere "Com'è venuto?" (analisi foto piatto) */
 .dish-feedback { background: var(--input-bg); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; line-height: 1.5; font-size: 1rem; }
+/* Chat "Chiedi allo chef" */
+.chef-log { max-height: 46vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.chef-log:empty { display: none; }
+.chef-q { align-self: flex-end; max-width: 85%; background: var(--primary-grad); color: #1a1208; border-radius: 14px 14px 4px 14px; padding: 8px 12px; font-weight: 600; font-size: 0.95rem; }
+.chef-a { align-self: flex-start; max-width: 90%; background: var(--input-bg); border: 1px solid var(--border); border-radius: 14px 14px 14px 4px; padding: 8px 12px; line-height: 1.45; font-size: 0.95rem; }
+.chef-a--load { min-height: 34px; display: flex; align-items: center; }
+.spinner--sm { width: 18px; height: 18px; border-width: 2px; margin: 0; }
 .tagchip--season { background: rgba(120, 200, 120, 0.16); border: 1px solid rgba(120, 200, 120, 0.34); color: #9be29b; }
 .tagchip--ahead { background: rgba(120, 160, 255, 0.16); border: 1px solid rgba(120, 160, 255, 0.34); color: #a9c2ff; }
 .diffdots { display: inline-flex; gap: 3px; vertical-align: middle; }
