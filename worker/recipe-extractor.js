@@ -553,11 +553,15 @@ const TEXT_MODELS = [
   "@cf/mistralai/mistral-7b-instruct-v0.1",
   "@cf/qwen/qwen1.5-14b-chat-awq"
 ];
-async function aiText(env, messages, maxTokens) {
+async function aiText(env, messages, maxTokens, schema) {
   let lastErr = "";
+  const input = { messages, max_tokens: maxTokens || 700 };
+  if (schema) input.response_format = { type: "json_schema", json_schema: schema };
   for (const model of TEXT_MODELS) {
     try {
-      const out = await env.AI.run(model, { messages, max_tokens: maxTokens || 700 });
+      const out = await env.AI.run(model, input);
+      // In JSON mode alcuni modelli ritornano out.response già come oggetto.
+      if (out && out.response && typeof out.response === "object") return JSON.stringify(out.response);
       const t = String((out && (out.response || out.text)) || "").trim();
       if (t) return t;
     } catch (e) { lastErr = (e && e.message) || String(e); }
@@ -566,15 +570,31 @@ async function aiText(env, messages, maxTokens) {
   err.detail = lastErr;
   throw err;
 }
-// Estrae il primo oggetto JSON da un testo del modello (tollerante a code-fence/prefazioni).
+// Estrae il primo oggetto JSON da un testo del modello (tollera code-fence,
+// prefazioni e virgole finali).
 function extractJson(text) {
   if (!text) return null;
-  let s = text.replace(/```(?:json)?/gi, "").trim();
+  let s = String(text).replace(/```(?:json)?/gi, "").trim();
   const i = s.indexOf("{");
   const j = s.lastIndexOf("}");
-  if (i < 0 || j < 0 || j <= i) return null;
-  try { return JSON.parse(s.slice(i, j + 1)); } catch (e) { return null; }
+  if (i < 0 || j <= i) return null;
+  s = s.slice(i, j + 1);
+  for (const cand of [s, s.replace(/,\s*([}\]])/g, "$1")]) {
+    try { return JSON.parse(cand); } catch (e) { /* prova la variante */ }
+  }
+  return null;
 }
+// Schema JSON per le ricette (forza un output strutturato valido).
+const RECIPE_SCHEMA = {
+  type: "object",
+  properties: {
+    title: { type: "string" },
+    servings: { type: "number" },
+    ingredients: { type: "array", items: { type: "string" } },
+    steps: { type: "array", items: { type: "string" } }
+  },
+  required: ["title", "ingredients", "steps"]
+};
 
 // "Chiedi allo chef": risposta in italiano a una domanda di cucina, con
 // eventuale contesto della ricetta. POST { question, title?, ingredients?, steps? }.
@@ -614,7 +634,7 @@ async function handleGenerate(request, env) {
     { role: "user", content: `Ingredienti disponibili: ${ing}.${note ? " Nota: " + note + "." : ""}` }
   ];
   try {
-    const raw = await aiText(env, messages, 800);
+    const raw = await aiText(env, messages, 800, RECIPE_SCHEMA);
     const r = extractJson(raw);
     if (!r || !r.title) return json({ error: "parse", message: "Non sono riuscito a creare la ricetta. Riprova." }, 200);
     return json({
@@ -673,7 +693,7 @@ async function handleImportVideo(request, env) {
     { role: "user", content: text }
   ];
   try {
-    const raw = await aiText(env, messages, 900);
+    const raw = await aiText(env, messages, 900, RECIPE_SCHEMA);
     const r = extractJson(raw);
     if (!r || !r.title) return json({ error: "parse", message: "Non sono riuscito a strutturare la ricetta. Prova a incollare la descrizione completa." }, 200);
     return json({
