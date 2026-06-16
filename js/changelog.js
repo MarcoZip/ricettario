@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.14",
+    d: "2026-06-16",
+    items: [
+      "Nuovo: guarda il video della ricetta dentro l'app (YouTube/TikTok), quando il link è un video.",
+      "Nuovo strumento Timer: avvia più timer con nome anche fuori dalla Modalità cucina (Opzioni → Timer da cucina); restano attivi mentre usi l'app."
+    ]
+  },
+  {
     v: "7.13",
     d: "2026-06-16",
     items: [

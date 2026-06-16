@@ -1608,6 +1608,7 @@ function renderRecipeDetail() {
 
     <button class="btn btn--block" id="cookedBtn" style="margin-bottom:10px">${iconHtml("fire")} Segna come cucinata${r.cookCount ? ` · ${r.cookCount} ${r.cookCount === 1 ? "volta" : "volte"}` : ""}</button>
     <button class="btn btn--block" id="reviewBtn" style="margin-bottom:10px">📝 Com'è venuta? (voto, foto, nota)</button>
+    ${videoInfo(r.url) ? `<button class="btn btn--block" id="watchVideo" style="margin-bottom:10px">▶ Guarda il video</button>` : ""}
     <button class="btn btn--block" id="checkPhotoBtn" style="margin-bottom:10px">📷 Com'è venuto? Controlla con una foto</button>
     <input type="file" id="checkPhotoFile" accept="image/*" capture="environment" hidden />
     ${isImportConfigured() ? `<button class="btn btn--block" id="askChefBtn" style="margin-bottom:10px">💬 Chiedi allo chef (AI)</button>` : ""}
@@ -1712,6 +1713,8 @@ function renderRecipeDetail() {
   });
   const askChefBtn = root.querySelector("#askChefBtn");
   if (askChefBtn) askChefBtn.addEventListener("click", () => openAskChef(r));
+  const watchVideo = root.querySelector("#watchVideo");
+  if (watchVideo) watchVideo.addEventListener("click", () => openVideoPlayer(r.url));
 
   const galFile = root.querySelector("#galFile");
   const galAdd = root.querySelector("#galAdd");
@@ -2171,6 +2174,130 @@ function openAskChef(r) {
   };
   sendBtn.onclick = ask;
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") ask(); });
+}
+
+// ---------------- Strumento Timer (globale, fuori dalla Modalità cucina) ----------------
+// I timer continuano a contare mentre navighi nell'app e suonano/vibrano a fine.
+let gTimers = []; // { id, label, remaining, running, alarming }
+let gTicker = null, gAlarm = null, gSeq = 0;
+let timersPanelEl = null; // modale Timer aperta (per ridisegnarla a ogni tick)
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination); o.type = "sine"; o.frequency.value = 880;
+    o.start(); g.gain.setValueAtTime(0.3, ctx.currentTime); o.stop(ctx.currentTime + 0.6);
+  } catch (e) { /* audio non disponibile */ }
+}
+function vibrateAlarm() { try { navigator.vibrate && navigator.vibrate([300, 120, 300]); } catch (e) {} }
+function fmtClock(s) { const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, "0")}`; }
+function ensureGlobalTicker() {
+  const any = gTimers.some((t) => t.running);
+  if (any && !gTicker) gTicker = setInterval(gTick, 1000);
+  else if (!any && gTicker) { clearInterval(gTicker); gTicker = null; }
+}
+function ensureGlobalAlarm() {
+  const any = gTimers.some((t) => t.alarming);
+  if (any && !gAlarm) gAlarm = setInterval(() => { playBeep(); vibrateAlarm(); }, 1700);
+  else if (!any && gAlarm) { clearInterval(gAlarm); gAlarm = null; }
+}
+function gTick() {
+  for (const t of gTimers) {
+    if (!t.running) continue;
+    t.remaining--;
+    if (t.remaining <= 0) { t.remaining = 0; t.running = false; t.alarming = true; playBeep(); vibrateAlarm(); toast(`⏰ ${t.label} finito!`, "success"); }
+  }
+  ensureGlobalTicker(); ensureGlobalAlarm(); paintTimerWidget(); paintTimersPanel();
+}
+function addGlobalTimer(mins, secs, label) {
+  const total = Math.max(1, (parseInt(mins, 10) || 0) * 60 + (parseInt(secs, 10) || 0));
+  gTimers.push({ id: ++gSeq, label: (label || "").trim() || `Timer ${gTimers.length + 1}`, remaining: total, running: true });
+  ensureGlobalTicker(); paintTimerWidget(); paintTimersPanel();
+}
+// Indicatore fluttuante mostrato quando c'è almeno un timer attivo.
+function paintTimerWidget() {
+  let w = document.getElementById("timerWidget");
+  if (!gTimers.length) { if (w) w.remove(); return; }
+  if (!w) { w = document.createElement("button"); w.id = "timerWidget"; w.className = "timer-widget"; w.onclick = openTimersTool; document.body.appendChild(w); }
+  const alarming = gTimers.some((t) => t.alarming);
+  const soon = gTimers.filter((t) => t.running).sort((a, b) => a.remaining - b.remaining)[0] || gTimers.find((t) => t.alarming) || gTimers[0];
+  w.classList.toggle("is-alarm", alarming);
+  w.innerHTML = `⏱ ${alarming ? "Finito!" : fmtClock(soon.remaining)}${gTimers.length > 1 ? ` · ${gTimers.length}` : ""}`;
+}
+function paintTimersPanel() {
+  if (!timersPanelEl || !timersPanelEl.isConnected) { timersPanelEl = null; return; }
+  const box = timersPanelEl.querySelector("#timersList");
+  if (!box) return;
+  box.innerHTML = gTimers.length
+    ? gTimers.map((t) => `<div class="ctimer ${t.alarming ? "is-alarm" : ""}" data-id="${t.id}">
+        <span class="ctimer__lbl">${escapeHtml(t.label)}</span>
+        <span class="ctimer__time">${t.alarming ? "Finito!" : fmtClock(t.remaining)}</span>
+        <button class="ctimer__btn" data-act="toggle">${t.alarming ? "🔕 OK" : (t.running ? "⏸" : "▶")}</button>
+        <button class="ctimer__btn" data-act="del">✕</button>
+      </div>`).join("")
+    : `<div class="hint" style="text-align:center;padding:8px">Nessun timer attivo. Aggiungine uno qui sotto.</div>`;
+  box.querySelectorAll(".ctimer").forEach((row) => {
+    const id = parseInt(row.dataset.id, 10);
+    const t = gTimers.find((x) => x.id === id);
+    row.querySelector('[data-act="toggle"]').onclick = () => { if (t.alarming) { t.alarming = false; ensureGlobalAlarm(); } else if (t.remaining > 0) { t.running = !t.running; ensureGlobalTicker(); } paintTimersPanel(); paintTimerWidget(); };
+    row.querySelector('[data-act="del"]').onclick = () => { gTimers = gTimers.filter((x) => x.id !== id); ensureGlobalTicker(); ensureGlobalAlarm(); paintTimersPanel(); paintTimerWidget(); };
+  });
+}
+function openTimersTool() {
+  const m = openModal(`
+    <h3 class="modal__title">⏱ Timer da cucina</h3>
+    <p class="hint" style="margin-top:-8px;margin-bottom:12px">Avvia più timer con nome: continuano a contare mentre usi l'app e suonano alla fine.</p>
+    <div id="timersList"></div>
+    <div class="timer-add">
+      <input type="text" id="ntName" placeholder="Nome (es. Pasta)" />
+      <input type="number" id="ntMin" min="0" inputmode="numeric" value="10" title="Minuti" />
+      <input type="number" id="ntSec" min="0" max="59" inputmode="numeric" value="0" title="Secondi" />
+      <button class="btn btn--primary" id="ntAdd">${iconHtml("plus")} Avvia</button>
+    </div>
+    <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
+  `);
+  timersPanelEl = m.el;
+  m.el.querySelector('[data-act="ok"]').onclick = () => { timersPanelEl = null; m.close(); };
+  const add = () => { addGlobalTimer(m.el.querySelector("#ntMin").value, m.el.querySelector("#ntSec").value, m.el.querySelector("#ntName").value); m.el.querySelector("#ntName").value = ""; };
+  m.el.querySelector("#ntAdd").onclick = add;
+  paintTimersPanel();
+}
+
+// ---------------- Video della ricetta ----------------
+// Riconosce un link video e ne ricava l'URL da incorporare (player nell'app).
+function videoInfo(url) {
+  if (!url) return null;
+  let u;
+  try { u = new URL(url); } catch (e) { return null; }
+  const h = u.hostname.replace(/^www\./, "");
+  if (h === "youtu.be" || h === "youtube.com" || h.endsWith(".youtube.com")) {
+    let id = "";
+    if (h === "youtu.be") id = u.pathname.slice(1);
+    else if (u.pathname.startsWith("/shorts/")) id = u.pathname.split("/")[2];
+    else if (u.pathname.startsWith("/embed/")) id = u.pathname.split("/")[2];
+    else id = u.searchParams.get("v") || "";
+    id = (id || "").split(/[/?#]/)[0];
+    if (id) return { kind: "youtube", embed: `https://www.youtube.com/embed/${id}`, tall: false };
+  }
+  if (h === "tiktok.com" || h.endsWith(".tiktok.com")) {
+    const mm = u.pathname.match(/\/video\/(\d+)/) || u.pathname.match(/\/(\d{6,})/);
+    if (mm) return { kind: "tiktok", embed: `https://www.tiktok.com/embed/v2/${mm[1]}`, tall: true };
+    return { kind: "external" };
+  }
+  if (h === "vimeo.com") { const mm = u.pathname.match(/\/(\d+)/); if (mm) return { kind: "vimeo", embed: `https://player.vimeo.com/video/${mm[1]}`, tall: false }; }
+  if (h.endsWith("instagram.com") || h.endsWith("facebook.com") || h.endsWith("fb.watch")) return { kind: "external" };
+  return null;
+}
+function openVideoPlayer(url) {
+  const vi = videoInfo(url);
+  if (!vi || vi.kind === "external" || !vi.embed) { try { window.open(url, "_blank", "noopener"); } catch (e) {} return; }
+  const m = openModal(`
+    <h3 class="modal__title">▶ Video della ricetta</h3>
+    <div class="video-wrap ${vi.tall ? "video-wrap--tall" : ""}"><iframe src="${escapeHtml(vi.embed)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe></div>
+    <div class="modal__actions"><button class="btn" id="vOpen">Apri originale</button><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
+  `);
+  m.el.querySelector('[data-act="ok"]').onclick = m.close;
+  m.el.querySelector("#vOpen").onclick = () => { try { window.open(url, "_blank", "noopener"); } catch (e) {} };
 }
 
 function openCookReview(r) {
@@ -4670,6 +4797,13 @@ function renderImpostazioni() {
       </div>
       <div class="setting-row">
         <div>
+          <div class="setting-row__label">Timer da cucina</div>
+          <div class="setting-row__desc">Più timer con nome, sempre attivi mentre usi l'app.</div>
+        </div>
+        <button class="btn" id="timersBtn">Apri</button>
+      </div>
+      <div class="setting-row">
+        <div>
           <div class="setting-row__label">Nickname</div>
           <div class="setting-row__desc">${getNickname() ? "Come ti salutiamo: " + escapeHtml(getNickname()) : "Scegli come farti salutare."}</div>
         </div>
@@ -4824,6 +4958,8 @@ function renderImpostazioni() {
   root.querySelector("#changelogBtn").addEventListener("click", () => openChangelog(CHANGELOG, {}));
   root.querySelector("#statsBtn").addEventListener("click", () => openStats());
   root.querySelector("#convBtn").addEventListener("click", () => openConverter());
+  const timersBtn = root.querySelector("#timersBtn");
+  if (timersBtn) timersBtn.addEventListener("click", () => openTimersTool());
   root.querySelector("#nickBtn").addEventListener("click", () => openChangeNickname());
   const chEmailBtn = root.querySelector("#chEmailBtn");
   if (chEmailBtn) chEmailBtn.addEventListener("click", () => openChangeEmail());
