@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.18",
+    d: "2026-06-16",
+    minor: true,
+    items: [
+      "Timer: l'indicatore fluttuante non copre più il tasto Avvia quando il pannello è aperto; caselle più alte e comode."
+    ]
+  },
+  {
     v: "7.17",
     d: "2026-06-16",
     items: [

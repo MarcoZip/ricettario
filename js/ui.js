@@ -2234,6 +2234,10 @@ function addGlobalTimer(mins, secs, label) {
 // Indicatore fluttuante mostrato quando c'è almeno un timer attivo.
 function paintTimerWidget() {
   let w = document.getElementById("timerWidget");
+  // Mentre il pannello Timer è aperto i timer si vedono già lì: niente chip
+  // fluttuante (evita la sovrapposizione col tasto "Avvia").
+  if (timersPanelEl && !timersPanelEl.isConnected) timersPanelEl = null;
+  if (timersPanelEl) { if (w) w.remove(); return; }
   if (!gTimers.length) { if (w) w.remove(); return; }
   if (!w) { w = document.createElement("button"); w.id = "timerWidget"; w.className = "timer-widget"; w.onclick = openTimersTool; document.body.appendChild(w); }
   const alarming = gTimers.some((t) => t.alarming);
@@ -2274,7 +2278,7 @@ function openTimersTool() {
     <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
   `);
   timersPanelEl = m.el;
-  m.el.querySelector('[data-act="ok"]').onclick = () => { timersPanelEl = null; m.close(); };
+  m.el.querySelector('[data-act="ok"]').onclick = () => { timersPanelEl = null; m.close(); paintTimerWidget(); };
   const add = () => { addGlobalTimer(m.el.querySelector("#ntMin").value, m.el.querySelector("#ntSec").value, m.el.querySelector("#ntName").value); m.el.querySelector("#ntName").value = ""; };
   m.el.querySelector("#ntAdd").onclick = add;
   paintTimersPanel();
