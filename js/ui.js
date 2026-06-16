@@ -7,7 +7,7 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo } from "./import-recipe.js";
+import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo, robotProgram } from "./import-recipe.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage, shareMenuImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
@@ -1612,6 +1612,7 @@ function renderRecipeDetail() {
     <button class="btn btn--block" id="checkPhotoBtn" style="margin-bottom:10px">📷 Com'è venuto? Controlla con una foto</button>
     <input type="file" id="checkPhotoFile" accept="image/*" capture="environment" hidden />
     ${isImportConfigured() ? `<button class="btn btn--block" id="askChefBtn" style="margin-bottom:10px">💬 Chiedi allo chef (AI)</button>` : ""}
+    ${isImportConfigured() && (steps.length || ingredients.length) ? `<button class="btn btn--block" id="robotBtn" style="margin-bottom:10px">🤖 Modalità robot (Companion / Bimby)</button>` : ""}
     <button class="btn btn--block" id="collectionsBtn" style="margin-bottom:10px">${iconHtml("book-bookmark")} Aggiungi a una raccolta</button>
     <button class="btn btn--block" id="shareImg" style="margin-bottom:10px">${iconHtml("image")} Condividi come immagine</button>
     <button class="btn btn--block" id="qrBtn" style="margin-bottom:10px">${iconHtml("qr-code")} Mostra codice QR</button>
@@ -1715,6 +1716,8 @@ function renderRecipeDetail() {
   if (askChefBtn) askChefBtn.addEventListener("click", () => openAskChef(r));
   const watchVideo = root.querySelector("#watchVideo");
   if (watchVideo) watchVideo.addEventListener("click", () => openVideoPlayer(r.url));
+  const robotBtn = root.querySelector("#robotBtn");
+  if (robotBtn) robotBtn.addEventListener("click", () => openRobotMode(r));
 
   const galFile = root.querySelector("#galFile");
   const galAdd = root.querySelector("#galAdd");
@@ -2298,6 +2301,41 @@ function openVideoPlayer(url) {
   `);
   m.el.querySelector('[data-act="ok"]').onclick = m.close;
   m.el.querySelector("#vOpen").onclick = () => { try { window.open(url, "_blank", "noopener"); } catch (e) {} };
+}
+
+// "Modalità robot": converte la ricetta in comandi per Companion o Bimby (AI).
+function openRobotMode(r) {
+  const run = async (device) => {
+    try { localStorage.setItem("ricettario.robot", device); } catch (e) {}
+    const ingredients = (r.ingredients || []).map((it) => ingredientText(it)).filter(Boolean);
+    const label = device === "bimby" ? "Bimby" : "Companion";
+    const m = openModal(`
+      <h3 class="modal__title">🤖 Modalità ${escapeHtml(label)}</h3>
+      <div id="robotBody"><div style="text-align:center;padding:8px 0"><div class="spinner"></div><div class="hint">Converto la ricetta per il ${escapeHtml(label)}…</div></div></div>
+      <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
+    `);
+    m.el.querySelector('[data-act="ok"]').onclick = m.close;
+    const body = m.el.querySelector("#robotBody");
+    try {
+      const prog = await robotProgram({ title: r.title, ingredients, steps: r.steps || [] }, device);
+      if (!body.isConnected) return;
+      const note = prog.note ? `<div class="hint" style="margin-bottom:10px">${escapeHtml(prog.note)}</div>` : "";
+      const list = prog.steps.map((s, i) => `<div class="robot-step"><span class="robot-step__n">${i + 1}</span><div class="robot-step__main"><div class="robot-step__a">${escapeHtml(s.azione)}</div>${s.impostazioni ? `<div class="robot-step__s">${iconHtml("sliders-horizontal")} ${escapeHtml(s.impostazioni)}</div>` : ""}</div></div>`).join("");
+      body.innerHTML = note + `<div class="robot-list">${list}</div><div class="hint" style="margin-top:10px">⚠️ Valori indicativi generati dall'AI: controllali sul tuo ${escapeHtml(label)}. L'app non comanda il robot.</div>`;
+    } catch (e) {
+      if (!body.isConnected) return;
+      body.innerHTML = `<div class="hint" style="color:var(--danger)">${escapeHtml(e.message || "Non riuscito.")}</div>`;
+    }
+  };
+  const m = openModal(`
+    <h3 class="modal__title">🤖 Modalità robot</h3>
+    <p class="hint" style="margin-top:-8px;margin-bottom:12px">Converto la ricetta nei comandi del tuo robot da impostare a mano (accessorio, velocità, temperatura, tempo). Scegli il tuo robot:</p>
+    <div class="modal__actions" style="flex-direction:column;gap:8px">
+      <button class="btn btn--primary btn--block" data-dev="companion">🤖 Moulinex Companion</button>
+      <button class="btn btn--block" data-dev="bimby">🥣 Bimby (Thermomix)</button>
+    </div>
+  `);
+  m.el.querySelectorAll("[data-dev]").forEach((b) => b.onclick = () => { m.close(); run(b.dataset.dev); });
 }
 
 function openCookReview(r) {

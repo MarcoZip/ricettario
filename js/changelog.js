@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.15",
+    d: "2026-06-16",
+    items: [
+      "Nuovo: \"Modalità robot\" — converte la ricetta nei comandi del tuo Moulinex Companion o Bimby (accessorio, velocità, temperatura, tempo) da impostare a mano.",
+      "I valori sono un aiuto generato dall'AI: controllali sul tuo robot. L'app non comanda il robot."
+    ]
+  },
+  {
     v: "7.14",
     d: "2026-06-16",
     items: [

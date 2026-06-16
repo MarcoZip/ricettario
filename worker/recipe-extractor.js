@@ -400,6 +400,7 @@ export default {
     if (url.pathname === "/ask") return handleAsk(request, env);
     if (url.pathname === "/generate") return handleGenerate(request, env);
     if (url.pathname === "/importvideo") return handleImportVideo(request, env);
+    if (url.pathname === "/robot") return handleRobot(request, env);
     if (url.pathname === "/img") return handleImageProxy(url.searchParams.get("u"));
     if (url.pathname === "/moulinex-img") return handleMoulinexImg(url.searchParams.get("u"));
     if (url.pathname === "/searchbimby") return handleSearchBimby(url.searchParams.get("q"), url.searchParams.get("page"));
@@ -595,6 +596,22 @@ const RECIPE_SCHEMA = {
   },
   required: ["title", "ingredients", "steps"]
 };
+// Schema JSON per un "programma robot" (Companion/Bimby): passi con azione + impostazioni.
+const ROBOT_SCHEMA = {
+  type: "object",
+  properties: {
+    note: { type: "string" },
+    steps: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { azione: { type: "string" }, impostazioni: { type: "string" } },
+        required: ["azione", "impostazioni"]
+      }
+    }
+  },
+  required: ["steps"]
+};
 
 // "Chiedi allo chef": risposta in italiano a una domanda di cucina, con
 // eventuale contesto della ricetta. POST { question, title?, ingredients?, steps? }.
@@ -702,6 +719,37 @@ async function handleImportVideo(request, env) {
       ingredients: Array.isArray(r.ingredients) ? r.ingredients.map((x) => String(x)).slice(0, 50) : [],
       steps: Array.isArray(r.steps) ? r.steps.map((x) => String(x)).slice(0, 50) : [],
       sourceUrl: url || ""
+    }, 200);
+  } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova tra poco." + (e && (e.detail || e.message) ? " (" + String(e.detail || e.message).slice(0, 140) + ")" : "") }, 200); }
+}
+
+// "Modalità robot": converte la ricetta in un programma per Moulinex Companion o
+// Bimby (TM6), passo per passo con accessorio/velocità/temperatura/tempo da
+// IMPOSTARE A MANO sul robot (NON lo pilota). POST { title, ingredients[], steps[], device }.
+async function handleRobot(request, env) {
+  if (request.method !== "POST") return json({ error: "method", message: "Usa POST" }, 405);
+  if (!env || !env.AI) return json({ error: "noai", message: "Workers AI non collegato (binding AI mancante)." }, 200);
+  let body;
+  try { body = await request.json(); } catch (e) { return json({ error: "badreq" }, 400); }
+  const device = String((body && body.device) || "").toLowerCase() === "bimby" ? "bimby" : "companion";
+  const title = String((body && body.title) || "").slice(0, 140);
+  const ingredients = Array.isArray(body.ingredients) ? body.ingredients.map((x) => String(x)).slice(0, 50) : [];
+  const steps = Array.isArray(body.steps) ? body.steps.map((x) => String(x)).slice(0, 50) : [];
+  if (!title && !ingredients.length) return json({ error: "norecipe", message: "Ricetta insufficiente" }, 400);
+
+  const sys = device === "bimby"
+    ? "Sei un esperto del Bimby (Thermomix TM6). Converti la ricetta in un programma passo-passo in stile Bimby da impostare A MANO. Per ogni passo indica nelle impostazioni, quando ha senso: velocità (da 1 a 10, oppure Turbo, oppure 'antiorario' per non sminuzzare), temperatura (da 37 a 160°C, oppure Varoma, oppure nessuna se a freddo) e tempo. Esempio impostazioni: \"Vel 2 · 100°C · 10 min\" oppure \"Vel 4 · 30 sec\". Usa valori realistici e prudenti. Rispondi SOLO con JSON valido: {\"note\": string, \"steps\": [{\"azione\": string, \"impostazioni\": string}]}. La nota ricorda all'utente di verificare i valori sul proprio Bimby. Tutto in italiano. Niente markdown."
+    : "Sei un esperto del robot da cucina Moulinex i-Companion. Converti la ricetta in un programma passo-passo da impostare A MANO sul Companion. Per ogni passo indica nelle impostazioni, quando ha senso: l'accessorio (Ultrablade/lama, mescolatore, sbattitore a farfalla/frusta, lama impastatrice, cestello vapore), la velocità (da 1 a 12), la temperatura (da 30 a 130°C, o nessuna se a freddo) e il tempo. Esempio impostazioni: \"Mescolatore · Vel 5 · 100°C · 10 min\". Usa valori realistici e prudenti. Rispondi SOLO con JSON valido: {\"note\": string, \"steps\": [{\"azione\": string, \"impostazioni\": string}]}. La nota ricorda di verificare i valori sul proprio Companion. Tutto in italiano. Niente markdown.";
+
+  const userMsg = `Ricetta: ${title}\nIngredienti:\n${ingredients.join("\n")}\n\nPreparazione:\n${steps.join("\n")}`;
+  try {
+    const raw = await aiText(env, [{ role: "system", content: sys }, { role: "user", content: userMsg.slice(0, 3500) }], 900, ROBOT_SCHEMA);
+    const r = extractJson(raw);
+    if (!r || !Array.isArray(r.steps) || !r.steps.length) return json({ error: "parse", message: "Non sono riuscito a creare il programma. Riprova." }, 200);
+    return json({
+      device,
+      note: String(r.note || "").slice(0, 300),
+      steps: r.steps.map((s) => ({ azione: String(s.azione || "").slice(0, 300), impostazioni: String(s.impostazioni || "").slice(0, 120) })).slice(0, 40)
     }, 200);
   } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova tra poco." + (e && (e.detail || e.message) ? " (" + String(e.detail || e.message).slice(0, 140) + ")" : "") }, 200); }
 }
