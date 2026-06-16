@@ -9,6 +9,26 @@
   "orientation": "portrait",
   "background_color": "#0e0f13",
   "theme_color": "#0e0f13",
+  "shortcuts": [
+    {
+      "name": "Nuova ricetta",
+      "short_name": "Nuova",
+      "url": "./index.html?action=new",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Cosa cucino oggi?",
+      "short_name": "Cosa cucino",
+      "url": "./index.html?action=surprise",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Timer da cucina",
+      "short_name": "Timer",
+      "url": "./index.html?action=timer",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
   "icons": [
     {
       "src": "icons/icon-192.png",

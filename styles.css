@@ -1132,6 +1132,14 @@ a { color: var(--primary-2); }
 .robot-step__main { min-width: 0; }
 .robot-step__a { line-height: 1.4; }
 .robot-step__s { margin-top: 4px; font-weight: 700; color: var(--primary-2); font-size: 0.9rem; display: flex; align-items: center; gap: 6px; }
+/* Fotografa il frigo: chip ingredienti riconosciuti */
+.fr-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.fr-chip { cursor: pointer; }
+/* Pianificatore settimanale AI: anteprima */
+.wp-list { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; }
+.wp-day { display: flex; gap: 10px; align-items: baseline; background: var(--input-bg); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; }
+.wp-day__d { flex: 0 0 88px; font-weight: 700; color: var(--text-soft); font-size: 0.85rem; }
+.wp-day__r { min-width: 0; }
 /* Ingredienti toccabili nel passo (Modalità cucina) */
 .cook-ing { color: var(--primary-2); border-bottom: 1.5px dotted rgba(var(--primary-rgb, 255,184,107), 0.7); cursor: pointer; font-weight: 600; }
 .cook-ing:active { background: rgba(var(--primary-rgb, 255,184,107), 0.18); border-radius: 4px; }

@@ -401,6 +401,8 @@ export default {
     if (url.pathname === "/generate") return handleGenerate(request, env);
     if (url.pathname === "/importvideo") return handleImportVideo(request, env);
     if (url.pathname === "/robot") return handleRobot(request, env);
+    if (url.pathname === "/fridge") return handleFridge(request, env);
+    if (url.pathname === "/planweek") return handlePlanWeek(request, env);
     if (url.pathname === "/img") return handleImageProxy(url.searchParams.get("u"));
     if (url.pathname === "/moulinex-img") return handleMoulinexImg(url.searchParams.get("u"));
     if (url.pathname === "/searchbimby") return handleSearchBimby(url.searchParams.get("q"), url.searchParams.get("page"));
@@ -750,6 +752,69 @@ async function handleRobot(request, env) {
       device,
       note: String(r.note || "").slice(0, 300),
       steps: r.steps.map((s) => ({ azione: String(s.azione || "").slice(0, 300), impostazioni: String(s.impostazioni || "").slice(0, 120) })).slice(0, 40)
+    }, 200);
+  } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova tra poco." + (e && (e.detail || e.message) ? " (" + String(e.detail || e.message).slice(0, 140) + ")" : "") }, 200); }
+}
+
+// "Fotografa il frigo": elenca gli alimenti visibili in una foto. POST { image: base64 }.
+async function handleFridge(request, env) {
+  if (request.method !== "POST") return json({ error: "method", message: "Usa POST" }, 405);
+  if (!env || !env.AI) return json({ error: "noai", message: "Workers AI non collegato (binding AI mancante)." }, 200);
+  let body;
+  try { body = await request.json(); } catch (e) { return json({ error: "badreq" }, 400); }
+  const b64 = String((body && body.image) || "").replace(/^data:[^,]+,/, "");
+  if (!b64) return json({ error: "noimage", message: "Foto mancante" }, 400);
+  let bytes;
+  try { const bin = atob(b64); bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); }
+  catch (e) { return json({ error: "badimage", message: "Foto non leggibile" }, 400); }
+  const prompt = "Guarda questa foto di un frigorifero o di una dispensa. Elenca SOLO gli alimenti e ingredienti che riconosci con ragionevole sicurezza. Rispondi in italiano con un semplice elenco separato da virgole (esempio: uova, latte, zucchine, parmigiano, pomodori). Niente frasi, niente quantità: solo i nomi degli alimenti.";
+  const models = ["@cf/meta/llama-3.2-11b-vision-instruct", "@cf/llava-hf/llava-1.5-7b-hf"];
+  let lastErr = "";
+  for (const model of models) {
+    try {
+      const out = await env.AI.run(model, { image: [...bytes], prompt, max_tokens: 300 });
+      const text = String((out && (out.response || out.description || out.text)) || "").trim();
+      if (text) {
+        const items = text.replace(/^[^:]*:/, "").split(/[,\n;•\-]+/)
+          .map((s) => clean(s).toLowerCase().replace(/^(e |ed |un |una |dei |del |della |delle |degli )/, "").trim())
+          .filter((s) => s.length >= 2 && s.length <= 30 && /[a-zà-ù]/i.test(s));
+        const uniq = [...new Set(items)].slice(0, 30);
+        if (uniq.length) return json({ ingredients: uniq }, 200);
+      }
+    } catch (e) { lastErr = (e && e.message) || String(e); }
+  }
+  return json({ error: "empty", message: "Non ho riconosciuto alimenti. Riprova con una foto più chiara." + (lastErr ? " (" + lastErr.slice(0, 100) + ")" : "") }, 200);
+}
+
+// Pianificatore settimanale: l'AI compone 7 giorni scegliendo tra i titoli forniti.
+// POST { titles:[string], includeLunch:bool, expiring:[string] } → { days:[{pranzo?,cena}] }.
+const PLAN_SCHEMA = {
+  type: "object",
+  properties: {
+    days: {
+      type: "array",
+      items: { type: "object", properties: { pranzo: { type: "string" }, cena: { type: "string" } }, required: ["cena"] }
+    }
+  },
+  required: ["days"]
+};
+async function handlePlanWeek(request, env) {
+  if (request.method !== "POST") return json({ error: "method", message: "Usa POST" }, 405);
+  if (!env || !env.AI) return json({ error: "noai", message: "Workers AI non collegato (binding AI mancante)." }, 200);
+  let body;
+  try { body = await request.json(); } catch (e) { return json({ error: "badreq" }, 400); }
+  const titles = Array.isArray(body.titles) ? body.titles.map((x) => String(x)).filter(Boolean).slice(0, 60) : [];
+  if (titles.length < 2) return json({ error: "few", message: "Servono almeno 2 ricette salvate." }, 200);
+  const includeLunch = !!body.includeLunch;
+  const expiring = Array.isArray(body.expiring) ? body.expiring.map((x) => String(x)).slice(0, 20) : [];
+  const sys = `Sei un aiuto-cuoco. Devi comporre un menù settimanale di 7 giorni scegliendo i piatti SOLO dall'elenco di titoli di ricette forniti (usa i titoli ESATTI, copiati identici). Per ogni giorno scegli una "cena"${includeLunch ? ' e un "pranzo"' : ""}. Regole: varia il più possibile, NON ripetere lo stesso piatto nella settimana se ci sono abbastanza ricette, alterna i tipi di piatto.${expiring.length ? " Dai priorità ai piatti che usano questi ingredienti in scadenza: " + expiring.join(", ") + "." : ""} Rispondi SOLO con JSON valido: {"days":[{"pranzo":string,"cena":string}]} con esattamente 7 elementi. Tutto in italiano, nessun markdown.`;
+  const userMsg = "Ricette disponibili (scegli SOLO tra questi titoli):\n- " + titles.join("\n- ");
+  try {
+    const raw = await aiText(env, [{ role: "system", content: sys }, { role: "user", content: userMsg.slice(0, 3500) }], 900, PLAN_SCHEMA);
+    const r = extractJson(raw);
+    if (!r || !Array.isArray(r.days) || !r.days.length) return json({ error: "parse", message: "Non sono riuscito a creare il menù. Riprova." }, 200);
+    return json({
+      days: r.days.slice(0, 7).map((d) => ({ pranzo: String((d && d.pranzo) || "").slice(0, 140), cena: String((d && d.cena) || "").slice(0, 140) }))
     }, 200);
   } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova tra poco." + (e && (e.detail || e.message) ? " (" + String(e.detail || e.message).slice(0, 140) + ")" : "") }, 200); }
 }

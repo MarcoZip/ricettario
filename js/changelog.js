@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    v: "7.17",
+    d: "2026-06-16",
+    items: [
+      "Nuovo: \"Fotografa il frigo\" (in Dispensa) — l'AI riconosce gli alimenti dalla foto e li aggiungi o cerchi ricette.",
+      "Nuovo: \"Menù AI\" nel Piano (vista Settimana) — propone le cene della settimana dalle tue ricette, con anteprima e rigenera.",
+      "Scorciatoie rapide: tieni premuta l'icona di Fornelli per Nuova ricetta, Cosa cucino oggi, Timer."
+    ]
+  },
+  {
     v: "7.16",
     d: "2026-06-16",
     minor: true,

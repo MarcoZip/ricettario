@@ -21,6 +21,17 @@ function scheduleReminders() {
   setTimeout(doReminders, 3000);
 }
 
+// Scorciatoie dall'icona dell'app (manifest shortcuts): ?action=new|surprise|timer.
+function consumeShortcut() {
+  try {
+    const a = new URLSearchParams(location.search).get("action");
+    if (!a) return;
+    ui.handleShortcut(a);
+    // pulisci l'URL così la scorciatoia non si ripete al refresh
+    history.replaceState(null, "", location.pathname);
+  } catch (e) { /* ignora */ }
+}
+
 applyTheme();
 applyAccent();
 applyTextScale();
@@ -66,6 +77,7 @@ async function startLocal() {
   scheduleReminders();
   ui.maybeShowWhatsNew();
   ui.promptNicknameIfMissing();
+  consumeShortcut();
 }
 
 async function startCloud() {
@@ -119,6 +131,7 @@ async function startCloud() {
       scheduleReminders();
       ui.maybeShowWhatsNew();
       ui.promptNicknameIfMissing();
+      consumeShortcut();
     } else {
       accountEmail = null;
       ensureMounted();

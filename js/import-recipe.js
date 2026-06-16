@@ -98,6 +98,38 @@ export async function robotProgram(recipe, device) {
   throw new Error((d && d.message) || "Non sono riuscito a creare il programma. Riprova.");
 }
 
+// "Fotografa il frigo": l'AI elenca gli alimenti visibili in una foto.
+export async function fridgeIngredients(image) {
+  if (!WORKER_URL) throw new Error("Funzione non disponibile (worker non configurato).");
+  let res;
+  try {
+    res = await fetch(`${WORKER_URL}/fridge`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image })
+    });
+  } catch (e) { throw new Error("Servizio non raggiungibile. Controlla la connessione."); }
+  const d = await res.json().catch(() => ({}));
+  if (d && Array.isArray(d.ingredients) && d.ingredients.length) return d.ingredients;
+  if (d && d.error === "noai") throw new Error("La funzione non è ancora attiva sul worker (manca il collegamento all'AI).");
+  throw new Error((d && d.message) || "Non ho riconosciuto alimenti. Riprova.");
+}
+
+// Pianificatore settimanale AI: dai titoli → 7 giorni { pranzo?, cena }.
+export async function planWeekAI(titles, includeLunch, expiring) {
+  if (!WORKER_URL) throw new Error("Funzione non disponibile (worker non configurato).");
+  let res;
+  try {
+    res = await fetch(`${WORKER_URL}/planweek`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ titles, includeLunch: !!includeLunch, expiring: expiring || [] })
+    });
+  } catch (e) { throw new Error("Servizio non raggiungibile. Controlla la connessione."); }
+  const d = await res.json().catch(() => ({}));
+  if (d && Array.isArray(d.days) && d.days.length) return d.days;
+  if (d && d.error === "noai") throw new Error("La funzione non è ancora attiva sul worker (manca il collegamento all'AI).");
+  throw new Error((d && d.message) || "Non sono riuscito a creare il menù. Riprova.");
+}
+
 // Abbinamento vino consigliato per un piatto (via Spoonacular).
 export async function winePairing(food) {
   if (!WORKER_URL || !food) return null;

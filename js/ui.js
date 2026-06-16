@@ -7,7 +7,7 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo, robotProgram } from "./import-recipe.js";
+import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo, robotProgram, fridgeIngredients, planWeekAI } from "./import-recipe.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage, shareMenuImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
@@ -922,6 +922,20 @@ export function navigate(route) {
   // Dissolvenza/scorrimento morbido tra le schede (anche dove le View Transitions
   // non sono supportate). Gated reduce-motion via CSS.
   if (root) { root.classList.remove("view-anim"); void root.offsetWidth; root.classList.add("view-anim"); }
+}
+
+// Scorciatoie dall'icona dell'app (manifest "shortcuts"): ?action=new|surprise|timer.
+export function handleShortcut(action) {
+  if (!action) return;
+  setTimeout(() => {
+    if (action === "new") openRecipeForm({});
+    else if (action === "timer") openTimersTool();
+    else if (action === "surprise") {
+      const all = store.getAllRecipes();
+      if (!all.length) { toast("Aggiungi prima qualche ricetta", "error"); return; }
+      openRecipe(all[Math.floor(Math.random() * all.length)].id);
+    }
+  }, 500);
 }
 
 function openTool(toolId) {
@@ -2301,6 +2315,84 @@ function openVideoPlayer(url) {
   `);
   m.el.querySelector('[data-act="ok"]').onclick = m.close;
   m.el.querySelector("#vOpen").onclick = () => { try { window.open(url, "_blank", "noopener"); } catch (e) {} };
+}
+
+// "Fotografa il frigo": l'AI riconosce gli alimenti da una foto, poi li aggiungi
+// in dispensa o cerchi ricette online.
+async function openFridgePhoto(file) {
+  let dataUrl;
+  try { dataUrl = await fileToDataUrl(file, 800, 0.6); } catch (e) { toast("Foto non valida", "error"); return; }
+  const m = openModal(`
+    <h3 class="modal__title">🧊 Cosa c'è nel frigo</h3>
+    <div id="frBody"><div style="text-align:center;padding:8px 0"><div class="spinner"></div><div class="hint">Guardo cosa c'è…</div></div></div>
+    <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
+  `);
+  m.el.querySelector('[data-act="ok"]').onclick = m.close;
+  const body = m.el.querySelector("#frBody");
+  let items = [];
+  const draw = () => {
+    body.innerHTML = `<div class="hint" style="margin-bottom:8px">Ingredienti riconosciuti (tocca per togliere quelli sbagliati):</div>
+      <div class="fr-chips">${items.length ? items.map((x, i) => `<button class="chip fr-chip" data-i="${i}">${escapeHtml(x)} ✕</button>`).join("") : '<span class="hint">Nessun alimento riconosciuto.</span>'}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+        <button class="btn btn--primary" id="frPantry">${iconHtml("basket")} Aggiungi in dispensa</button>
+        <button class="btn btn--ghost" id="frOnline">${iconHtml("magnifying-glass")} Cerca ricette online</button>
+      </div>`;
+    body.querySelectorAll(".fr-chip").forEach((b) => b.onclick = () => { items.splice(parseInt(b.dataset.i, 10), 1); draw(); });
+    body.querySelector("#frPantry").onclick = async () => {
+      if (!items.length) { toast("Nessun alimento", "error"); return; }
+      for (const it of items) await store.addPantryItem(it, null);
+      m.close();
+      toast(`${items.length} alimenti aggiunti in dispensa`, "success");
+      if (currentRoute === "spesa") renderShopping();
+    };
+    body.querySelector("#frOnline").onclick = () => {
+      if (!items.length) { toast("Nessun alimento", "error"); return; }
+      m.close(); mealTab = "online"; navigate("ricettario"); performMealSearch(items.join(", "));
+    };
+  };
+  try { items = await fridgeIngredients(dataUrl); if (!body.isConnected) return; draw(); }
+  catch (e) { if (!body.isConnected) return; body.innerHTML = `<div class="hint" style="color:var(--danger)">${escapeHtml(e.message || "Non riuscito.")}</div>`; }
+}
+
+// Pianificatore settimanale AI: propone le cene della settimana scegliendo tra le
+// tue ricette, con anteprima (rigenera / applica). Riempie solo i giorni vuoti.
+function openWeekPlanner(days) {
+  let recipes = allRecipes();
+  if (typeof anyDietPref === "function" && anyDietPref()) { const f = recipes.filter(matchesDiet); if (f.length >= 2) recipes = f; }
+  if (recipes.length < 2) { toast("Servono almeno 2 ricette salvate", "error"); return; }
+  const titles = recipes.map((r) => r.title);
+  let expiring = [];
+  try { expiring = store.recipesForExpiring(3).map((r) => r.title); } catch (e) {}
+  const matchTitle = (t) => {
+    const lt = (t || "").toLowerCase().trim(); if (!lt) return null;
+    return recipes.find((r) => r.title.toLowerCase().trim() === lt)
+      || recipes.find((r) => { const rt = r.title.toLowerCase(); return rt.includes(lt) || lt.includes(rt); });
+  };
+  const m = openModal(`<h3 class="modal__title">✨ Menù della settimana (AI)</h3><div id="wpBody"></div>`);
+  const body = m.el.querySelector("#wpBody");
+  const spinner = () => { body.innerHTML = `<div style="text-align:center;padding:10px 0"><div class="spinner"></div><div class="hint">Compongo la settimana…</div></div>`; };
+  const draw = (daysData) => {
+    body.innerHTML = `<div class="hint" style="margin-bottom:8px">Proposta per le cene. Rigenera o applica (riempie solo i giorni senza cena).</div>
+      <div class="wp-list">${days.map((d, i) => { const rec = matchTitle((daysData[i] || {}).cena); return `<div class="wp-day"><span class="wp-day__d">${WEEKDAYS_IT[i]} ${d.getDate()}</span><span class="wp-day__r">${rec ? escapeHtml(rec.title) : '<span style="color:var(--text-soft)">—</span>'}</span></div>`; }).join("")}</div>
+      <div class="modal__actions" style="margin-top:12px"><button class="btn" id="wpRegen">↻ Rigenera</button><button class="btn btn--primary" id="wpApply">Applica</button></div>`;
+    body.querySelector("#wpRegen").onclick = load;
+    body.querySelector("#wpApply").onclick = async () => {
+      let n = 0;
+      for (let i = 0; i < days.length; i++) {
+        const d = days[i]; const ds = ymd(d.getFullYear(), d.getMonth(), d.getDate());
+        if (store.getPlanByDate(ds).some((e) => e.slot === "cena")) continue;
+        const rec = matchTitle((daysData[i] || {}).cena);
+        if (rec) { await store.addPlan(ds, rec.id, "cena"); n++; }
+      }
+      m.close(); toast(n ? `${n} cene pianificate ✨` : "Cene già pianificate", n ? "success" : ""); render();
+    };
+  };
+  const load = async () => {
+    spinner();
+    try { const daysData = await planWeekAI(titles, false, expiring); if (!body.isConnected) return; draw(daysData); }
+    catch (e) { if (!body.isConnected) return; body.innerHTML = `<div class="hint" style="color:var(--danger)">${escapeHtml(e.message || "Non riuscito.")}</div><div class="modal__actions"><button class="btn btn--primary" id="wpClose">Chiudi</button></div>`; const c = body.querySelector("#wpClose"); if (c) c.onclick = m.close; }
+  };
+  load();
 }
 
 // "Modalità robot": converte la ricetta in comandi per Companion o Bimby (AI).
@@ -4087,7 +4179,8 @@ function renderPantry() {
 
   wrap.innerHTML = `
     <div class="hint" style="margin-bottom:10px">Quello che metti qui non verrà aggiunto alla lista della spesa. La data di scadenza è facoltativa. Tocca la ⭐ per segnare una <b>scorta di base</b>: quando la elimini (finita) torna subito nella spesa.</div>
-    <button class="btn btn--primary btn--block" id="cookSuggest" style="margin-bottom:14px">${iconHtml("fork-knife")} Cosa posso cucinare con questi?</button>
+    <button class="btn btn--primary btn--block" id="cookSuggest" style="margin-bottom:10px">${iconHtml("fork-knife")} Cosa posso cucinare con questi?</button>
+    ${isImportConfigured() ? `<button class="btn btn--block" id="fridgePhoto" style="margin-bottom:14px">🧊 Fotografa il frigo (l'AI riconosce gli alimenti)</button><input type="file" id="fridgeFile" accept="image/*" capture="environment" hidden />` : ""}
     <div class="pan-add">
       <input type="text" id="panAdd" placeholder="Aggiungi un alimento..." />
       <div class="pan-add__row">
@@ -4111,6 +4204,10 @@ function renderPantry() {
   wrap.querySelector("#panAddBtn").addEventListener("click", doAdd);
   addInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdd(); });
   wrap.querySelector("#cookSuggest").addEventListener("click", openCookSuggestions);
+  const fridgePhoto = wrap.querySelector("#fridgePhoto");
+  const fridgeFile = wrap.querySelector("#fridgeFile");
+  if (fridgePhoto) fridgePhoto.addEventListener("click", () => fridgeFile.click());
+  if (fridgeFile) fridgeFile.addEventListener("change", () => { const f = fridgeFile.files[0]; fridgeFile.value = ""; if (f) openFridgePhoto(f); });
   const scanBtn = wrap.querySelector("#panScan");
   if (scanBtn) scanBtn.addEventListener("click", openBarcodeScanner);
   wrap.querySelectorAll(".shop-row").forEach((rowEl) => {
@@ -4311,7 +4408,8 @@ function renderPlanWeek() {
     })()}
     <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
       <button class="btn btn--ghost" id="weekToday">Oggi</button>
-      <button class="btn btn--primary" id="genWeek">${iconHtml("sparkle")} Menù settimana</button>
+      ${isImportConfigured() ? `<button class="btn btn--primary" id="aiWeek">✨ Menù AI</button>` : ""}
+      <button class="btn btn--ghost" id="genWeek">${iconHtml("sparkle")} Menù settimana</button>
       <button class="btn btn--ghost" id="fillWeek">${iconHtml("sparkle")} Riempi le cene</button>
       <button class="btn btn--ghost" id="weekShop">${iconHtml("shopping-cart-simple")} Spesa settimana</button>
       <button class="btn btn--ghost" id="weekShare">${iconHtml("image")} Condividi il menù</button>
@@ -4325,6 +4423,8 @@ function renderPlanWeek() {
   root.querySelectorAll(".week-day__h").forEach((b) => b.addEventListener("click", () => openDaySheet(b.dataset.date)));
   root.querySelectorAll(".week-meal").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); if (b.dataset.recipe) openRecipe(b.dataset.recipe); }));
 
+  const aiWeek = root.querySelector("#aiWeek");
+  if (aiWeek) aiWeek.addEventListener("click", () => openWeekPlanner(days));
   root.querySelector("#fillWeek").addEventListener("click", async () => {
     const recipes = allRecipes();
     if (!recipes.length) { toast("Aggiungi prima qualche ricetta", "error"); return; }
