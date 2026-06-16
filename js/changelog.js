@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    v: "7.13",
+    d: "2026-06-16",
+    items: [
+      "In Modalità cucina tocca un ingrediente dentro il passo per vedere la quantità, senza tornare indietro.",
+      "I timer rapidi dei passi ora si chiamano da soli (Forno, Cottura, Lievitazione…).",
+      "Tocco grafico più moderno: leggero effetto vetro su finestre e card, piccole vibrazioni al tocco."
+    ]
+  },
+  {
     v: "7.12",
     d: "2026-06-16",
     items: [

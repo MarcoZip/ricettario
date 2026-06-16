@@ -933,6 +933,7 @@ function openTool(toolId) {
 
 function openRecipe(recipeId) {
   const r = store.getRecipe(recipeId);
+  haptic(6);
   currentRecipeId = recipeId;
   currentToolId = r ? r.toolId : currentToolId;
   // Porzioni predefinite: se impostate e la ricetta ha le porzioni, apri già scalato.
@@ -2404,6 +2405,76 @@ function fmtDur(mins) {
   const h = Math.floor(mins / 60), m = mins % 60;
   return h + "h" + (m ? " " + m : "");
 }
+// Pulisce il nome di un ingrediente da numeri e unità (alcune fonti scrivono
+// "Merluzzo 500 g", quindi il nome grezzo contiene la quantità).
+const ING_STOP = new Set(["di", "da", "in", "il", "la", "lo", "le", "gli", "un", "una", "uno", "con", "per", "del", "della", "dello", "delle", "degli", "dei", "al", "allo", "alla", "alle", "sul", "sulla", "fresco", "fresca", "fresche", "freschi", "medie", "medio", "media", "medi", "grande", "grandi", "piccolo", "piccola", "tipo", "circa", "fino", "fine", "extra", "vergine", "qb", "quanto", "basta"]);
+const ING_UNITS = /\b(g|gr|kg|ml|l|cl|dl|q\.?\s?b\.?|cucchiai|cucchiaio|cucchiaini|cucchiaino|tazze|tazza|bustine|bustina|spicchi|spicchio|fette|fetta|ciuffo|ciuffi|pizzico|pizzichi|confezioni|confezione|barattoli|barattolo|lattine|lattina|foglie|foglia|rametti|rametto|mazzetti|mazzetto|pezzi|pezzo|noci|noce|gocce|goccia|litri|litro)\b/gi;
+function cleanIngName(name) {
+  return String(name || "").toLowerCase()
+    .replace(/\d+([.,]\d+)?/g, " ")
+    .replace(ING_UNITS, " ")
+    .replace(/[^a-zà-ù\s]/gi, " ")
+    .replace(/\s+/g, " ").trim();
+}
+// Evidenzia nel testo del passo gli ingredienti della ricetta, rendendoli
+// toccabili per vedere la quantità senza tornare alla lista (stile Crouton/Mela).
+function buildStepHtml(text, ingredients) {
+  text = String(text || "");
+  // Per ogni ingrediente, prepara i termini di ricerca (frase pulita + parole chiave).
+  const pairs = []; // { term, label }
+  (ingredients || []).forEach((it) => {
+    if (!it || !it.name) return;
+    const label = ingredientText(it);
+    const clean = cleanIngName(it.name);
+    const words = clean.split(" ").filter((w) => w.length >= 3 && !ING_STOP.has(w));
+    const terms = [];
+    if (clean.includes(" ") && clean.length >= 5) terms.push(clean);
+    words.sort((a, b) => b.length - a.length).forEach((w) => terms.push(w));
+    [...new Set(terms)].forEach((term) => pairs.push({ term, label }));
+  });
+  if (!pairs.length) return escapeHtml(text);
+  pairs.sort((a, b) => b.term.length - a.term.length); // i termini più specifici prima
+  const lower = text.toLowerCase();
+  const isSep = (ch) => ch === undefined || /[^a-zà-ù0-9]/i.test(ch);
+  const marks = [];
+  const usedLabels = new Set();
+  for (const p of pairs) {
+    if (usedLabels.has(p.label)) continue; // un solo segno per ingrediente
+    let from = 0, i;
+    while ((i = lower.indexOf(p.term, from)) !== -1) {
+      const end = i + p.term.length;
+      if (isSep(lower[i - 1]) && isSep(lower[end]) && !marks.some((mk) => i < mk.end && end > mk.start)) {
+        marks.push({ start: i, end, label: p.label });
+        usedLabels.add(p.label);
+        break;
+      }
+      from = end;
+    }
+  }
+  if (!marks.length) return escapeHtml(text);
+  marks.sort((a, b) => a.start - b.start);
+  let html = "", pos = 0;
+  for (const mk of marks) {
+    if (mk.start < pos) continue;
+    html += escapeHtml(text.slice(pos, mk.start));
+    html += `<span class="cook-ing" data-q="${escapeHtml(mk.label)}">${escapeHtml(text.slice(mk.start, mk.end))}</span>`;
+    pos = mk.end;
+  }
+  html += escapeHtml(text.slice(pos));
+  return html;
+}
+// Nome "intelligente" per un timer dedotto dal contenuto del passo.
+function stepTimerLabel(text, n) {
+  const t = (text || "").toLowerCase();
+  if (/forn|inforn|gratin/.test(t)) return "Forno";
+  if (/lievit/.test(t)) return "Lievitazione";
+  if (/marin/.test(t)) return "Marinatura";
+  if (/ripos|raffredd|in frigo|frigorifer/.test(t)) return "Riposo";
+  if (/frigg|frittur/.test(t)) return "Frittura";
+  if (/boll|less|scott|sbollent/.test(t)) return "Cottura";
+  if (/soffrigg|rosol|cuoci|cottura|cuocere|stufa/.test(t)) return "Cottura";
+  return "Passo " + n;
+}
 
 function openCookingMode(recipe) {
   const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
@@ -2426,10 +2497,10 @@ function openCookingMode(recipe) {
   host.appendChild(el);
 
   function goNext() {
-    if (idx < steps.length - 1) { idx++; draw(); speakStep(); }
+    if (idx < steps.length - 1) { idx++; haptic(6); draw(); speakStep(); }
     else { store.markCooked(recipe.id); close(); }
   }
-  function goPrev() { if (idx > 0) { idx--; draw(); speakStep(); } }
+  function goPrev() { if (idx > 0) { idx--; haptic(6); draw(); speakStep(); } }
 
   // Comandi vocali: avanti / indietro / timer N minuti / leggi.
   const NUMWORDS = { uno: 1, una: 1, un: 1, due: 2, tre: 3, quattro: 4, cinque: 5, sei: 6, sette: 7, otto: 8, nove: 9, dieci: 10, undici: 11, dodici: 12, quindici: 15, venti: 20, venticinque: 25, trenta: 30, quaranta: 40, quarantacinque: 45, sessanta: 60 };
@@ -2563,7 +2634,7 @@ function openCookingMode(recipe) {
         <button class="cook__close ${speak ? "is-on" : ""}" id="ckSpeak" title="Leggi ad alta voce">🔊</button>
       </div>
       <div class="cook__track"><div class="cook__fill" style="width:${((idx + 1) / steps.length) * 100}%"></div></div>
-      <div class="cook__body"><div class="cook__step">${escapeHtml(steps[idx])}</div></div>
+      <div class="cook__body"><div class="cook__step">${buildStepHtml(steps[idx], recipe.ingredients)}</div></div>
       <div class="cook__timers" id="ckTimers"></div>
       ${(() => { const ds = parseDurations(steps[idx]); return ds.length ? `<div class="cook__quick">${ds.map((d) => `<button class="chip" data-qmin="${d}">${iconHtml("timer")} ${fmtDur(d)}</button>`).join("")}</div>` : ""; })()}
       <div class="cook__addtimer">
@@ -2585,7 +2656,20 @@ function openCookingMode(recipe) {
     el.querySelector("#ckPrev").onclick = goPrev;
     el.querySelector("#ckNext").onclick = goNext;
     el.querySelector("#tAdd").onclick = () => { addTimer(el.querySelector("#tMin").value, el.querySelector("#tName").value); el.querySelector("#tName").value = ""; };
-    el.querySelectorAll("[data-qmin]").forEach((b) => b.onclick = () => addTimer(parseInt(b.dataset.qmin, 10), "Passo " + (idx + 1)));
+    el.querySelectorAll("[data-qmin]").forEach((b) => b.onclick = () => addTimer(parseInt(b.dataset.qmin, 10), stepTimerLabel(steps[idx], idx + 1)));
+    // Tocca un ingrediente nel testo del passo → mostra la quantità in un fumetto.
+    el.querySelectorAll(".cook-ing").forEach((s) => s.addEventListener("click", () => {
+      document.querySelectorAll(".cook-ing-pop").forEach((p) => p.remove());
+      const pop = document.createElement("div");
+      pop.className = "cook-ing-pop";
+      pop.textContent = s.dataset.q || s.textContent;
+      document.body.appendChild(pop);
+      const r = s.getBoundingClientRect();
+      pop.style.left = Math.max(8, Math.min(window.innerWidth - 8 - pop.offsetWidth, r.left + r.width / 2 - pop.offsetWidth / 2)) + "px";
+      pop.style.top = Math.max(8, r.top - pop.offsetHeight - 8) + "px";
+      haptic(8);
+      setTimeout(() => pop.remove(), 2600);
+    }));
     paintTimers();
   }
 
