@@ -544,11 +544,27 @@ async function handleVision(request, env) {
 }
 
 // ---------- Funzioni AI testuali (Cloudflare Workers AI, gratis entro quota) ----------
-//  Modello di testo veloce e multilingue. Richiede lo stesso binding "AI".
-const TEXT_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+//  Modelli di testo multilingue, provati in cascata (alcuni account ne hanno
+//  solo alcuni). Richiede lo stesso binding "AI".
+const TEXT_MODELS = [
+  "@cf/meta/llama-3.1-8b-instruct",
+  "@cf/meta/llama-3-8b-instruct",
+  "@cf/meta/llama-3.1-8b-instruct-fast",
+  "@cf/mistralai/mistral-7b-instruct-v0.1",
+  "@cf/qwen/qwen1.5-14b-chat-awq"
+];
 async function aiText(env, messages, maxTokens) {
-  const out = await env.AI.run(TEXT_MODEL, { messages, max_tokens: maxTokens || 700 });
-  return String((out && (out.response || out.text)) || "").trim();
+  let lastErr = "";
+  for (const model of TEXT_MODELS) {
+    try {
+      const out = await env.AI.run(model, { messages, max_tokens: maxTokens || 700 });
+      const t = String((out && (out.response || out.text)) || "").trim();
+      if (t) return t;
+    } catch (e) { lastErr = (e && e.message) || String(e); }
+  }
+  const err = new Error(lastErr || "Nessun modello di testo disponibile.");
+  err.detail = lastErr;
+  throw err;
 }
 // Estrae il primo oggetto JSON da un testo del modello (tollerante a code-fence/prefazioni).
 function extractJson(text) {
@@ -580,7 +596,7 @@ async function handleAsk(request, env) {
     const answer = await aiText(env, messages, 500);
     if (!answer) return json({ error: "empty", message: "Nessuna risposta. Riprova." }, 200);
     return json({ answer }, 200);
-  } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova tra poco." }, 200); }
+  } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova tra poco." + (e && (e.detail || e.message) ? " (" + String(e.detail || e.message).slice(0, 140) + ")" : "") }, 200); }
 }
 
 // "Inventa una ricetta" dagli ingredienti disponibili. POST { ingredients, note? }.
@@ -607,7 +623,7 @@ async function handleGenerate(request, env) {
       ingredients: Array.isArray(r.ingredients) ? r.ingredients.map((x) => String(x)).slice(0, 40) : [],
       steps: Array.isArray(r.steps) ? r.steps.map((x) => String(x)).slice(0, 40) : []
     }, 200);
-  } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova tra poco." }, 200); }
+  } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova tra poco." + (e && (e.detail || e.message) ? " (" + String(e.detail || e.message).slice(0, 140) + ")" : "") }, 200); }
 }
 
 // Import ricetta da link video social (TikTok/Instagram/YouTube) o da testo
@@ -667,7 +683,7 @@ async function handleImportVideo(request, env) {
       steps: Array.isArray(r.steps) ? r.steps.map((x) => String(x)).slice(0, 50) : [],
       sourceUrl: url || ""
     }, 200);
-  } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova tra poco." }, 200); }
+  } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova tra poco." + (e && (e.detail || e.message) ? " (" + String(e.detail || e.message).slice(0, 140) + ")" : "") }, 200); }
 }
 
 function json(obj, status) {
