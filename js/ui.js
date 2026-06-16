@@ -2253,8 +2253,8 @@ function openTimersTool() {
     <div id="timersList"></div>
     <div class="timer-add">
       <input type="text" id="ntName" placeholder="Nome (es. Pasta)" />
-      <input type="number" id="ntMin" min="0" inputmode="numeric" value="10" title="Minuti" />
-      <input type="number" id="ntSec" min="0" max="59" inputmode="numeric" value="0" title="Secondi" />
+      <label class="timer-unit">min<input type="number" id="ntMin" min="0" inputmode="numeric" value="10" /></label>
+      <label class="timer-unit">sec<input type="number" id="ntSec" min="0" max="59" inputmode="numeric" value="0" /></label>
       <button class="btn btn--primary" id="ntAdd">${iconHtml("plus")} Avvia</button>
     </div>
     <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>

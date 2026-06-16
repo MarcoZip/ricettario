@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.16",
+    d: "2026-06-16",
+    minor: true,
+    items: [
+      "Nello strumento Timer le due caselle ora indicano chiaramente \"min\" e \"sec\"."
+    ]
+  },
+  {
     v: "7.15",
     d: "2026-06-16",
     items: [
