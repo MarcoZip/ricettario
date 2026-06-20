@@ -342,11 +342,11 @@ export function mount(rootEl) {
   });
   const help = document.getElementById("helpBtn");
   if (help) help.addEventListener("click", () => openGuide());
-  // Guida al primo avvio.
+  // Guida al primo avvio: mostrala SOLO dopo lo splash (e fuori dal login), e
+  // segna "vista" solo quando appare davvero — così non si perde dietro lo splash.
   try {
     if (!localStorage.getItem("ricettario.guide.v8")) {
-      localStorage.setItem("ricettario.guide.v8", "1");
-      setTimeout(() => openGuide(true), 500);
+      whenReadyForPopup(() => { localStorage.setItem("ricettario.guide.v8", "1"); openGuide(true); });
     }
   } catch {}
   setupBackHandler();
@@ -444,6 +444,17 @@ function setupBackHandler() {
 // Mostra le novità quando la versione è cambiata dall'ultima volta (non al primo
 // avvio assoluto). Salva la versione vista in localStorage. Va chiamata SOLO dopo
 // l'accesso (quando si è nell'app vera), non sulla schermata di login.
+// Esegue cb solo quando l'app è davvero pronta a mostrare un popup: niente
+// splash in corso, niente schermata di login, niente altri popup/guida aperti.
+// Evita che benvenuto/novità "lampeggino" dietro lo splash e si perdano.
+function whenReadyForPopup(cb, tries) {
+  tries = tries || 0;
+  const blocked = document.getElementById("splash") || loginMode ||
+    document.querySelector("#modalRoot .modal-backdrop") || document.querySelector(".guide");
+  if (blocked) { if (tries < 150) setTimeout(() => whenReadyForPopup(cb, tries + 1), 200); return; }
+  cb();
+}
+
 export function maybeShowWhatsNew() {
   try {
     const KEY = "ricettario.seenVersion";
@@ -455,19 +466,9 @@ export function maybeShowWhatsNew() {
     // Nel popup solo le novità "degne di nota" (niente correzioni minori).
     const fresh = all.filter((c) => !c.minor);
     if (!fresh.length) { localStorage.setItem(KEY, APP_VERSION); return; }
-    // Mostra SOLO quando si è davvero nell'app: niente splash, niente schermata di
-    // login (Firebase a volte emette prima null), niente altri popup/guida aperti.
-    // La versione viene segnata "vista" solo quando la finestra appare davvero, così
-    // non viene "consumata" durante un lampo della schermata di login.
-    let tries = 0;
-    const open = () => {
-      const blocked = document.getElementById("splash") || loginMode ||
-        document.querySelector("#modalRoot .modal-backdrop") || document.querySelector(".guide");
-      if (blocked) { if (tries++ < 100) setTimeout(open, 200); return; }
-      localStorage.setItem(KEY, APP_VERSION);
-      openChangelog(fresh, { whatsNew: true });
-    };
-    setTimeout(open, 400);
+    // Segna "vista" solo quando la finestra appare DAVVERO (dopo lo splash), così
+    // non viene consumata durante un lampo dello splash o della schermata di login.
+    whenReadyForPopup(() => { localStorage.setItem(KEY, APP_VERSION); openChangelog(fresh, { whatsNew: true }); });
   } catch (e) { /* ignora */ }
 }
 
@@ -1352,8 +1353,9 @@ function renderStrumenti() {
     ${neglectedCard}
     ${seasonCard}
     ${banner}
-    <div class="search-bar">
-      <input type="search" id="homeSearch" placeholder="Cerca (anche più ingredienti: zucchine, pollo)" value="${escapeHtml(homeQuery)}" />
+    <div class="search-bar search-bar--hero">
+      <span class="search-bar__ic">${iconHtml("magnifying-glass")}</span>
+      <input type="search" id="homeSearch" placeholder="Cerca una ricetta o un ingrediente…" value="${escapeHtml(homeQuery)}" />
       ${voiceOK ? `<button class="btn mic-btn" id="homeMic" title="Cerca a voce" aria-label="Cerca a voce">🎤</button>` : ""}
     </div>
     ${total ? `<button class="btn btn--block" id="surpriseBtn" style="margin:4px 0 12px">${iconHtml("shuffle")} Cosa cucino oggi?</button>` : ""}

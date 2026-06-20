@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    v: "7.28",
+    d: "2026-06-16",
+    items: [
+      "Casa condivisa: ora arriva una NOTIFICA anche ad app chiusa quando l'altra persona aggiunge qualcosa alla lista (servono le notifiche attive su entrambi i telefoni).",
+      "Casella di ricerca più grande ed evidente anche nella schermata principale.",
+      "Risolto: le schermate di benvenuto e Novità non si perdono più dietro l'animazione d'avvio."
+    ]
+  },
+  {
     v: "7.27",
     d: "2026-06-16",
     items: [

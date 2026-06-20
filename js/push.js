@@ -140,8 +140,25 @@ export async function registerPush(store) {
     });
   }
   const reminders = buildReminders(store, getNotifyPrefs());
-  await postWorker("/register", { subscription: sub.toJSON(), reminders });
+  await postWorker("/register", { subscription: sub.toJSON(), reminders, household: currentHousehold() });
   return true;
+}
+
+function currentHousehold() { try { return (localStorage.getItem("ricettario.household") || "").trim(); } catch (e) { return ""; } }
+
+// Casa condivisa: avvisa (push, anche ad app chiusa) gli ALTRI membri della casa
+// che sono stati aggiunti degli articoli. Esclude questo dispositivo.
+export async function notifyHousehold(names) {
+  try {
+    if (!isPushConfigured() || !Array.isArray(names) || !names.length) return;
+    const code = currentHousehold();
+    if (!code) return;
+    let endpoint = "";
+    try { const sub = await getSubscription(); if (sub) endpoint = sub.endpoint; } catch (e) {}
+    const nick = (localStorage.getItem("ricettario.nickname") || "").trim() || "Qualcuno";
+    const list = names.slice(0, 3).join(", ") + (names.length > 3 ? "…" : "");
+    await postWorker("/household-notify", { code, title: "Lista della spesa", body: `${nick} ha aggiunto: ${list}`, fromEndpoint: endpoint });
+  } catch (e) { /* offline o non configurato: ignora */ }
 }
 
 // Ricalcola e ricarica i promemoria (se già iscritti). Silenzioso in caso d'errore.
@@ -151,7 +168,7 @@ export async function refreshReminders(store) {
     const sub = await getSubscription();
     if (!sub) return;
     const reminders = buildReminders(store, getNotifyPrefs());
-    await postWorker("/register", { subscription: sub.toJSON(), reminders });
+    await postWorker("/register", { subscription: sub.toJSON(), reminders, household: currentHousehold() });
   } catch (e) { /* offline o worker non raggiungibile: riproverà alla prossima apertura */ }
 }
 

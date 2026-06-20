@@ -122,8 +122,9 @@ async function handleRegister(request, env) {
   const sub = data.subscription;
   if (!sub || !sub.endpoint) return new Response("Bad subscription", { status: 400, headers: CORS });
   const reminders = Array.isArray(data.reminders) ? data.reminders : [];
+  const household = (data.household || "").trim();
   const key = "sub:" + bytesToB64url(new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(sub.endpoint))));
-  await env.PUSH_KV.put(key, JSON.stringify({ subscription: sub, reminders }));
+  await env.PUSH_KV.put(key, JSON.stringify({ subscription: sub, reminders, household }));
   return new Response(JSON.stringify({ ok: true, count: reminders.length }), { headers: { ...CORS, "Content-Type": "application/json" } });
 }
 
@@ -158,6 +159,35 @@ async function handleBroadcast(request, env) {
     }
   } while (cursor);
   return new Response(JSON.stringify({ ok: true, sent, removed }), { headers: { ...CORS, "Content-Type": "application/json" } });
+}
+
+// Casa condivisa: invia un avviso a tutti gli iscritti della stessa casa (stesso
+// codice household), TRANNE chi ha fatto la modifica (fromEndpoint).
+async function handleHouseholdNotify(request, env) {
+  const data = await request.json();
+  const code = (data.code || "").trim();
+  if (!code) return new Response("Bad request", { status: 400, headers: CORS });
+  const title = (data.title || "Fornelli").slice(0, 80);
+  const body = (data.body || "").slice(0, 160);
+  let fromKey = null;
+  if (data.fromEndpoint) fromKey = "sub:" + bytesToB64url(new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(data.fromEndpoint))));
+  let sent = 0, cursor;
+  do {
+    const list = await env.PUSH_KV.list({ prefix: "sub:", cursor });
+    cursor = list.list_complete ? null : list.cursor;
+    for (const k of list.keys) {
+      if (fromKey && k.name === fromKey) continue; // non avvisare chi ha aggiunto
+      const raw = await env.PUSH_KV.get(k.name);
+      if (!raw) continue;
+      const entry = JSON.parse(raw);
+      if ((entry.household || "") !== code) continue;
+      try {
+        const status = await sendPush(entry.subscription, { title, body, url: "./" }, env.VAPID_PRIVATE);
+        if (status === 404 || status === 410) { await env.PUSH_KV.delete(k.name); } else sent++;
+      } catch (e) { /* salta */ }
+    }
+  } while (cursor);
+  return new Response(JSON.stringify({ ok: true, sent }), { headers: { ...CORS, "Content-Type": "application/json" } });
 }
 
 // Cron: invia i promemoria scaduti e li rimuove; elimina le iscrizioni morte.
@@ -207,6 +237,7 @@ export default {
       if (request.method === "POST" && url.pathname === "/register") return await handleRegister(request, env);
       if (request.method === "POST" && url.pathname === "/unregister") return await handleUnregister(request, env);
       if (request.method === "POST" && url.pathname === "/broadcast") return await handleBroadcast(request, env);
+      if (request.method === "POST" && url.pathname === "/household-notify") return await handleHouseholdNotify(request, env);
       if (url.pathname === "/" || url.pathname === "/health") {
         return new Response("Fornelli push worker attivo", { headers: CORS });
       }

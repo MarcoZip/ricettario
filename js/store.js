@@ -239,8 +239,10 @@ export async function addShoppingItems(rawItems) {
   const merged = combine(rawItems.filter((i) => i && i.name));
   let added = 0;
   let skipped = 0;
+  const addedNames = [];
   for (const it of merged) {
     if (inPantry(it.name)) { skipped++; continue; } // già in dispensa
+    addedNames.push(it.name);
     const key = shopKey(it);
     const existing = state.shopping.find((s) => !s.checked && shopKey(s) === key);
     if (existing) {
@@ -267,6 +269,10 @@ export async function addShoppingItems(rawItems) {
       });
     }
     added++;
+  }
+  // Casa condivisa: avvisa l'altra persona (push, anche ad app chiusa).
+  if (addedNames.length && shoppingAuthor()) {
+    try { const p = await import("./push.js"); p.notifyHousehold(addedNames); } catch (e) { /* ignora */ }
   }
   return { added, skipped };
 }

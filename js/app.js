@@ -171,8 +171,14 @@ if ("serviceWorker" in navigator) {
   const hadController = Boolean(navigator.serviceWorker.controller);
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (refreshing || !hadController) return; // non ricaricare alla primissima installazione
-    refreshing = true;
-    window.location.reload();
+    // Non interrompere con un reload una finestra appena aperta (benvenuto, novità,
+    // un modale): aspetta che venga chiusa, poi ricarica per applicare l'aggiornamento.
+    const waitClear = () => {
+      if (document.querySelector(".guide, #modalRoot .modal-backdrop, .cook")) { setTimeout(waitClear, 1500); return; }
+      refreshing = true;
+      window.location.reload();
+    };
+    waitClear();
   });
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("sw.js").then((reg) => {
