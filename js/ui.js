@@ -113,6 +113,7 @@ let mealLoading = false;
 let mealError = "";
 let mealTotal = null; // totale risultati Moulinex (può superare quelli mostrati)
 let mealPage = 0; // pagina corrente dei risultati online
+let mealElapsedMs = 0; // tempo impiegato dall'ultima ricerca online
 
 // Callback impostate da app.js
 export const handlers = {
@@ -3709,8 +3710,10 @@ function searchOnline(term) {
   if (!q) return;
   mealTab = "online";
   if (BROWSE_SOURCES.has(mealSource)) mealSource = "all"; // una fonte con ricerca testuale
+  // Avvia la ricerca DOPO che la pagina Ricettario è disegnata: la consuma
+  // renderOnlineTab (altrimenti partirebbe prima del DOM e resterebbe bloccata).
+  pendingMealQuery = q;
   navigate("ricettario");
-  performMealSearch(q);
 }
 async function performMealSearch(q, keepPage = false) {
   q = (q || "").trim();
@@ -3721,13 +3724,16 @@ async function performMealSearch(q, keepPage = false) {
   }
   if (!q && !BROWSE_SOURCES.has(mealSource)) return;
   if (!keepPage) mealPage = 0;
-  mealQuery = q; mealLoading = true; mealError = ""; mealTotal = null; renderOnlineTab();
+  mealQuery = q; mealLoading = true; mealError = ""; mealTotal = null; mealElapsedMs = 0; renderOnlineTab();
+  const t0 = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
   try {
     mealResults = await runMealSearch(q);
   } catch (e) {
     mealError = e && e.code === "nokey" ? "Questa fonte non è configurata (vedi README)." : "Servizio non raggiungibile o troppo lento. Riprova.";
     mealResults = null;
   }
+  const t1 = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+  mealElapsedMs = Math.max(0, Math.round(t1 - t0));
   mealLoading = false; renderOnlineTab();
 }
 // Cambia pagina dei risultati: rifà la ricerca (fonti server-paginate) o slice locale.
@@ -3913,6 +3919,7 @@ function setupPullToRefresh(body) {
 
 function renderOnlineTab() {
   const body = root.querySelector("#ricettarioBody");
+  if (!body) return; // la pagina non è ancora pronta: evita errori e blocchi
   // Ricerca "in sospeso" (es. da un ingrediente di stagione): avviala da sola.
   if (pendingMealQuery) {
     const q = pendingMealQuery; pendingMealQuery = "";
@@ -3933,10 +3940,11 @@ function renderOnlineTab() {
     const totalItems = serverPaged ? (mealTotal != null ? mealTotal : mealResults.length) : mealResults.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / MEAL_PAGE_SIZE));
     const pageItems = serverPaged ? mealResults : mealResults.slice(mealPage * MEAL_PAGE_SIZE, mealPage * MEAL_PAGE_SIZE + MEAL_PAGE_SIZE);
+    const timeStr = mealElapsedMs > 0 ? ` · ${(mealElapsedMs / 1000).toFixed(1)} s` : "";
     const countLine = mealSource === "all"
-      ? `<div class="result-count">${iconHtml("magnifying-glass")} Trovate <b>${totalItems}</b> ricette da ${mealSourceCounts.length} ${mealSourceCounts.length === 1 ? "fonte" : "fonti"}${totalPages > 1 ? ` · pagina ${mealPage + 1} di ${totalPages}` : ""}</div>`
+      ? `<div class="result-count">${iconHtml("magnifying-glass")} Trovate <b>${totalItems}</b> ricette da ${mealSourceCounts.length} ${mealSourceCounts.length === 1 ? "fonte" : "fonti"}${totalPages > 1 ? ` · pagina ${mealPage + 1} di ${totalPages}` : ""}${timeStr}</div>`
         + (mealSourceCounts.length ? `<div class="src-summary">${mealSourceCounts.map((s) => `<span class="src-chip">${escapeHtml(s.label)} <b>${s.count}</b></span>`).join("")}</div>` : "")
-      : `<div class="result-count">${iconHtml("magnifying-glass")} Trovate <b>${totalItems}</b> ${totalItems === 1 ? "ricetta" : "ricette"}${totalPages > 1 ? ` · pagina ${mealPage + 1} di ${totalPages}` : ""}</div>`;
+      : `<div class="result-count">${iconHtml("magnifying-glass")} Trovate <b>${totalItems}</b> ${totalItems === 1 ? "ricetta" : "ricette"}${totalPages > 1 ? ` · pagina ${mealPage + 1} di ${totalPages}` : ""}${timeStr}</div>`;
     const pager = totalPages > 1 ? `<div class="pager">
         <button class="btn btn--ghost" id="pagePrev" ${mealPage === 0 ? "disabled" : ""}>${iconHtml("caret-left")} Prec.</button>
         <span class="pager__info">${mealPage + 1} / ${totalPages}</span>

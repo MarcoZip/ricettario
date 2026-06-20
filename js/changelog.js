@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.35",
+    d: "2026-06-16",
+    items: [
+      "Risolto: la ricerca avviata toccando un ingrediente di stagione non resta più bloccata sui rettangoli grigi.",
+      "Sotto i risultati del Ricettario online ora vedi il tempo impiegato dalla ricerca (es. \"· 1,2 s\")."
+    ]
+  },
+  {
     v: "7.34",
     d: "2026-06-16",
     minor: true,
