@@ -141,7 +141,8 @@
       "WebFetch(domain:home.organizeat.com)",
       "WebFetch(domain:nestsync.org)",
       "WebFetch(domain:techcrunch.com)",
-      "WebFetch(domain:marcozip.github.io)"
+      "WebFetch(domain:marcozip.github.io)",
+      "Bash(printf '\\\\n/* ====== v7.20 effetti wow ====== */\\\\n/* Bordo luminoso animato sulla Ricetta del giorno */\\\\n@property --rotd-a { syntax: \"<angle>\"; initial-value: 0deg; inherits: false; }\\\\n@media \\(prefers-reduced-motion: no-preference\\) {\\\\n  .rotd::before { content: \"\"; position: absolute; inset: 0; z-index: 2; border-radius: inherit; padding: 2px; background: conic-gradient\\(from var\\(--rotd-a\\), transparent 50%%, rgba\\(var\\(--primary-rgb,255,184,107\\),0.95\\), #ffffffcc, transparent 88%%\\); -webkit-mask: linear-gradient\\(#000 0 0\\) content-box, linear-gradient\\(#000 0 0\\); -webkit-mask-composite: xor; mask: linear-gradient\\(#000 0 0\\) content-box, linear-gradient\\(#000 0 0\\); mask-composite: exclude; animation: rotdSpin 5s linear infinite; pointer-events: none; }\\\\n}\\\\n@keyframes rotdSpin { to { --rotd-a: 360deg; } }\\\\n/* Immagini: dissolvenza morbida in entrata \\(blur-up\\) */\\\\n@media \\(prefers-reduced-motion: no-preference\\) {\\\\n  .meal-card > img, .rotd__img, .recipe-hero img, .result-grid .pick-row img, .totry-row img { animation: imgFade 0.5s ease backwards; }\\\\n}\\\\n@keyframes imgFade { from { opacity: 0; filter: blur\\(10px\\); } to { opacity: 1; filter: blur\\(0\\); } }\\\\n/* Tocco elastico \\(spring\\) sui controlli premibili */\\\\n.btn, .chip, .filter-chip, .accent-sw, .tag-add { transition: transform 0.2s var\\(--spring\\); }\\\\n')"
     ]
   }
 }

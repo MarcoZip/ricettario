@@ -27,6 +27,7 @@
   --nav-h: 66px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --spring: linear(0, 0.45, 1.02, 1.17, 1.09, 0.99, 1.005, 1);
 }
 
 /* Alto contrasto (accessibilità): testi e bordi più marcati. */
@@ -419,7 +420,7 @@ a { color: var(--primary-2); }
   padding: 20px 18px calc(20px + var(--safe-bottom));
   max-height: 90vh;
   overflow-y: auto;
-  animation: slideup 0.22s ease;
+  animation: slideup 0.34s var(--spring);
 }
 @media (min-width: 600px) {
   .modal-backdrop { align-items: center; }
@@ -1231,3 +1232,18 @@ html[data-theme="dark"] .alert-banner { color: #ffcf94; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideup { from { transform: translateY(34px); opacity: 0.5; } to { transform: translateY(0); opacity: 1; } }
+
+/* ====== v7.20 effetti wow ====== */
+/* Bordo luminoso animato sulla Ricetta del giorno */
+@property --rotd-a { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+@media (prefers-reduced-motion: no-preference) {
+  .rotd::before { content: ""; position: absolute; inset: 0; z-index: 2; border-radius: inherit; padding: 2px; background: conic-gradient(from var(--rotd-a), transparent 50%, rgba(var(--primary-rgb,255,184,107),0.95), #ffffffcc, transparent 88%); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude; animation: rotdSpin 5s linear infinite; pointer-events: none; }
+}
+@keyframes rotdSpin { to { --rotd-a: 360deg; } }
+/* Immagini: dissolvenza morbida in entrata (blur-up) */
+@media (prefers-reduced-motion: no-preference) {
+  .meal-card > img, .rotd__img, .recipe-hero img, .result-grid .pick-row img, .totry-row img { animation: imgFade 0.5s ease backwards; }
+}
+@keyframes imgFade { from { opacity: 0; filter: blur(10px); } to { opacity: 1; filter: blur(0); } }
+/* Tocco elastico (spring) sui controlli premibili */
+.btn, .chip, .filter-chip, .accent-sw, .tag-add { transition: transform 0.2s var(--spring); }

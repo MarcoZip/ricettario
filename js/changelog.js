@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.20",
+    d: "2026-06-16",
+    minor: true,
+    items: [
+      "Tocchi grafici: bordo luminoso animato sulla Ricetta del giorno, foto che entrano in dissolvenza, finestre con apertura elastica e tasti più reattivi."
+    ]
+  },
+  {
     v: "7.19",
     d: "2026-06-16",
     items: [
