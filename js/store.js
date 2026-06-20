@@ -22,6 +22,16 @@ export function getMode() {
   return adapter ? adapter.mode : "local";
 }
 
+// In una Casa condivisa (solo cloud), marca chi aggiunge un articolo, così
+// l'altro riceve l'avviso "X ha aggiunto…". Vuoto se non condivisa.
+function shoppingAuthor() {
+  try {
+    const hh = (localStorage.getItem("ricettario.household") || "").trim();
+    if (!hh || getMode() !== "cloud") return "";
+    return (localStorage.getItem("ricettario.nickname") || "").trim() || "Qualcuno";
+  } catch (e) { return ""; }
+}
+
 function newId() {
   if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
   return "id-" + Date.now().toString(36) + "-" + Math.random().toString(16).slice(2);
@@ -252,6 +262,7 @@ export async function addShoppingItems(rawItems) {
         from: it.from || "",
         checked: false,
         order: state.shopping.filter((s) => !s.checked).length,
+        by: shoppingAuthor(),
         createdAt: now()
       });
     }

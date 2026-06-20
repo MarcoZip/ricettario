@@ -320,6 +320,23 @@ export function mount(rootEl) {
   // Inietta le icone Phosphor dove indicato nell'HTML (es. barra di navigazione).
   document.querySelectorAll("[data-ph]").forEach((el) => { el.innerHTML = rawIcon(el.dataset.ph); });
   store.subscribe(() => render());
+  // Casa condivisa: avvisa quando l'ALTRA persona aggiunge qualcosa alla lista.
+  let shopSeenIds = null;
+  store.subscribe((st) => {
+    const items = st.shopping || [];
+    const ids = new Set(items.map((i) => i.id));
+    if (shopSeenIds === null) { shopSeenIds = ids; return; } // primo carico: nessun avviso
+    if (getHousehold() && store.getMode() === "cloud") {
+      const me = (getNickname() || "").trim();
+      const added = items.filter((i) => !shopSeenIds.has(i.id) && i.by && i.by !== me && !i.checked);
+      if (added.length) {
+        const names = added.slice(0, 3).map((i) => i.name).join(", ");
+        toast(`👥 ${added[0].by} ha aggiunto: ${names}${added.length > 3 ? "…" : ""}`, "success");
+        haptic(20);
+      }
+    }
+    shopSeenIds = ids;
+  });
   document.querySelectorAll(".bottom-nav__btn").forEach((btn) => {
     btn.addEventListener("click", () => navigate(btn.dataset.route));
   });

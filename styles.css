@@ -1161,8 +1161,8 @@ a { color: var(--primary-2); }
 @keyframes popIn { from { opacity: 0; transform: translateY(4px) scale(0.96); } to { opacity: 1; transform: none; } }
 /* Tocco "vetro" (glassmorphism) leggero su superfici chiave — solo dove supportato */
 @supports (backdrop-filter: blur(8px)) or (-webkit-backdrop-filter: blur(8px)) {
+  /* Solo sui modali (non scorrono) per non appesantire lo scroll su telefoni medi. */
   .modal { -webkit-backdrop-filter: blur(14px) saturate(1.3); backdrop-filter: blur(14px) saturate(1.3); background: color-mix(in srgb, var(--modal-bg) 82%, transparent); }
-  .today-card, .season-card { -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); background: color-mix(in srgb, var(--surface) 78%, transparent); }
 }
 .tagchip--season { background: rgba(120, 200, 120, 0.16); border: 1px solid rgba(120, 200, 120, 0.34); color: #9be29b; }
 .tagchip--ahead { background: rgba(120, 160, 255, 0.16); border: 1px solid rgba(120, 160, 255, 0.34); color: #a9c2ff; }
@@ -1244,7 +1244,7 @@ html[data-theme="dark"] .alert-banner { color: #ffcf94; }
 @media (prefers-reduced-motion: no-preference) {
   .meal-card > img, .rotd__img, .recipe-hero img, .result-grid .pick-row img, .totry-row img { animation: imgFade 0.5s ease backwards; }
 }
-@keyframes imgFade { from { opacity: 0; filter: blur(10px); } to { opacity: 1; filter: blur(0); } }
+@keyframes imgFade { from { opacity: 0; } to { opacity: 1; } }
 /* Tocco elastico (spring) sui controlli premibili */
 .btn, .chip, .filter-chip, .accent-sw, .tag-add { transition: transform 0.2s var(--spring); }
 

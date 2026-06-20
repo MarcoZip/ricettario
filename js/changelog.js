@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.27",
+    d: "2026-06-16",
+    items: [
+      "Casa condivisa: avviso in tempo reale quando l'altra persona aggiunge qualcosa alla lista (\"👥 … ha aggiunto: latte\").",
+      "Ottimizzazioni: scorrimento più fluido sui telefoni di fascia media (effetti alleggeriti)."
+    ]
+  },
+  {
     v: "7.26",
     d: "2026-06-16",
     items: [
