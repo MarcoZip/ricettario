@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.34",
+    d: "2026-06-16",
+    minor: true,
+    items: [
+      "Tocchi un ingrediente di stagione e vai dritto al Ricettario con la ricerca già avviata (un solo tocco)."
+    ]
+  },
+  {
     v: "7.33",
     d: "2026-06-16",
     items: [
