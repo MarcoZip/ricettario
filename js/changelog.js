@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.23",
+    d: "2026-06-16",
+    items: [
+      "Nuovo in Home: \"Suggeriti per te\" — proposte personalizzate in base alle tue abitudini (giorno della settimana, piatti più cucinati, preferiti) e a cosa sta per scadere. Attivabile in Opzioni → Sezioni della Home."
+    ]
+  },
+  {
     v: "7.22",
     d: "2026-06-16",
     items: [

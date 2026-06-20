@@ -1113,6 +1113,30 @@ function renderHomeBody() {
 }
 let toolReorder = false;
 
+// Suggerimenti personalizzati dalle abitudini: affinità col giorno della
+// settimana, quante volte cucinato, preferiti, e bonus anti-spreco (in scadenza).
+function pickSuggestions(limit = 3) {
+  let recipes = store.getAllRecipes();
+  if (anyDietPref()) { const f = recipes.filter(matchesDiet); if (f.length >= 4) recipes = f; }
+  if (recipes.length < 4) return [];
+  const todayDow = new Date().getDay();
+  const planned = new Set(store.getPlanByDate(todayStr()).map((e) => e.recipeId));
+  let expSet = new Set();
+  try { expSet = new Set(store.recipesForExpiring(3).map((r) => r.id)); } catch (e) {}
+  const scored = recipes.filter((r) => !planned.has(r.id)).map((r) => {
+    let s = (r.cookCount || 0);
+    const log = Array.isArray(r.cookLog) ? r.cookLog : [];
+    const sameDow = log.filter((ts) => { const d = new Date(ts); return !isNaN(d) && d.getDay() === todayDow; }).length;
+    s += sameDow * 3;
+    if (r.favorite) s += 2;
+    if (expSet.has(r.id)) s += 6;
+    return { r, s };
+  });
+  if (!scored.some((x) => x.s > 0)) return []; // niente storico → niente "suggeriti"
+  scored.sort((a, b) => b.s - a.s);
+  return scored.slice(0, limit).map((x) => x.r);
+}
+
 function renderStrumenti() {
   const tools = store.getTools();
   const info = handlers.getAccountInfo();
@@ -1203,6 +1227,16 @@ function renderStrumenti() {
       </div>`
     : "";
 
+  // "Suggeriti per te": scelte personalizzate dalle abitudini (giorno della
+  // settimana, piatti più cucinati, preferiti) + priorità anti-spreco.
+  const suggested = prefBool("homeSuggest", true) ? pickSuggestions(3) : [];
+  const suggestedCard = suggested.length
+    ? `<div class="today-card">
+        <div class="today__h">${iconHtml("sparkle")} Suggeriti per te</div>
+        ${suggested.map((r) => `<button class="today__item" data-recipe="${r.id}"><span class="today__name">${escapeHtml(r.title)}</span>${iconHtml("caret-right")}</button>`).join("")}
+      </div>`
+    : "";
+
   const specials = [
     ...(anyDietPref() ? [{ k: "permeo", label: "Per me", icon: "heart" }] : []),
     { k: "season", label: "Di stagione", icon: "carrot" },
@@ -1234,6 +1268,7 @@ function renderStrumenti() {
     ${backupBanner}
     ${useFirstCard}
     ${todayCard}
+    ${suggestedCard}
     ${neglectedCard}
     ${seasonCard}
     ${banner}
@@ -5143,6 +5178,10 @@ function renderImpostazioni() {
       <label class="setting-row" style="cursor:pointer">
         <div class="setting-row__label">⏳ Non lo cucini da un po'</div>
         <input type="checkbox" class="mini-check" data-pref="homeNeglect" ${prefBool("homeNeglect", true) ? "checked" : ""} />
+      </label>
+      <label class="setting-row" style="cursor:pointer">
+        <div class="setting-row__label">✨ Suggeriti per te</div>
+        <input type="checkbox" class="mini-check" data-pref="homeSuggest" ${prefBool("homeSuggest", true) ? "checked" : ""} />
       </label>
     </div>
     ${notifyGroupHtml()}
