@@ -6,6 +6,16 @@
 
 export const CHANGELOG = [
   {
+    v: "7.44",
+    d: "2026-06-20",
+    items: [
+      "Nuovo: \"Menù delle feste\" (in Strumenti → filtro \"Menu e feste\") — organizza un grande pranzo (Natale, Pasqua…) con i piatti per portata, i piatti portati dagli ospiti (solo da scaldare) e i tempi.",
+      "Piano di battaglia: spesa, preparazioni anticipate giorno per giorno (es. il tiramisù il giorno prima) e la timeline del giorno della festa, con avviso quando due piatti vogliono il forno insieme.",
+      "Imposti l'ora \"in tavola\" e il numero di ospiti (la lista della spesa moltiplica le dosi), ricevi i promemoria al momento giusto e generi un messaggio pronto per chi porta un piatto.",
+      "I menù si salvano: l'anno dopo li riapri o li duplichi senza rifare tutto."
+    ]
+  },
+  {
     v: "7.43",
     d: "2026-06-20",
     minor: true,

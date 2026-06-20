@@ -5,7 +5,7 @@ import { createLocalAdapter } from "./store-local.js";
 import { combine, categorize } from "./ingredients.js";
 
 let adapter = null;
-let state = { tools: [], recipes: [], shopping: [], plan: [], pantry: [], menus: [] };
+let state = { tools: [], recipes: [], shopping: [], plan: [], pantry: [], menus: [], events: [] };
 const subscribers = new Set();
 
 function notify() {
@@ -375,6 +375,44 @@ export function getMenuRecipes(id) {
   return (m.recipeIds || []).map((rid) => getRecipe(rid)).filter(Boolean);
 }
 
+// ---- Menù delle feste (eventi) ----
+// Un evento è un menù importante salvabile e riusabile, con piatti per portata,
+// metadati di preparazione (quando prepararlo, forno, ospiti) e l'ora "in tavola".
+export function getEvents() {
+  return [...state.events].sort((a, b) => (b.servingAt || "").localeCompare(a.servingAt || "") || (b.createdAt || "").localeCompare(a.createdAt || ""));
+}
+export function getEvent(id) {
+  return state.events.find((e) => e.id === id) || null;
+}
+export async function addEvent(ev) {
+  const id = newId();
+  const rec = {
+    id,
+    name: (ev && ev.name || "").trim() || "Menù delle feste",
+    servingAt: ev && ev.servingAt || null,
+    guests: ev && ev.guests || null,
+    dishes: ev && Array.isArray(ev.dishes) ? ev.dishes : [],
+    notes: ev && ev.notes || "",
+    createdAt: now(),
+    updatedAt: now()
+  };
+  await adapter.addEvent(rec);
+  return id;
+}
+export async function updateEvent(id, patch) {
+  await adapter.updateEvent(id, { ...patch, updatedAt: now() });
+}
+export async function deleteEvent(id) {
+  await adapter.deleteEvent(id);
+}
+// Crea un nuovo evento partendo da uno esistente (per "rifare" un menù un altro anno).
+export async function duplicateEvent(id, newName) {
+  const e = getEvent(id);
+  if (!e) return null;
+  return addEvent({ name: (newName || (e.name + " (copia)")), servingAt: null, guests: e.guests, notes: e.notes,
+    dishes: (e.dishes || []).map((d) => ({ ...d, id: newId() })) });
+}
+
 // ---- Piano settimanale / calendario ----
 export function getPlan() {
   return [...state.plan];
@@ -476,7 +514,7 @@ export async function getAccessStats() {
 
 // ---- Esporta / Importa (backup manuale) ----
 export function exportData() {
-  return { version: 5, exportedAt: now(), tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan, pantry: state.pantry, menus: state.menus };
+  return { version: 6, exportedAt: now(), tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan, pantry: state.pantry, menus: state.menus, events: state.events };
 }
 
 export async function importData(data, { merge = false } = {}) {
@@ -489,6 +527,6 @@ export async function importData(data, { merge = false } = {}) {
     for (const t of data.tools) if (!existingTools.has(t.id)) await adapter.addTool(t);
     for (const r of data.recipes) if (!existingRecipes.has(r.id)) await adapter.addRecipe(r);
   } else {
-    await adapter.replaceAll({ tools: data.tools, recipes: data.recipes, shopping: data.shopping || [], plan: data.plan || [], pantry: data.pantry || [], menus: data.menus || [] });
+    await adapter.replaceAll({ tools: data.tools, recipes: data.recipes, shopping: data.shopping || [], plan: data.plan || [], pantry: data.pantry || [], menus: data.menus || [], events: data.events || [] });
   }
 }

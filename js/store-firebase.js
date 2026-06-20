@@ -26,6 +26,7 @@ export async function createFirebaseAdapter(uid) {
   const planCol = collection(db, "users", uid, "plan");
   const pantryCol = collection(db, "users", uid, "pantry");
   const menusCol = collection(db, "users", uid, "menus");
+  const eventsCol = collection(db, "users", uid, "events");
 
   let tools = [];
   let recipes = [];
@@ -33,10 +34,11 @@ export async function createFirebaseAdapter(uid) {
   let plan = [];
   let pantry = [];
   let menus = [];
+  let events = [];
   let onChange = () => {};
 
   function emit() {
-    onChange({ tools: [...tools], recipes: [...recipes], shopping: [...shopping], plan: [...plan], pantry: [...pantry], menus: [...menus] });
+    onChange({ tools: [...tools], recipes: [...recipes], shopping: [...shopping], plan: [...plan], pantry: [...pantry], menus: [...menus], events: [...events] });
   }
 
   return {
@@ -68,6 +70,10 @@ export async function createFirebaseAdapter(uid) {
       });
       onSnapshot(menusCol, (snap) => {
         menus = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        emit();
+      });
+      onSnapshot(eventsCol, (snap) => {
+        events = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         emit();
       });
     },
@@ -146,6 +152,17 @@ export async function createFirebaseAdapter(uid) {
       await deleteDoc(doc(menusCol, id));
     },
 
+    async addEvent(ev) {
+      const { id, ...data } = ev;
+      await setDoc(doc(eventsCol, id), data);
+    },
+    async updateEvent(id, patch) {
+      await setDoc(doc(eventsCol, id), patch, { merge: true });
+    },
+    async deleteEvent(id) {
+      await deleteDoc(doc(eventsCol, id));
+    },
+
     async replaceAll(data) {
       const batch = writeBatch(db);
       (data.tools || []).forEach((t) => {
@@ -171,6 +188,10 @@ export async function createFirebaseAdapter(uid) {
       (data.menus || []).forEach((mn) => {
         const { id, ...rest } = mn;
         batch.set(doc(menusCol, id), rest);
+      });
+      (data.events || []).forEach((ev) => {
+        const { id, ...rest } = ev;
+        batch.set(doc(eventsCol, id), rest);
       });
       await batch.commit();
     },

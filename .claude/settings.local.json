@@ -149,7 +149,10 @@
       "WebFetch(domain:www.braze.com)",
       "WebFetch(domain:userpilot.com)",
       "WebFetch(domain:www.copilotkit.ai)",
-      "WebFetch(domain:agenta.ai)"
+      "WebFetch(domain:agenta.ai)",
+      "WebFetch(domain:www.americastestkitchen.com)",
+      "WebFetch(domain:www.scriptbyai.com)",
+      "WebFetch(domain:www.lifeasastrawberry.com)"
     ]
   }
 }

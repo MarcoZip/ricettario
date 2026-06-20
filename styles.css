@@ -1132,6 +1132,33 @@ a { color: var(--primary-2); }
 .ct-step--end::before { background: var(--primary-2); width: 13px; height: 13px; left: -22px; top: 2px; }
 .ct-step__time { font-weight: 800; font-variant-numeric: tabular-nums; margin-right: 8px; }
 .ct-step__d { color: var(--text-soft); font-size: 0.84rem; }
+
+/* ---------- Menù delle feste (eventi) ---------- */
+.menus-sec__title { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--primary-2); margin: 6px 4px 10px; }
+.menus-sec__title:not(:first-child) { margin-top: 26px; }
+.ev-when { display: block; color: var(--text-soft); font-size: 0.8rem; margin-top: 2px; }
+.ev-meta { display: flex; gap: 10px; margin-bottom: 14px; }
+.ev-field { display: flex; flex-direction: column; gap: 4px; flex: 1; margin-bottom: 12px; }
+.ev-field > span { font-size: 0.82rem; color: var(--text-soft); font-weight: 600; }
+.ev-field input, .ev-field select { padding: 10px; border-radius: 10px; border: 1px solid var(--surface-3); background: var(--surface-2); color: var(--text); font-size: 1rem; }
+.ev-field input[readonly] { opacity: 0.7; }
+.ev-row-chk { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; cursor: pointer; }
+.ev-course { margin-bottom: 14px; }
+.ev-course__t { font-weight: 800; color: var(--primary-2); font-size: 0.9rem; margin-bottom: 6px; }
+.ev-dish { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-bottom: 7px; color: var(--text); }
+.ev-dish__name { font-weight: 700; }
+.ev-dish__chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.ev-chip { font-size: 0.72rem; font-weight: 700; color: var(--text-soft); background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; }
+.ev-chip--guest { color: #5aa9ff; }
+.ev-chip--ahead { color: var(--primary-2); }
+.ev-phase { margin: 16px 0; padding: 12px 14px; background: var(--card-grad); border: 1px solid var(--surface-3); border-radius: var(--radius); }
+.ev-phase__t { font-weight: 800; margin-bottom: 8px; }
+.ev-phase__d { color: var(--text-soft); font-weight: 600; font-size: 0.85rem; }
+.ev-task { display: flex; align-items: flex-start; gap: 10px; padding: 7px 0; cursor: pointer; }
+.ev-task input { margin-top: 3px; flex-shrink: 0; }
+.ev-task__d { color: var(--text-soft); font-size: 0.84rem; }
+.ev-warn { background: rgba(255, 184, 107, 0.12); border: 1px solid rgba(255, 184, 107, 0.4); border-radius: 10px; padding: 9px 11px; font-size: 0.88rem; margin-bottom: 8px; }
+.ev-msg { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--surface-3); background: var(--surface-2); color: var(--text); font-size: 0.95rem; line-height: 1.5; resize: vertical; }
 .put-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
 .put-row:last-child { border-bottom: none; }
 .put-row__name { flex: 1; font-weight: 600; display: flex; align-items: center; gap: 8px; min-width: 0; }

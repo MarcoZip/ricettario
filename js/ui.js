@@ -1367,7 +1367,7 @@ function renderStrumenti() {
     { k: "easy", label: "Facili", icon: "fire" },
     { k: "ng", label: "Senza glutine", icon: "carrot" },
     { k: "nl", label: "Senza lattosio", icon: "carrot" },
-    { k: "menu", label: "Menu", icon: "book-bookmark" }
+    { k: "menu", label: "Menu e feste", icon: "book-bookmark" }
   ];
   const chips = specials.map((s) => `<button class="filter-chip ${homeFilter === s.k ? "is-on" : ""}" data-filter="${s.k}">${iconHtml(s.icon)} ${s.label}</button>`).join("") +
     allTags.map((t) => `<button class="filter-chip ${homeFilter === t ? "is-on" : ""}" data-filter="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("");
@@ -5245,13 +5245,29 @@ function openPrompt(title, placeholder, onOk, value = "") {
 }
 
 function renderMenusBody(body) {
+  const events = store.getEvents();
+  const evList = events.length
+    ? events.map((e) => {
+        const n = (e.dishes || []).length;
+        const when = e.servingAt ? fmtEventWhen(e.servingAt) : "data da scegliere";
+        return `<button class="pick-row" data-event="${e.id}"><span class="day-row__icon">🎉</span><span class="day-row__name">${escapeHtml(e.name)}<span class="have-badge">${n} ${n === 1 ? "piatto" : "piatti"}</span><span class="ev-when">${escapeHtml(when)}</span></span></button>`;
+      }).join("")
+    : `<div class="hint">Organizza un grande menù (Natale, Pasqua…) con i tempi: spesa, preparazioni anticipate, piatti portati dagli ospiti e timeline del giorno. Si salva per rifarlo.</div>`;
   const menus = store.getMenus();
   const list = menus.length
     ? menus.map((mn) => `<button class="pick-row" data-menu="${mn.id}"><span class="day-row__icon">${iconHtml("book-bookmark")}</span><span class="day-row__name">${escapeHtml(mn.name)}<span class="have-badge">${(mn.recipeIds || []).length} ricette</span></span></button>`).join("")
-    : `<div class="hint">Nessun menu. Crea un menu per raggruppare più ricette (es. "Cena con amici") e generare un'unica lista della spesa.</div>`;
-  body.innerHTML = `${list}<button class="btn btn--primary btn--block" id="newMenu" style="margin-top:12px">${iconHtml("plus")} Nuovo menu</button>`;
-  body.querySelectorAll(".pick-row").forEach((b) => b.addEventListener("click", () => openMenuSheet(b.dataset.menu)));
-  body.querySelector("#newMenu").addEventListener("click", () => openPrompt("Nuovo menu", "Es. Cena con amici", async (name) => { await store.addMenu(name); renderHomeBody(); }));
+    : `<div class="hint">Nessuna raccolta. Crea una raccolta per raggruppare più ricette (es. "Cena con amici") e generare un'unica lista della spesa.</div>`;
+  body.innerHTML = `
+    <div class="menus-sec__title">🎉 Menù delle feste</div>
+    ${evList}
+    <button class="btn btn--primary btn--block" id="newEvent" style="margin:10px 0 22px">${iconHtml("plus")} Nuovo menù delle feste</button>
+    <div class="menus-sec__title">${iconHtml("book-bookmark")} Raccolte</div>
+    ${list}
+    <button class="btn btn--block" id="newMenu" style="margin-top:12px">${iconHtml("plus")} Nuova raccolta</button>`;
+  body.querySelectorAll("[data-event]").forEach((b) => b.addEventListener("click", () => openEventSheet(b.dataset.event)));
+  body.querySelectorAll("[data-menu]").forEach((b) => b.addEventListener("click", () => openMenuSheet(b.dataset.menu)));
+  body.querySelector("#newEvent").addEventListener("click", () => openPrompt("Nuovo menù delle feste", "Es. Natale 2026", async (name) => { const id = await store.addEvent({ name }); openEventSheet(id); }));
+  body.querySelector("#newMenu").addEventListener("click", () => openPrompt("Nuova raccolta", "Es. Cena con amici", async (name) => { await store.addMenu(name); renderHomeBody(); }));
 }
 
 function openMenuSheet(menuId) {
@@ -5298,6 +5314,301 @@ function openMenuSheet(menuId) {
     const ok = await confirmDialog({ title: "Eliminare il menu?", message: `"${mn.name}" verrà eliminato (le ricette restano).`, confirmText: "Elimina", danger: true });
     if (ok) { await store.deleteMenu(menuId); m.close(); renderHomeBody(); }
   });
+}
+
+// ================= Menù delle feste (eventi) =================
+const EVENT_COURSES = ["Antipasti", "Primi", "Secondi", "Contorni", "Dolci"];
+const PREP_DAY_LABELS = { 1: "Il giorno prima", 2: "Due giorni prima", 3: "Tre giorni prima" };
+const PREP_DAY_SHORT = { 1: "il giorno prima", 2: "2 giorni prima", 3: "3 giorni prima" };
+
+function fmtEventWhen(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const mon = MONTHS_IT[d.getMonth()].slice(0, 3).toLowerCase();
+  return `${d.getDate()} ${mon} ${d.getFullYear()}, ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+// Default sensati per un piatto aggiunto da una ricetta (portata, quando
+// prepararlo, come si serve, forno) — l'utente può sempre correggere.
+function guessDishDefaults(recipe) {
+  const title = (recipe.title || "").toLowerCase();
+  const tags = recipe.tags || [];
+  let course = EVENT_COURSES.find((c) => tags.includes(c)) || guessCategory(recipe.title);
+  if (!EVENT_COURSES.includes(course)) course = "Secondi";
+  const aheadRe = /(tiramis|semifreddo|cheesecake|panna cotta|budino|gelato|brasat|stufat|rag[uù]|arrosto|spezzatin|sugo|brodo|marinat|gelatina|aspic|insalata di riso)/;
+  const ovenRe = /(forno|arrost|gratin|sformat|lasagn|torta|crostata|teglia|gratinat|al forno|parmigiana|timball)/;
+  return {
+    course,
+    time: recipe.time || null,
+    prepDay: (course === "Dolci" || aheadRe.test(title)) ? 1 : 0,
+    servedTemp: course === "Dolci" ? "freddo" : (course === "Antipasti" ? "ambiente" : "caldo"),
+    usesOven: ovenRe.test(title),
+    ovenTemp: null
+  };
+}
+
+function eventDishRow(d) {
+  const chips = [];
+  if (d.broughtByGuest) chips.push(`<span class="ev-chip ev-chip--guest">👤 ${escapeHtml(d.guestName || "ospite")}</span>`);
+  if (d.reheatOnly) chips.push(`<span class="ev-chip">🔥 da scaldare</span>`);
+  else if ((+d.prepDay || 0) > 0) chips.push(`<span class="ev-chip ev-chip--ahead">${PREP_DAY_SHORT[+d.prepDay] || "prima"}</span>`);
+  if (d.time) chips.push(`<span class="ev-chip">${d.time}′</span>`);
+  if (d.usesOven && d.ovenTemp) chips.push(`<span class="ev-chip">🔥 ${d.ovenTemp}°</span>`);
+  return `<button class="ev-dish" data-dish="${d.id}"><span class="ev-dish__name">${escapeHtml(d.title || "Piatto")}</span><span class="ev-dish__chips">${chips.join("")}</span></button>`;
+}
+
+function openEventSheet(eventId) {
+  const ev = store.getEvent(eventId);
+  if (!ev) { renderHomeBody(); return; }
+  const dishes = ev.dishes || [];
+  let groups = "";
+  for (const course of EVENT_COURSES) {
+    const list = dishes.filter((d) => d.course === course);
+    if (list.length) groups += `<div class="ev-course"><div class="ev-course__t">${course}</div>${list.map(eventDishRow).join("")}</div>`;
+  }
+  const other = dishes.filter((d) => !EVENT_COURSES.includes(d.course));
+  if (other.length) groups += `<div class="ev-course"><div class="ev-course__t">Altro</div>${other.map(eventDishRow).join("")}</div>`;
+  const hasGuests = dishes.some((d) => d.broughtByGuest);
+
+  const m = openModal(`
+    <h3 class="modal__title">🎉 ${escapeHtml(ev.name)}</h3>
+    <div class="ev-meta">
+      <label class="ev-field"><span>Quando (in tavola)</span><input type="datetime-local" id="evWhen" value="${ev.servingAt ? escapeHtml(ev.servingAt) : ""}" /></label>
+      <label class="ev-field"><span>Ospiti a tavola</span><input type="number" id="evGuests" min="1" inputmode="numeric" value="${ev.guests || ""}" placeholder="es. 8" /></label>
+    </div>
+    <div id="evDishes">${groups || `<div class="hint">Nessun piatto ancora. Aggiungi i tuoi piatti, per portata.</div>`}</div>
+    <button class="btn btn--primary btn--block" id="evAdd" style="margin:10px 0 16px">${iconHtml("plus")} Aggiungi un piatto</button>
+    <button class="btn btn--block" id="evPlan" style="margin-bottom:8px">📋 Piano di battaglia</button>
+    <button class="btn btn--block" id="evShop" style="margin-bottom:8px">${iconHtml("shopping-cart-simple")} Lista della spesa</button>
+    <button class="btn btn--block" id="evRemind" style="margin-bottom:8px">🔔 Imposta i promemoria</button>
+    ${hasGuests ? `<button class="btn btn--block" id="evMsg" style="margin-bottom:8px">💬 Messaggio per gli ospiti</button>` : ""}
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button class="btn btn--ghost" id="evDup">🗂️ Duplica</button>
+      <button class="btn btn--ghost" id="evRename">${iconHtml("pencil-simple")} Rinomina</button>
+      <button class="btn btn--ghost" id="evDel" style="color:var(--danger)">${iconHtml("trash")} Elimina</button>
+    </div>
+  `);
+  m.el.querySelector("#evWhen").addEventListener("change", (e) => store.updateEvent(eventId, { servingAt: e.target.value || null }));
+  m.el.querySelector("#evGuests").addEventListener("change", (e) => store.updateEvent(eventId, { guests: parseInt(e.target.value, 10) || null }));
+  m.el.querySelectorAll("[data-dish]").forEach((row) => row.addEventListener("click", () => { m.close(); openEventDishEditor(eventId, dishes.find((d) => d.id === row.dataset.dish)); }));
+  m.el.querySelector("#evAdd").addEventListener("click", () => { m.close(); openEventAddChooser(eventId); });
+  m.el.querySelector("#evPlan").addEventListener("click", () => { m.close(); openEventPlan(eventId); });
+  m.el.querySelector("#evShop").addEventListener("click", () => eventAddToShopping(eventId));
+  m.el.querySelector("#evRemind").addEventListener("click", () => eventSetReminders(eventId));
+  const msgBtn = m.el.querySelector("#evMsg");
+  if (msgBtn) msgBtn.addEventListener("click", () => { m.close(); openEventGuestMessage(eventId); });
+  m.el.querySelector("#evDup").addEventListener("click", async () => { const id = await store.duplicateEvent(eventId); m.close(); toast("Menù duplicato", "success"); if (id) openEventSheet(id); });
+  m.el.querySelector("#evRename").addEventListener("click", () => { m.close(); openPrompt("Rinomina menù", "Nome", async (name) => { await store.updateEvent(eventId, { name }); openEventSheet(eventId); }, ev.name); });
+  m.el.querySelector("#evDel").addEventListener("click", async () => {
+    const ok = await confirmDialog({ title: "Eliminare il menù?", message: `"${ev.name}" verrà eliminato.`, confirmText: "Elimina", danger: true });
+    if (ok) { await store.deleteEvent(eventId); m.close(); renderHomeBody(); }
+  });
+}
+
+function openEventAddChooser(eventId) {
+  const m = openModal(`
+    <h3 class="modal__title">Aggiungi un piatto</h3>
+    <button class="btn btn--primary btn--block" id="evFromRecipe" style="margin-bottom:10px">${iconHtml("fork-knife")} Da una mia ricetta</button>
+    <button class="btn btn--block" id="evGuestDish">👤 Portato da un ospite (da scaldare)</button>
+    <div class="modal__actions"><button class="btn" data-act="c">Annulla</button></div>
+  `);
+  m.el.querySelector('[data-act="c"]').onclick = () => { m.close(); openEventSheet(eventId); };
+  m.el.querySelector("#evFromRecipe").onclick = () => {
+    m.close();
+    openRecipePicker((rid) => { const r = store.getRecipe(rid); openEventDishEditor(eventId, { id: null, recipeId: rid, title: r ? r.title : "Piatto", reheatOnly: false, broughtByGuest: false, ...guessDishDefaults(r || {}) }); });
+  };
+  m.el.querySelector("#evGuestDish").onclick = () => {
+    m.close();
+    openEventDishEditor(eventId, { id: null, recipeId: null, title: "", course: "Antipasti", time: null, prepDay: 0, servedTemp: "caldo", usesOven: false, ovenTemp: null, reheatOnly: true, broughtByGuest: true, guestName: "" });
+  };
+}
+
+function openEventDishEditor(eventId, dish) {
+  if (!dish) { openEventSheet(eventId); return; }
+  const isGuest = !!dish.broughtByGuest;
+  const courseOpts = EVENT_COURSES.map((c) => `<option value="${c}" ${dish.course === c ? "selected" : ""}>${c}</option>`).join("");
+  const tempOpts = [["caldo", "Caldo (forno/fornelli)"], ["ambiente", "Temperatura ambiente"], ["freddo", "Freddo (dal frigo)"]].map(([v, l]) => `<option value="${v}" ${dish.servedTemp === v ? "selected" : ""}>${l}</option>`).join("");
+  const prepOpts = [[0, "Il giorno stesso"], [1, "Il giorno prima"], [2, "Due giorni prima"], [3, "Tre giorni prima"]].map(([v, l]) => `<option value="${v}" ${(+dish.prepDay || 0) === v ? "selected" : ""}>${l}</option>`).join("");
+  const m = openModal(`
+    <h3 class="modal__title">${dish.id ? "Modifica piatto" : "Nuovo piatto"}</h3>
+    <label class="ev-field"><span>Nome</span><input type="text" id="dName" value="${escapeHtml(dish.title || "")}" ${dish.recipeId ? "readonly" : ""} placeholder="Es. Lasagne" /></label>
+    <label class="ev-field"><span>Portata</span><select id="dCourse">${courseOpts}</select></label>
+    ${isGuest ? `<label class="ev-field"><span>Portato da</span><input type="text" id="dGuest" value="${escapeHtml(dish.guestName || "")}" placeholder="Nome ospite" /></label>` : ""}
+    <label class="ev-row-chk"><span>Va solo scaldato (arriva/è già pronto)</span><input type="checkbox" id="dReheat" class="mini-check" ${dish.reheatOnly ? "checked" : ""} /></label>
+    <label class="ev-field"><span>Tempo (minuti)</span><input type="number" id="dTime" min="0" inputmode="numeric" value="${dish.time != null ? dish.time : ""}" placeholder="${isGuest ? "minuti per scaldarlo" : "minuti di cottura"}" /></label>
+    <label class="ev-field" id="dPrepWrap"><span>Quando prepararlo</span><select id="dPrep">${prepOpts}</select></label>
+    <label class="ev-field"><span>Come si serve</span><select id="dTemp">${tempOpts}</select></label>
+    <label class="ev-row-chk"><span>Usa il forno</span><input type="checkbox" id="dOven" class="mini-check" ${dish.usesOven ? "checked" : ""} /></label>
+    <label class="ev-field" id="dOvenTempWrap" style="${dish.usesOven ? "" : "display:none"}"><span>Temperatura forno (°C)</span><input type="number" id="dOvenTemp" min="0" inputmode="numeric" value="${dish.ovenTemp != null ? dish.ovenTemp : ""}" placeholder="es. 180" /></label>
+    <div class="modal__actions">
+      ${dish.id ? `<button class="btn" data-act="del" style="color:var(--danger)">Elimina</button>` : `<button class="btn" data-act="c">Annulla</button>`}
+      <button class="btn btn--primary" data-act="ok">Salva</button>
+    </div>
+  `);
+  const ovenChk = m.el.querySelector("#dOven");
+  ovenChk.addEventListener("change", () => { m.el.querySelector("#dOvenTempWrap").style.display = ovenChk.checked ? "" : "none"; });
+  const reheatChk = m.el.querySelector("#dReheat");
+  const syncReheat = () => { m.el.querySelector("#dPrepWrap").style.display = reheatChk.checked ? "none" : ""; };
+  reheatChk.addEventListener("change", syncReheat); syncReheat();
+  const back = () => { m.close(); openEventSheet(eventId); };
+  const cancel = m.el.querySelector('[data-act="c"]'); if (cancel) cancel.onclick = back;
+  const del = m.el.querySelector('[data-act="del"]'); if (del) del.onclick = async () => {
+    const ev = store.getEvent(eventId); if (!ev) { back(); return; }
+    await store.updateEvent(eventId, { dishes: (ev.dishes || []).filter((d) => d.id !== dish.id) });
+    back();
+  };
+  m.el.querySelector('[data-act="ok"]').onclick = async () => {
+    const ev = store.getEvent(eventId); if (!ev) { back(); return; }
+    const reheat = reheatChk.checked;
+    const ovenTempVal = m.el.querySelector("#dOvenTemp").value.trim();
+    const timeVal = m.el.querySelector("#dTime").value.trim();
+    const updated = {
+      id: dish.id || (window.crypto && crypto.randomUUID ? crypto.randomUUID() : "d-" + Date.now().toString(36) + Math.random().toString(16).slice(2, 6)),
+      recipeId: dish.recipeId || null,
+      title: (m.el.querySelector("#dName").value || "").trim() || (dish.title || "Piatto"),
+      course: m.el.querySelector("#dCourse").value,
+      time: timeVal === "" ? null : Math.max(0, parseInt(timeVal, 10) || 0),
+      prepDay: reheat ? 0 : (parseInt(m.el.querySelector("#dPrep").value, 10) || 0),
+      servedTemp: m.el.querySelector("#dTemp").value,
+      usesOven: ovenChk.checked,
+      ovenTemp: ovenChk.checked && ovenTempVal !== "" ? (parseInt(ovenTempVal, 10) || null) : null,
+      reheatOnly: reheat,
+      broughtByGuest: !!dish.broughtByGuest,
+      guestName: isGuest && m.el.querySelector("#dGuest") ? m.el.querySelector("#dGuest").value.trim() : ""
+    };
+    const list = [...(ev.dishes || [])];
+    const i = list.findIndex((d) => d.id === updated.id);
+    if (i >= 0) list[i] = updated; else list.push(updated);
+    await store.updateEvent(eventId, { dishes: list });
+    back();
+  };
+}
+
+function openEventPlan(eventId) {
+  const ev = store.getEvent(eventId);
+  if (!ev) return;
+  if (!ev.servingAt) { toast("Imposta prima la data e l'ora 'in tavola'", "error"); openEventSheet(eventId); return; }
+  const serving = new Date(ev.servingAt);
+  const dishes = ev.dishes || [];
+  const done = ev.done || {};
+  const chk = (key) => `<input type="checkbox" class="ev-chk mini-check" data-k="${escapeHtml(key)}" ${done[key] ? "checked" : ""} />`;
+  const dayName = (d) => `${WEEKDAYS_IT[(d.getDay() + 6) % 7].toLowerCase()} ${d.getDate()} ${MONTHS_IT[d.getMonth()].slice(0, 3).toLowerCase()}`;
+  const clock = (dt) => `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+
+  let html = `<div class="ev-phase"><div class="ev-phase__t">🛒 Spesa</div>
+    <label class="ev-task">${chk("shop-big")}<span>Spesa grossa (dispensa, surgelati, non deperibili) — qualche giorno prima</span></label>
+    <label class="ev-task">${chk("shop-fresh")}<span>Spesa fresca (verdure, pesce, pane) — 1-2 giorni prima</span></label>
+    <button class="btn btn--ghost btn--block" id="evpShop" style="margin-top:6px">${iconHtml("shopping-cart-simple")} Aggiungi tutto alla lista della spesa</button></div>`;
+
+  const aheadDays = [...new Set(dishes.filter((d) => !d.reheatOnly && (+d.prepDay || 0) > 0).map((d) => +d.prepDay))].sort((a, b) => b - a);
+  for (const pd of aheadDays) {
+    const d0 = new Date(serving); d0.setDate(d0.getDate() - pd);
+    const list = dishes.filter((d) => !d.reheatOnly && (+d.prepDay || 0) === pd);
+    html += `<div class="ev-phase"><div class="ev-phase__t">📅 ${PREP_DAY_LABELS[pd] || pd + " giorni prima"} <span class="ev-phase__d">(${dayName(d0)})</span></div>
+      ${list.map((d) => `<label class="ev-task">${chk("ah:" + d.id)}<span>Prepara <b>${escapeHtml(d.title)}</b>${d.time ? ` <span class="ev-task__d">(${d.time}′)</span>` : ""}</span></label>`).join("")}</div>`;
+  }
+
+  const sched = dishes.filter((d) => (d.reheatOnly || (+d.prepDay || 0) === 0) && d.time != null)
+    .map((d) => ({ d, start: new Date(serving.getTime() - d.time * 60000) }))
+    .sort((a, b) => a.start - b.start);
+  const noTime = dishes.filter((d) => (d.reheatOnly || (+d.prepDay || 0) === 0) && d.time == null);
+  const warmAhead = dishes.filter((d) => !d.reheatOnly && (+d.prepDay || 0) > 0 && d.servedTemp === "caldo");
+  let dayHtml = sched.map(({ d, start }) => `<div class="ct-step"><span class="ct-step__time">${clock(start)}</span><span class="ct-step__txt">${d.reheatOnly ? "scalda" : "inizia"} <b>${escapeHtml(d.title)}</b> <span class="ct-step__d">(${d.time}′${d.usesOven && d.ovenTemp ? `, forno ${d.ovenTemp}°` : ""})</span></span></div>`).join("");
+  dayHtml += `<div class="ct-step ct-step--end"><span class="ct-step__time">${clock(serving)}</span><span class="ct-step__txt">🍽️ <b>In tavola!</b></span></div>`;
+  html += `<div class="ev-phase"><div class="ev-phase__t">🔥 Il giorno della festa <span class="ev-phase__d">(${dayName(serving)})</span></div>
+    ${warmAhead.length ? `<div class="hint" style="margin-bottom:8px">Da tirare fuori dal frigo / scaldare: ${warmAhead.map((d) => escapeHtml(d.title)).join(", ")}.</div>` : ""}
+    <div class="ct-line">${dayHtml}</div>
+    ${noTime.length ? `<div class="hint" style="margin-top:8px">Senza tempo (aggiungilo per metterli in orario): ${noTime.map((d) => escapeHtml(d.title)).join(", ")}.</div>` : ""}</div>`;
+
+  // Conflitti forno: due piatti in forno nella stessa finestra a temperature diverse.
+  const ovenItems = sched.filter(({ d }) => d.usesOven && d.ovenTemp).map(({ d, start }) => ({ title: d.title, temp: d.ovenTemp, start: start.getTime(), end: serving.getTime() }));
+  let warns = "";
+  for (let i = 0; i < ovenItems.length; i++) for (let j = i + 1; j < ovenItems.length; j++) {
+    const a = ovenItems[i], b = ovenItems[j];
+    if (a.start < b.end && b.start < a.end && a.temp !== b.temp) {
+      const avg = Math.round((a.temp + b.temp) / 2 / 5) * 5;
+      warns += `<div class="ev-warn">⚠️ <b>${escapeHtml(a.title)}</b> (${a.temp}°) e <b>${escapeHtml(b.title)}</b> (${b.temp}°) userebbero il forno insieme. Cuocili a ~${avg}° insieme (non per dolci/lievitati), oppure sfasa le cotture.</div>`;
+    }
+  }
+  if (warns) html += `<div class="ev-phase"><div class="ev-phase__t">🔥 Attenzione al forno</div>${warns}</div>`;
+
+  const m = openModal(`<h3 class="modal__title">📋 Piano · ${escapeHtml(ev.name)}</h3><p class="hint" style="margin-top:-6px">In tavola: ${escapeHtml(fmtEventWhen(ev.servingAt))}</p>${html}<div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>`);
+  m.el.querySelector('[data-act="ok"]').onclick = () => { m.close(); openEventSheet(eventId); };
+  const sb = m.el.querySelector("#evpShop"); if (sb) sb.addEventListener("click", () => eventAddToShopping(eventId));
+  m.el.querySelectorAll(".ev-chk").forEach((c) => c.addEventListener("change", async () => {
+    const cur = store.getEvent(eventId); if (!cur) return;
+    const nd = { ...(cur.done || {}) };
+    if (c.checked) nd[c.dataset.k] = true; else delete nd[c.dataset.k];
+    await store.updateEvent(eventId, { done: nd });
+  }));
+}
+
+async function eventAddToShopping(eventId) {
+  const ev = store.getEvent(eventId); if (!ev) return;
+  const items = [];
+  for (const d of (ev.dishes || [])) {
+    if (!d.recipeId) continue; // i piatti degli ospiti non hanno ingredienti
+    const r = store.getRecipe(d.recipeId); if (!r) continue;
+    let factor = 1;
+    if (ev.guests && r.servings) factor = ev.guests / r.servings;
+    for (const it of (r.ingredients || [])) {
+      items.push({ name: it.name, unit: it.unit || "", qty: it.qty != null ? it.qty * factor : null, category: categorize(it.name), from: r.title });
+    }
+  }
+  if (!items.length) { toast("Nessun ingrediente da aggiungere (i piatti degli ospiti non contano)", "error"); return; }
+  const res = await store.addShoppingItems(items);
+  toast(shoppingToast(res) + (ev.guests ? " · dosi per " + ev.guests : ""), "success");
+}
+
+function eventSetReminders(eventId) {
+  const ev = store.getEvent(eventId); if (!ev) return;
+  if (!ev.servingAt) { toast("Imposta prima la data 'in tavola'", "error"); return; }
+  const serving = new Date(ev.servingAt);
+  const prefix = "evt:" + eventId + ":";
+  const nowMs = Date.now();
+  let list = getPrepReminders().filter((x) => !((x.recipeId || "") + "").startsWith(prefix));
+  let n = 0;
+  for (const d of (ev.dishes || [])) {
+    if (d.reheatOnly || !((+d.prepDay || 0) > 0)) continue;
+    const dd = new Date(serving); dd.setDate(dd.getDate() - (+d.prepDay)); dd.setHours(10, 0, 0, 0);
+    if (dd.getTime() > nowMs) { list.push({ recipeId: prefix + d.id, title: `Prepara per ${ev.name}: ${d.title}`, due: dd.getTime() }); n++; }
+  }
+  const starts = (ev.dishes || []).filter((d) => (d.reheatOnly || (+d.prepDay || 0) === 0) && d.time != null).map((d) => serving.getTime() - d.time * 60000);
+  if (starts.length) { const first = Math.min(...starts); if (first > nowMs) { list.push({ recipeId: prefix + "start", title: `Inizia a cucinare per ${ev.name}!`, due: first }); n++; } }
+  setPrepReminders(list);
+  try { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
+  toast(n ? `${n} promemoria impostati` : "Nessun promemoria (date già passate?)", n ? "success" : "");
+}
+
+function openEventGuestMessage(eventId) {
+  const ev = store.getEvent(eventId); if (!ev) return;
+  const guests = (ev.dishes || []).filter((d) => d.broughtByGuest);
+  const when = ev.servingAt ? fmtEventWhen(ev.servingAt) : "(data da definire)";
+  const lines = [`Ciao! Per "${ev.name}" (${when}) ecco cosa porti:`];
+  for (const d of guests) {
+    let l = `• ${d.guestName ? d.guestName + ": " : ""}${d.title || "piatto"}`;
+    if (d.reheatOnly) l += ` — arriva pronto, lo scaldiamo noi${d.time ? ` (~${d.time}′${d.usesOven && d.ovenTemp ? ` a ${d.ovenTemp}°` : ""})` : ""}`;
+    lines.push(l);
+  }
+  lines.push("Grazie! 🎉");
+  const text = lines.join("\n");
+  const m = openModal(`
+    <h3 class="modal__title">💬 Messaggio per gli ospiti</h3>
+    <textarea id="evMsgT" rows="${Math.min(12, lines.length + 2)}" class="ev-msg">${escapeHtml(text)}</textarea>
+    <div class="modal__actions">
+      <button class="btn" data-act="c">Chiudi</button>
+      <button class="btn btn--primary" data-act="send">📤 Invia / Copia</button>
+    </div>
+  `);
+  m.el.querySelector('[data-act="c"]').onclick = () => { m.close(); openEventSheet(eventId); };
+  m.el.querySelector('[data-act="send"]').onclick = async () => {
+    const t = m.el.querySelector("#evMsgT").value;
+    try {
+      if (navigator.share) await navigator.share({ text: t });
+      else { await navigator.clipboard.writeText(t); toast("Messaggio copiato", "success"); }
+    } catch (e) { try { await navigator.clipboard.writeText(t); toast("Messaggio copiato", "success"); } catch (e2) {} }
+  };
 }
 
 // ---------------- Schermata: Impostazioni ----------------
