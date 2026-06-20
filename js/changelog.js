@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.33",
+    d: "2026-06-16",
+    items: [
+      "Nuovo: \"Mostrami passo-passo\" — per alcune funzioni (Casa condivisa, Menù della settimana, Fotografa il frigo) l'app ti accompagna aprendo le pagine ed evidenziando cosa toccare. Lo trovi nell'assistente (❓)."
+    ]
+  },
+  {
     v: "7.32",
     d: "2026-06-16",
     items: [

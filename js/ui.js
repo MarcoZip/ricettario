@@ -4120,6 +4120,63 @@ const GUIDE_SECTIONS = [
   { icon: "sparkle", title: "Personalizza", text: "In Opzioni scegli il tema chiaro o scuro. Con l'accesso le ricette sono salvate nel cloud e sincronizzate su tutti i dispositivi; puoi anche esportare un backup." }
 ];
 
+// Mini-motore di "tour guidato": evidenzia elementi e apre le pagine giuste,
+// passo dopo passo. Self-contained (niente librerie esterne, funziona offline).
+function runTour(steps) {
+  if (!Array.isArray(steps) || !steps.length) return;
+  document.querySelectorAll(".tour").forEach((t) => t.remove());
+  const overlay = document.createElement("div");
+  overlay.className = "tour";
+  document.body.appendChild(overlay);
+  const cleanup = () => { window.removeEventListener("resize", onResize); overlay.remove(); };
+  const onResize = () => render(true);
+  let i = 0;
+  async function render(repositionOnly) {
+    const step = steps[i];
+    if (!step) { cleanup(); return; }
+    if (!repositionOnly && typeof step.action === "function") { try { step.action(); } catch (e) {} }
+    let el = null;
+    if (step.selector) {
+      for (let t = 0; t < 24 && !el; t++) { el = document.querySelector(step.selector); if (!el) await new Promise((r) => setTimeout(r, 150)); }
+      if (el) { try { el.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e) {} await new Promise((r) => setTimeout(r, 280)); }
+    }
+    if (!overlay.isConnected) return;
+    const r = el ? el.getBoundingClientRect() : null;
+    const hole = r ? `<div class="tour__hole" style="top:${r.top - 6}px;left:${r.left - 6}px;width:${r.width + 12}px;height:${r.height + 12}px"></div>` : `<div class="tour__hole tour__hole--full"></div>`;
+    overlay.innerHTML = hole + `<div class="tour__pop">
+        <div class="tour__step">Passo ${i + 1} di ${steps.length}</div>
+        <div class="tour__title">${escapeHtml(step.title)}</div>
+        <div class="tour__text">${escapeHtml(step.text)}</div>
+        <div class="tour__btns"><button class="btn" data-t="skip">Esci</button><button class="btn btn--primary" data-t="next">${i === steps.length - 1 ? "Ho capito" : "Avanti"}</button></div>
+      </div>`;
+    const pop = overlay.querySelector(".tour__pop");
+    if (r && pop) {
+      const below = (r.bottom + 16 + pop.offsetHeight) < window.innerHeight;
+      pop.style.transform = "translateX(-50%)";
+      pop.style.top = (below ? r.bottom + 12 : Math.max(10, r.top - 12 - pop.offsetHeight)) + "px";
+    }
+    overlay.querySelector('[data-t="skip"]').onclick = cleanup;
+    overlay.querySelector('[data-t="next"]').onclick = () => { i++; render(false); };
+  }
+  window.addEventListener("resize", onResize);
+  render(false);
+}
+// Tour disponibili: ogni passo apre la pagina giusta (action) ed evidenzia un elemento.
+const TOURS = {
+  casa: [
+    { title: "Casa condivisa", text: "Ti mostro come condividere la lista della spesa con un'altra persona. Tocca Avanti.", action: () => navigate("impostazioni") },
+    { selector: "#householdBtn", title: "Attiva qui", text: "Tocca \"Attiva\", poi \"Crea una casa\": otterrai un codice da dare all'altra persona (che lo inserisce sul suo telefono).", action: () => navigate("impostazioni") }
+  ],
+  menusett: [
+    { title: "Menù della settimana", text: "Ti porto nel Piano, vista Settimana.", action: () => { planView = "week"; navigate("piano"); } },
+    { selector: "#aiWeek", title: "Menù AI", text: "Tocca \"✨ Menù AI\": l'app propone le cene della settimana dalle tue ricette, con anteprima.", action: () => { planView = "week"; navigate("piano"); } }
+  ],
+  frigo: [
+    { title: "Fotografa il frigo", text: "Ti porto nella Dispensa.", action: () => { shopTab = "dispensa"; navigate("spesa"); } },
+    { selector: "#fridgePhoto", title: "Da qui", text: "Tocca \"Fotografa il frigo\", scatta una foto e l'app riconosce gli alimenti.", action: () => { shopTab = "dispensa"; navigate("spesa"); } }
+  ]
+};
+
 // Esegue l'azione di una voce di aiuto (whitelist: pagina/finestra). Sicura.
 function executeHelpAction(topic, closeFn) {
   if (!topic || !topic.action) { if (closeFn) closeFn(); return; }
@@ -4153,10 +4210,14 @@ function openHelpAssistant() {
   const body = m.el.querySelector("#haBody");
   setTimeout(() => input.focus(), 50);
   const showAnswer = (reply, topic) => {
+    const hasTour = topic && topic.tour && TOURS[topic.tour];
     body.innerHTML = `<div class="dish-feedback">${escapeHtml(reply).replace(/\n+/g, "<br>")}</div>`
-      + (topic && topic.action ? `<button class="btn btn--primary btn--block" id="haDo" style="margin-top:10px">${iconHtml("arrow-square-out")} Aprilo per me</button>` : "");
+      + (topic && topic.action ? `<button class="btn btn--primary btn--block" id="haDo" style="margin-top:10px">${iconHtml("arrow-square-out")} Aprilo per me</button>` : "")
+      + (hasTour ? `<button class="btn btn--block" id="haTour" style="margin-top:8px">🧭 Mostrami passo-passo</button>` : "");
     const doBtn = body.querySelector("#haDo");
     if (doBtn) doBtn.onclick = () => executeHelpAction(topic, m.close);
+    const tourBtn = body.querySelector("#haTour");
+    if (tourBtn) tourBtn.onclick = () => { m.close(); runTour(TOURS[topic.tour]); };
   };
   const ask = async (q) => {
     q = (q || "").trim(); if (!q) return;

@@ -1273,3 +1273,13 @@ html[data-theme="dark"] .alert-banner { color: #ffcf94; }
 .dyk__txt { flex: 1; min-width: 0; text-align: left; background: none; border: none; color: var(--text); font-size: 0.9rem; line-height: 1.35; cursor: pointer; padding: 0; }
 .dyk__txt b { color: var(--primary-2); }
 .dyk__x { background: none; border: none; color: var(--text-soft); font-size: 1rem; padding: 4px 6px; cursor: pointer; flex-shrink: 0; }
+
+/* L3: tour guidato "Fallo con me" */
+.tour { position: fixed; inset: 0; z-index: 3000; }
+.tour__hole { position: fixed; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.6); border: 2px solid var(--primary); pointer-events: none; transition: top .25s ease, left .25s ease, width .25s ease, height .25s ease; }
+.tour__hole--full { inset: 0; width: auto; height: auto; border: none; border-radius: 0; box-shadow: none; background: rgba(0,0,0,0.6); }
+.tour__pop { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); width: min(92vw, 420px); background: var(--modal-bg); border: 1px solid var(--surface-3); border-radius: 16px; padding: 16px; box-shadow: var(--shadow); }
+.tour__step { font-size: .75rem; color: var(--text-soft); text-transform: uppercase; letter-spacing: .04em; }
+.tour__title { font-weight: 800; font-size: 1.1rem; margin: 4px 0 6px; }
+.tour__text { color: var(--text); line-height: 1.45; margin-bottom: 12px; }
+.tour__btns { display: flex; gap: 8px; justify-content: flex-end; }
