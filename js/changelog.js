@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.31",
+    d: "2026-06-16",
+    items: [
+      "Nuovo: \"Chiedi a Fornelli\" (tocca il ? in alto) — scrivi cosa vuoi fare (\"come condivido la spesa?\") e l'app ti risponde e ti apre la pagina giusta."
+    ]
+  },
+  {
     v: "7.30",
     d: "2026-06-16",
     items: [

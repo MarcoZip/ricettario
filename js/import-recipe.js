@@ -146,6 +146,22 @@ export async function convertRecipe(recipe, diet) {
   throw new Error((d && d.message) || "Non sono riuscito ad adattare la ricetta. Riprova.");
 }
 
+// "Chiedi a Fornelli": domanda + voci di manuale candidate → { reply, id }.
+export async function appHelp(question, topics) {
+  if (!WORKER_URL) throw new Error("Funzione non disponibile (worker non configurato).");
+  let res;
+  try {
+    res = await fetch(`${WORKER_URL}/apphelp`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, topics: (topics || []).map((t) => ({ id: t.id, title: t.title, answer: t.answer })) })
+    });
+  } catch (e) { throw new Error("Servizio non raggiungibile."); }
+  const d = await res.json().catch(() => ({}));
+  if (d && typeof d.reply === "string" && !d.error) return d;
+  if (d && d.error === "noai") throw new Error("noai");
+  throw new Error((d && d.message) || "Assistente non disponibile.");
+}
+
 // Abbinamento vino consigliato per un piatto (via Spoonacular).
 export async function winePairing(food) {
   if (!WORKER_URL || !food) return null;

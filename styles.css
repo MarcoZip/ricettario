@@ -1258,3 +1258,6 @@ html[data-theme="dark"] .alert-banner { color: #ffcf94; }
 .house-banner b { color: var(--primary-2); letter-spacing: 1px; }
 .search-bar--hero .search-bar__ic { display: flex; align-items: center; color: var(--primary-2); padding-left: 8px; }
 .search-bar--hero .search-bar__ic svg { width: 20px; height: 20px; }
+
+.help-chips { display: flex; flex-wrap: wrap; gap: 7px; margin: 10px 0 4px; }
+.help-ex { cursor: pointer; }

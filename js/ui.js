@@ -7,7 +7,8 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo, robotProgram, fridgeIngredients, planWeekAI, convertRecipe } from "./import-recipe.js";
+import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo, robotProgram, fridgeIngredients, planWeekAI, convertRecipe, appHelp } from "./import-recipe.js";
+import { HELP_TOPICS, findHelpTopics } from "./app-help.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage, shareMenuImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
@@ -342,7 +343,7 @@ export function mount(rootEl) {
     btn.addEventListener("click", () => navigate(btn.dataset.route));
   });
   const help = document.getElementById("helpBtn");
-  if (help) help.addEventListener("click", () => openGuide());
+  if (help) help.addEventListener("click", () => openHelpAssistant());
   // Guida al primo avvio: mostrala SOLO dopo lo splash (e fuori dal login), e
   // segna "vista" solo quando appare davvero — così non si perde dietro lo splash.
   try {
@@ -4073,6 +4074,67 @@ const GUIDE_SECTIONS = [
   { icon: "calendar-dots", title: "Promemoria", text: "In Opzioni attiva i \"Promemoria\": ricevi una notifica delle scadenze in dispensa e del pasto di oggi. Puoi scegliere l'ora dell'avviso e aggiungere un secondo avviso serale con l'anteprima dei pasti di domani. Su iPhone aggiungi prima l'app alla schermata Home." },
   { icon: "sparkle", title: "Personalizza", text: "In Opzioni scegli il tema chiaro o scuro. Con l'accesso le ricette sono salvate nel cloud e sincronizzate su tutti i dispositivi; puoi anche esportare un backup." }
 ];
+
+// Esegue l'azione di una voce di aiuto (whitelist: pagina/finestra). Sicura.
+function executeHelpAction(topic, closeFn) {
+  if (!topic || !topic.action) { if (closeFn) closeFn(); return; }
+  const a = topic.action;
+  if (closeFn) closeFn();
+  if (a.type === "page") {
+    if (a.target === "spesa-dispensa") { shopTab = "dispensa"; navigate("spesa"); }
+    else if (a.target === "ricettario") { mealTab = "online"; navigate("ricettario"); }
+    else navigate(a.target); // strumenti | spesa | piano | impostazioni
+  } else if (a.type === "open") {
+    if (a.target === "timer") openTimersTool();
+    else if (a.target === "household") openHouseholdSheet();
+    else if (a.target === "nuova-ricetta") openRecipeForm({});
+  }
+}
+
+// "Chiedi a Fornelli": l'assistente dell'app. Risponde basandosi sul manuale
+// (niente invenzioni) e offre "Aprilo per me" verso la funzione giusta.
+function openHelpAssistant() {
+  const m = openModal(`
+    <h3 class="modal__title">❓ Chiedi a Fornelli</h3>
+    <p class="hint" style="margin-top:-8px;margin-bottom:10px">Chiedi cosa vuoi fare (es. "come condivido la spesa?") e ti rispondo aprendoti la pagina giusta.</p>
+    <div class="search-bar search-bar--hero"><input type="text" id="haQ" placeholder="Scrivi la tua domanda…" /><button class="btn btn--primary" id="haSend">Chiedi</button></div>
+    <div class="help-chips">${["Come condivido la spesa?", "Come importo da un video?", "Come uso il Bimby?", "Come pianifico la settimana?"].map((q) => `<button class="chip help-ex" data-q="${escapeHtml(q)}">${escapeHtml(q)}</button>`).join("")}</div>
+    <div id="haBody"></div>
+    <div class="modal__actions"><button class="btn" id="haGuide">📖 Guida completa</button><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
+  `);
+  m.el.querySelector('[data-act="ok"]').onclick = m.close;
+  m.el.querySelector("#haGuide").onclick = () => { m.close(); openGuide(); };
+  const input = m.el.querySelector("#haQ");
+  const body = m.el.querySelector("#haBody");
+  setTimeout(() => input.focus(), 50);
+  const showAnswer = (reply, topic) => {
+    body.innerHTML = `<div class="dish-feedback">${escapeHtml(reply).replace(/\n+/g, "<br>")}</div>`
+      + (topic && topic.action ? `<button class="btn btn--primary btn--block" id="haDo" style="margin-top:10px">${iconHtml("arrow-square-out")} Aprilo per me</button>` : "");
+    const doBtn = body.querySelector("#haDo");
+    if (doBtn) doBtn.onclick = () => executeHelpAction(topic, m.close);
+  };
+  const ask = async (q) => {
+    q = (q || "").trim(); if (!q) return;
+    input.value = q;
+    body.innerHTML = `<div style="text-align:center;padding:8px 0"><div class="spinner"></div><div class="hint">Cerco…</div></div>`;
+    const cands = findHelpTopics(q, 5);
+    if (isImportConfigured() && cands.length) {
+      try {
+        const d = await appHelp(q, cands);
+        if (!body.isConnected) return;
+        const topic = HELP_TOPICS.find((t) => t.id === d.id) || cands[0];
+        showAnswer(d.reply || topic.answer, topic);
+        return;
+      } catch (e) { /* fallback locale */ }
+    }
+    if (!body.isConnected) return;
+    if (cands.length) showAnswer(cands[0].answer, cands[0]);
+    else body.innerHTML = `<div class="hint">Non ho trovato una risposta a questa domanda. Prova con altre parole, oppure apri la <b>Guida completa</b> qui sotto.</div>`;
+  };
+  m.el.querySelector("#haSend").onclick = () => ask(input.value);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") ask(input.value); });
+  m.el.querySelectorAll(".help-ex").forEach((b) => b.onclick = () => ask(b.dataset.q));
+}
 
 function openGuide(firstRun = false) {
   const host = document.getElementById("modalRoot");

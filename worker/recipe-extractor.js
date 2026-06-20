@@ -404,6 +404,7 @@ export default {
     if (url.pathname === "/fridge") return handleFridge(request, env);
     if (url.pathname === "/planweek") return handlePlanWeek(request, env);
     if (url.pathname === "/convert") return handleConvert(request, env);
+    if (url.pathname === "/apphelp") return handleAppHelp(request, env);
     if (url.pathname === "/img") return handleImageProxy(url.searchParams.get("u"));
     if (url.pathname === "/moulinex-img") return handleMoulinexImg(url.searchParams.get("u"));
     if (url.pathname === "/searchbimby") return handleSearchBimby(url.searchParams.get("q"), url.searchParams.get("page"));
@@ -854,6 +855,27 @@ async function handleConvert(request, env) {
       note: String(r.note || "").slice(0, 300)
     }, 200);
   } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova tra poco." + (e && (e.detail || e.message) ? " (" + String(e.detail || e.message).slice(0, 140) + ")" : "") }, 200); }
+}
+
+// "Chiedi a Fornelli": risponde a una domanda sull'app usando SOLO le voci di
+// manuale fornite dal client, e indica l'id della voce più pertinente (per il
+// bottone "Aprilo per me"). Non inventa azioni. POST { question, topics:[{id,title,answer}] }.
+async function handleAppHelp(request, env) {
+  if (request.method !== "POST") return json({ error: "method", message: "Usa POST" }, 405);
+  if (!env || !env.AI) return json({ error: "noai", message: "Workers AI non collegato (binding AI mancante)." }, 200);
+  let body;
+  try { body = await request.json(); } catch (e) { return json({ error: "badreq" }, 400); }
+  const question = String((body && body.question) || "").trim().slice(0, 400);
+  const topics = Array.isArray(body.topics) ? body.topics.filter((t) => t && t.id).slice(0, 8) : [];
+  if (!question || !topics.length) return json({ error: "few", message: "Domanda o voci mancanti" }, 200);
+  const sys = "Sei l'assistente dell'app di ricette \"Fornelli\". Ti fornisco alcune VOCI del manuale (id, titolo, risposta). Rispondi alla domanda dell'utente in italiano, in modo BREVE (max 3 frasi), gentile e pratico, USANDO SOLO le informazioni di queste voci. Se la domanda non riguarda queste voci, dillo gentilmente e invita ad aprire la guida. Indica anche l'id della voce più pertinente (o stringa vuota). Rispondi SOLO con JSON valido: {\"reply\": string, \"id\": string}. Nessun markdown.";
+  const userMsg = "Domanda: " + question + "\n\nVoci del manuale:\n" + topics.map((t) => `[${t.id}] ${String(t.title || "")}: ${String(t.answer || "")}`).join("\n");
+  try {
+    const raw = await aiText(env, [{ role: "system", content: sys }, { role: "user", content: userMsg.slice(0, 3500) }], 400);
+    const r = extractJson(raw) || {};
+    const validIds = new Set(topics.map((t) => t.id));
+    return json({ reply: String(r.reply || "").slice(0, 600), id: validIds.has(r.id) ? r.id : "" }, 200);
+  } catch (e) { return json({ error: "aifail", message: "Assistente non disponibile ora." + (e && (e.detail || e.message) ? " (" + String(e.detail || e.message).slice(0, 120) + ")" : "") }, 200); }
 }
 
 function json(obj, status) {
