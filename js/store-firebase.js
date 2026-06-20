@@ -27,6 +27,9 @@ export async function createFirebaseAdapter(uid) {
   const pantryCol = collection(db, "users", uid, "pantry");
   const menusCol = collection(db, "users", uid, "menus");
   const eventsCol = collection(db, "users", uid, "events");
+  // Casa condivisa: come la lista della spesa, i menù delle feste diventano
+  // condivisi (households/{code}/events) così entrambi li vedono e modificano.
+  const eventsTarget = household ? collection(db, "households", household, "events") : eventsCol;
 
   let tools = [];
   let recipes = [];
@@ -72,7 +75,7 @@ export async function createFirebaseAdapter(uid) {
         menus = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         emit();
       });
-      onSnapshot(eventsCol, (snap) => {
+      onSnapshot(eventsTarget, (snap) => {
         events = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         emit();
       });
@@ -154,13 +157,13 @@ export async function createFirebaseAdapter(uid) {
 
     async addEvent(ev) {
       const { id, ...data } = ev;
-      await setDoc(doc(eventsCol, id), data);
+      await setDoc(doc(eventsTarget, id), data);
     },
     async updateEvent(id, patch) {
-      await setDoc(doc(eventsCol, id), patch, { merge: true });
+      await setDoc(doc(eventsTarget, id), patch, { merge: true });
     },
     async deleteEvent(id) {
-      await deleteDoc(doc(eventsCol, id));
+      await deleteDoc(doc(eventsTarget, id));
     },
 
     async replaceAll(data) {

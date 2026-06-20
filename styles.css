@@ -1159,6 +1159,14 @@ a { color: var(--primary-2); }
 .ev-task__d { color: var(--text-soft); font-size: 0.84rem; }
 .ev-warn { background: rgba(255, 184, 107, 0.12); border: 1px solid rgba(255, 184, 107, 0.4); border-radius: 10px; padding: 9px 11px; font-size: 0.88rem; margin-bottom: 8px; }
 .ev-msg { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--surface-3); background: var(--surface-2); color: var(--text); font-size: 0.95rem; line-height: 1.5; resize: vertical; }
+/* Eventi nel calendario del Piano */
+.cal-cell.has-fest { border-color: var(--primary); }
+.cal-fest { position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); font-size: 0.7rem; line-height: 1; }
+.fest-up { margin-top: 16px; padding: 12px 14px; background: var(--card-grad); border: 1px solid var(--surface-3); border-radius: var(--radius); }
+.fest-up__t { font-weight: 800; margin-bottom: 8px; }
+.fest-up__row { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-bottom: 7px; color: var(--text); }
+.fest-up__name { font-weight: 700; }
+.fest-up__when { color: var(--text-soft); font-size: 0.82rem; white-space: nowrap; }
 .put-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
 .put-row:last-child { border-bottom: none; }
 .put-row__name { flex: 1; font-weight: 600; display: flex; align-items: center; gap: 8px; min-width: 0; }

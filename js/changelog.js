@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.45",
+    d: "2026-06-20",
+    items: [
+      "I Menù delle feste ora compaiono anche nel Piano: un 🎉 sul giorno nel calendario e l'elenco \"Prossime feste\" toccabile.",
+      "Con la Casa condivisa, i menù delle feste sono condivisi in tempo reale tra i due telefoni (come la lista della spesa): potete organizzarli in due."
+    ]
+  },
+  {
     v: "7.44",
     d: "2026-06-20",
     items: [

@@ -299,7 +299,7 @@ function openHouseholdSheet() {
   } else {
     const m = openModal(`
       <h3 class="modal__title">👥 Casa condivisa</h3>
-      <p class="hint" style="margin-top:-8px;margin-bottom:12px">Condividi la <b>lista della spesa in tempo reale</b> con un'altra persona (es. tu e Federica). Crea una casa e dalle il codice, oppure entra con il codice ricevuto. La dispensa resta personale.</p>
+      <p class="hint" style="margin-top:-8px;margin-bottom:12px">Condividi la <b>lista della spesa</b> e i <b>menù delle feste</b> in tempo reale con un'altra persona (es. tu e Federica). Crea una casa e dalle il codice, oppure entra con il codice ricevuto. Ricette e dispensa restano personali.</p>
       <button class="btn btn--primary btn--block" id="hCreate" style="margin-bottom:12px">${iconHtml("plus")} Crea una casa</button>
       <div class="field"><label>Hai ricevuto un codice?</label><div style="display:flex;gap:8px"><input type="text" id="hCode" placeholder="Es. K7M2QX" style="flex:1;min-width:0;text-transform:uppercase" /><button class="btn" id="hJoin">Entra</button></div></div>
       <div class="hint" style="margin-top:8px">Nota: gli articoli già in lista su questo account non si spostano; la lista condivisa parte da quella della casa.</div>
@@ -4863,9 +4863,10 @@ function renderPlan() {
   for (let day = 1; day <= daysInMonth; day++) {
     const ds = ymd(planYear, planMonth, day);
     const count = store.countPlanByDate(ds);
-    cells += `<button class="cal-cell ${ds === tStr ? "is-today" : ""} ${count ? "has-plan" : ""}" data-date="${ds}">
+    const fest = eventsOnDate(ds).length;
+    cells += `<button class="cal-cell ${ds === tStr ? "is-today" : ""} ${count ? "has-plan" : ""} ${fest ? "has-fest" : ""}" data-date="${ds}">
       <span class="cal-day">${day}</span>
-      ${count ? `<span class="cal-dot">${count > 1 ? count : ""}</span>` : ""}
+      ${fest ? `<span class="cal-fest">🎉</span>` : (count ? `<span class="cal-dot">${count > 1 ? count : ""}</span>` : "")}
     </button>`;
   }
 
@@ -4879,6 +4880,7 @@ function renderPlan() {
     </div>
     <div class="cal-grid cal-weekdays">${wk}</div>
     <div class="cal-grid">${cells}</div>
+    ${upcomingEventsHtml()}
     <div style="display:flex;gap:8px;margin-top:16px">
       <button class="btn btn--ghost" id="todayBtn">Oggi</button>
       <button class="btn btn--ghost" id="monthShop">${iconHtml("shopping-cart-simple")} Spesa del mese</button>
@@ -4890,6 +4892,7 @@ function renderPlan() {
   root.querySelector("#nextM").addEventListener("click", () => { planMonth++; if (planMonth > 11) { planMonth = 0; planYear++; } render(); });
   root.querySelector("#todayBtn").addEventListener("click", () => { planYear = today.getFullYear(); planMonth = today.getMonth(); render(); });
   root.querySelectorAll(".cal-cell[data-date]").forEach((c) => c.addEventListener("click", () => openDaySheet(c.dataset.date)));
+  wireUpcomingEvents();
   root.querySelector("#monthShop").addEventListener("click", async () => {
     const prefix = `${planYear}-${pad2(planMonth + 1)}-`;
     const entries = store.getPlan().filter((p) => p.date.startsWith(prefix));
@@ -4934,6 +4937,7 @@ function renderPlanWeek() {
       <button class="back-btn" id="nextW">${iconHtml("caret-right")}</button>
     </div>
     <div class="week-list">${cards}</div>
+    ${upcomingEventsHtml()}
     ${(() => {
       const weekEntries = days.flatMap((d) => store.getPlanByDate(ymd(d.getFullYear(), d.getMonth(), d.getDate())));
       const wn = dayNutrition(weekEntries);
@@ -4959,6 +4963,7 @@ function renderPlanWeek() {
   root.querySelector("#weekToday").addEventListener("click", () => { weekAnchor = startOfWeek(new Date()); render(); });
   root.querySelectorAll(".week-day__h").forEach((b) => b.addEventListener("click", () => openDaySheet(b.dataset.date)));
   root.querySelectorAll(".week-meal").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); if (b.dataset.recipe) openRecipe(b.dataset.recipe); }));
+  wireUpcomingEvents();
 
   const aiWeek = root.querySelector("#aiWeek");
   if (aiWeek) aiWeek.addEventListener("click", () => openWeekPlanner(days));
@@ -5327,6 +5332,25 @@ function fmtEventWhen(iso) {
   if (isNaN(d.getTime())) return iso;
   const mon = MONTHS_IT[d.getMonth()].slice(0, 3).toLowerCase();
   return `${d.getDate()} ${mon} ${d.getFullYear()}, ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+// Eventi (menù delle feste) che cadono in una certa data "YYYY-MM-DD".
+function eventsOnDate(ds) {
+  return store.getEvents().filter((e) => e.servingAt && e.servingAt.slice(0, 10) === ds);
+}
+// Box "Prossime feste" per il Piano: eventi da oggi in poi, toccabili.
+function upcomingEventsHtml() {
+  const today = todayStr();
+  const evs = store.getEvents().filter((e) => e.servingAt && e.servingAt.slice(0, 10) >= today)
+    .sort((a, b) => a.servingAt.localeCompare(b.servingAt));
+  if (!evs.length) return "";
+  return `<div class="fest-up">
+    <div class="fest-up__t">🎉 Prossime feste</div>
+    ${evs.map((e) => `<button class="fest-up__row" data-event="${e.id}"><span class="fest-up__name">${escapeHtml(e.name)}</span><span class="fest-up__when">${escapeHtml(fmtEventWhen(e.servingAt))}</span></button>`).join("")}
+  </div>`;
+}
+function wireUpcomingEvents() {
+  root.querySelectorAll(".fest-up__row[data-event]").forEach((b) => b.addEventListener("click", () => openEventSheet(b.dataset.event)));
 }
 
 // Default sensati per un piatto aggiunto da una ricetta (portata, quando
@@ -5818,7 +5842,7 @@ function renderImpostazioni() {
         <div class="setting-row">
           <div>
             <div class="setting-row__label">Casa condivisa ${getHousehold() ? "✓" : ""}</div>
-            <div class="setting-row__desc">${getHousehold() ? "Lista della spesa condivisa (codice " + escapeHtml(getHousehold()) + ")." : "Condividi la lista della spesa in tempo reale con un'altra persona."}</div>
+            <div class="setting-row__desc">${getHousehold() ? "Lista spesa e menù delle feste condivisi (codice " + escapeHtml(getHousehold()) + ")." : "Condividi lista della spesa e menù delle feste con un'altra persona."}</div>
           </div>
           <button class="btn" id="householdBtn">${getHousehold() ? "Gestisci" : "Attiva"}</button>
         </div>` : "";
