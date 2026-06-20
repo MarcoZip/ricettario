@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.39",
+    d: "2026-06-20",
+    minor: true,
+    items: [
+      "Rimossa dalle Impostazioni la dicitura \"Ricette online da TheMealDB\" (riferimento alle primissime versioni, ora superato)."
+    ]
+  },
+  {
     v: "7.38",
     d: "2026-06-20",
     items: [

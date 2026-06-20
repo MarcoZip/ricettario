@@ -5571,7 +5571,7 @@ function renderImpostazioni() {
     </div>
     ${adminGroup}
     <p style="text-align:center;color:var(--text-soft);font-size:0.78rem;margin-top:24px">
-      Fornelli · versione ${escapeHtml(APP_VERSION)}<br>Ricette online da TheMealDB
+      Fornelli · versione ${escapeHtml(APP_VERSION)}
     </p>
     <input type="file" id="importFile" accept="application/json,.json" style="display:none" />
   `;
