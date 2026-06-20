@@ -4762,14 +4762,66 @@ async function openBarcodeScanner() {
 
 function openCookSuggestions() {
   const list = store.suggestFromPantry();
+  const fmtMiss = (miss) => {
+    if (!miss.length) return `<span class="miss-line miss-line--ok">✓ hai tutto</span>`;
+    const clean = [...new Set(miss.map(cleanIngName).filter(Boolean))];
+    const show = clean.slice(0, 3).map(escapeHtml).join(", ");
+    const more = clean.length > 3 ? ` +${clean.length - 3}` : "";
+    return `<span class="miss-line">ti manca${clean.length === 1 ? "" : "no"}: ${show}${more}</span>`;
+  };
+  const rows = list.map(({ recipe, have, total, missing }) => {
+    const tool = store.getTool(recipe.toolId);
+    const addBtn = missing.length
+      ? `<button class="btn btn--ghost cks-add" data-id="${recipe.id}" title="Aggiungi alla spesa ciò che manca">${iconHtml("shopping-cart-simple")}</button>`
+      : "";
+    return `<div class="cks-row">
+      <button class="pick-row cks-pick" data-id="${recipe.id}">
+        <span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span>
+        <span class="day-row__name">${escapeHtml(recipe.title)}
+          <span class="have-badge">${have}/${total} ingredienti</span>
+          ${fmtMiss(missing)}
+        </span>
+      </button>
+      ${addBtn}
+    </div>`;
+  }).join("");
   const body = list.length
-    ? list.map(({ recipe, have, total }) => {
-        const tool = store.getTool(recipe.toolId);
-        return `<button class="pick-row" data-id="${recipe.id}"><span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span><span class="day-row__name">${escapeHtml(recipe.title)}<span class="have-badge">${have}/${total} ingredienti</span></span></button>`;
-      }).join("")
+    ? `<p class="hint" style="margin-top:-6px">Le ricette più vicine ad essere pronte, in cima. ${iconHtml("shopping-cart-simple")} aggiunge alla spesa ciò che manca.</p><div class="cks-list">${rows}</div>`
     : `<div class="empty"><span class="empty__emoji">${iconHtml("fork-knife")}</span>Nessun suggerimento.<br>Aggiungi alimenti in dispensa e ricette con ingredienti, poi riprova.</div>`;
-  const m = openModal(`<h3 class="modal__title">Cosa posso cucinare</h3><div>${body}</div>`);
-  m.el.querySelectorAll(".pick-row").forEach((b) => b.addEventListener("click", () => { m.close(); openRecipe(b.dataset.id); }));
+  const leftover = `<div class="cks-leftover">
+    <div class="cks-leftover__t">♻️ Hai un avanzo da smaltire?</div>
+    <div class="search-bar" style="margin-top:6px">
+      <input type="text" id="ckLeft" placeholder="Es. pollo cotto, riso avanzato..." />
+      <button class="btn btn--primary" id="ckLeftGo">${iconHtml("magnifying-glass")}</button>
+    </div>
+    <div class="hint" style="margin-top:6px">Cerca tra le tue ricette quelle che lo usano.</div>
+  </div>`;
+  const m = openModal(`<h3 class="modal__title">🧹 Svuota la dispensa</h3>${body}${leftover}`);
+  m.el.querySelectorAll(".cks-pick").forEach((b) => b.addEventListener("click", () => { m.close(); openRecipe(b.dataset.id); }));
+  m.el.querySelectorAll(".cks-add").forEach((b) => b.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const rec = store.getRecipe(b.dataset.id);
+    if (!rec) return;
+    const miss = (rec.ingredients || []).filter((it) => it.name && !store.inPantry(it.name));
+    if (!miss.length) { toast("Hai già tutto in dispensa", "success"); return; }
+    const items = miss.map((it) => ({ name: it.name, category: categorize(it.name), from: rec.title }));
+    const res = await store.addShoppingItems(items);
+    toast(shoppingToast(res), "success");
+  }));
+  const goLeft = () => {
+    const v = m.el.querySelector("#ckLeft").value.trim();
+    if (!v) return;
+    m.close();
+    // navigate() azzererebbe la ricerca: cambio route a mano e imposto homeQuery.
+    currentRoute = "strumenti"; currentToolId = null; currentRecipeId = null;
+    homeQuery = v; homeFilter = "";
+    document.querySelectorAll(".bottom-nav__btn").forEach((b) => b.classList.toggle("is-active", b.dataset.route === "strumenti"));
+    renderStrumenti();
+    const sb = root.querySelector("#homeSearch");
+    if (sb) { try { sb.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }
+  };
+  m.el.querySelector("#ckLeftGo").addEventListener("click", goLeft);
+  m.el.querySelector("#ckLeft").addEventListener("keydown", (e) => { if (e.key === "Enter") goLeft(); });
 }
 
 // ---------------- Schermata: Pianificazione (calendario) ----------------

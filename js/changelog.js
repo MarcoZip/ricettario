@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.41",
+    d: "2026-06-20",
+    items: [
+      "\"Svuota la dispensa\" (in Dispensa, \"Cosa posso cucinare\"): le ricette più vicine ad essere pronte in cima, con scritto cosa ti manca (\"ti mancano solo 2 cose\") e un tasto per aggiungere alla spesa ciò che serve.",
+      "Avanzi: nella stessa schermata puoi cercare le tue ricette che usano un avanzo (es. \"pollo cotto\")."
+    ]
+  },
+  {
     v: "7.40",
     d: "2026-06-20",
     items: [

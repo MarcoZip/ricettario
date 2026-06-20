@@ -445,7 +445,9 @@ export function recipesForExpiring(days = 3) {
   return res.sort((a, b) => b.count - a.count).map((x) => x.r);
 }
 
-// Suggerisce ricette in base a ciò che è in dispensa.
+// Suggerisce ricette in base a ciò che è in dispensa. Restituisce anche gli
+// ingredienti mancanti, così l'app può dire "ti mancano solo 2 cose" e ordinare
+// in cima le ricette più vicine ad essere pronte.
 export function suggestFromPantry() {
   if (!state.pantry.length) return [];
   const res = [];
@@ -453,10 +455,14 @@ export function suggestFromPantry() {
     const ings = r.ingredients || [];
     if (!ings.length) continue;
     let have = 0;
-    for (const it of ings) if (inPantry(it.name)) have++;
-    if (have > 0) res.push({ recipe: r, have, total: ings.length });
+    const missing = [];
+    for (const it of ings) {
+      if (inPantry(it.name)) have++;
+      else if (it.name) missing.push(it.name);
+    }
+    if (have > 0) res.push({ recipe: r, have, total: ings.length, missing });
   }
-  res.sort((a, b) => b.have / b.total - a.have / a.total || b.have - a.have);
+  res.sort((a, b) => a.missing.length - b.missing.length || b.have / b.total - a.have / a.total || b.have - a.have);
   return res;
 }
 
