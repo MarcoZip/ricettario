@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.30",
+    d: "2026-06-16",
+    items: [
+      "Ricettario online: scrivi il nome di una fonte o del tuo robot nella ricerca (es. \"pollo bimby\", \"costolette moulinex\") e cerca solo lì."
+    ]
+  },
+  {
     v: "7.29",
     d: "2026-06-16",
     items: [

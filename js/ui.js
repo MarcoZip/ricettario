@@ -3642,6 +3642,26 @@ const SERVER_PAGINATED = new Set(["moulinex", "bimby"]);
 // Fonti senza ricerca per parola (solo sfoglia): nascondiamo il campo di ricerca.
 const SEARCH_DISABLED = new Set([]);
 const MEAL_PAGE_SIZE = 12;
+// Riconosce nel testo il nome di una fonte/robot e ci instrada la ricerca
+// (es. "pollo bimby" → cerca solo tra le ricette Bimby, togliendo la parola).
+const SOURCE_CUES = [
+  { re: /\b(moulinex|i[-\s]?companion|companion|cookeo)\b/gi, source: "moulinex" },
+  { re: /\b(bimby|cookidoo|thermomix)\b/gi, source: "bimby" },
+  { re: /\b(giallozafferano|giallo\s?zafferano|gz)\b/gi, source: "gz" },
+  { re: /\bmisya\b/gi, source: "misya" },
+  { re: /\bcookist\b/gi, source: "cookist" },
+  { re: /\bricette?\s?(?:della\s)?nonna\b/gi, source: "ricettenonna" }
+];
+function detectSource(q) {
+  for (const c of SOURCE_CUES) {
+    c.re.lastIndex = 0;
+    if (c.re.test(q)) {
+      const cleaned = q.replace(c.re, " ").replace(/\s{2,}/g, " ").trim();
+      return { source: c.source, query: cleaned };
+    }
+  }
+  return null;
+}
 // Va al Ricettario online (scheda "Cerca online") e lancia subito la ricerca.
 function searchOnline(term) {
   const q = (term || "").trim();
@@ -3653,6 +3673,11 @@ function searchOnline(term) {
 }
 async function performMealSearch(q, keepPage = false) {
   q = (q || "").trim();
+  // Solo da "Tutte le fonti": se scrivi il nome di una fonte/robot, cerca solo lì.
+  if (!keepPage && mealSource === "all") {
+    const det = detectSource(q);
+    if (det) { mealSource = det.source; q = det.query; }
+  }
   if (!q && !BROWSE_SOURCES.has(mealSource)) return;
   if (!keepPage) mealPage = 0;
   mealQuery = q; mealLoading = true; mealError = ""; mealTotal = null; renderOnlineTab();
