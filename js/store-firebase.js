@@ -17,6 +17,12 @@ export async function createFirebaseAdapter(uid) {
   const toolsCol = collection(db, "users", uid, "tools");
   const recipesCol = collection(db, "users", uid, "recipes");
   const shoppingCol = collection(db, "users", uid, "shopping");
+  // Casa condivisa: se è impostato un codice, la lista della spesa vive in una
+  // collezione condivisa households/{code}/shopping, così due account la vedono
+  // e modificano in tempo reale. Cambiare casa = ricarica (letto qui all'avvio).
+  let household = "";
+  try { household = (localStorage.getItem("ricettario.household") || "").trim(); } catch (e) {}
+  const shopTarget = household ? collection(db, "households", household, "shopping") : shoppingCol;
   const planCol = collection(db, "users", uid, "plan");
   const pantryCol = collection(db, "users", uid, "pantry");
   const menusCol = collection(db, "users", uid, "menus");
@@ -48,7 +54,7 @@ export async function createFirebaseAdapter(uid) {
         recipes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         emit();
       });
-      onSnapshot(shoppingCol, (snap) => {
+      onSnapshot(shopTarget, (snap) => {
         shopping = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         emit();
       });
@@ -96,17 +102,17 @@ export async function createFirebaseAdapter(uid) {
 
     async addShopping(item) {
       const { id, ...data } = item;
-      await setDoc(doc(shoppingCol, id), data);
+      await setDoc(doc(shopTarget, id), data);
     },
     async updateShopping(id, patch) {
-      await setDoc(doc(shoppingCol, id), patch, { merge: true });
+      await setDoc(doc(shopTarget, id), patch, { merge: true });
     },
     async deleteShopping(id) {
-      await deleteDoc(doc(shoppingCol, id));
+      await deleteDoc(doc(shopTarget, id));
     },
     async clearShopping(ids) {
       const batch = writeBatch(db);
-      ids.forEach((id) => batch.delete(doc(shoppingCol, id)));
+      ids.forEach((id) => batch.delete(doc(shopTarget, id)));
       await batch.commit();
     },
 

@@ -258,6 +258,60 @@ export function confirmDialog({ title, message, confirmText = "Conferma", danger
   });
 }
 
+// ---------------- Casa condivisa (lista spesa in tempo reale) ----------------
+function getHousehold() { try { return (localStorage.getItem("ricettario.household") || "").trim(); } catch (e) { return ""; } }
+function setHousehold(code) { try { if (code) localStorage.setItem("ricettario.household", code); else localStorage.removeItem("ricettario.household"); } catch (e) {} }
+function genHouseCode() {
+  const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s = "";
+  const arr = (window.crypto && crypto.getRandomValues) ? crypto.getRandomValues(new Uint32Array(6)) : null;
+  for (let i = 0; i < 6; i++) { const n = arr ? arr[i] : Math.floor(Math.random() * A.length); s += A[n % A.length]; }
+  return s;
+}
+function openHouseholdSheet() {
+  const info = handlers.getAccountInfo();
+  if (!info.cloud) { toast("Disponibile solo con l'accesso cloud (backup attivo)", "error"); return; }
+  const cur = getHousehold();
+  const apply = (code) => { setHousehold(code); toast(code ? "Casa condivisa attiva" : "Uscito dalla casa", "success"); setTimeout(() => location.reload(), 800); };
+  if (cur) {
+    const m = openModal(`
+      <h3 class="modal__title">👥 Casa condivisa</h3>
+      <p class="hint" style="margin-top:-8px;margin-bottom:12px">La lista della spesa è <b>condivisa in tempo reale</b>. Chi entra con questo codice vede e modifica la stessa lista.</p>
+      <div class="house-code">${escapeHtml(cur)}</div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn--primary" id="hShare">${iconHtml("arrow-square-out")} Condividi il codice</button>
+        <button class="btn btn--ghost" id="hLeave" style="color:var(--danger)">Esci dalla casa</button>
+      </div>
+      <div class="modal__actions"><button class="btn" data-act="ok">Chiudi</button></div>
+    `);
+    m.el.querySelector('[data-act="ok"]').onclick = m.close;
+    m.el.querySelector("#hShare").onclick = async () => {
+      const txt = `Entra nella nostra lista della spesa su Fornelli con il codice: ${cur}`;
+      try { if (navigator.share) await navigator.share({ text: txt }); else { await navigator.clipboard.writeText(cur); toast("Codice copiato", "success"); } } catch (e) {}
+    };
+    m.el.querySelector("#hLeave").onclick = async () => {
+      const ok = await confirmDialog({ title: "Uscire dalla casa?", message: "La lista tornerà quella personale di questo account.", confirmText: "Esci", danger: true });
+      if (ok) { m.close(); apply(""); }
+    };
+  } else {
+    const m = openModal(`
+      <h3 class="modal__title">👥 Casa condivisa</h3>
+      <p class="hint" style="margin-top:-8px;margin-bottom:12px">Condividi la <b>lista della spesa in tempo reale</b> con un'altra persona (es. tu e Federica). Crea una casa e dalle il codice, oppure entra con il codice ricevuto. La dispensa resta personale.</p>
+      <button class="btn btn--primary btn--block" id="hCreate" style="margin-bottom:12px">${iconHtml("plus")} Crea una casa</button>
+      <div class="field"><label>Hai ricevuto un codice?</label><div style="display:flex;gap:8px"><input type="text" id="hCode" placeholder="Es. K7M2QX" style="flex:1;min-width:0;text-transform:uppercase" /><button class="btn" id="hJoin">Entra</button></div></div>
+      <div class="hint" style="margin-top:8px">Nota: gli articoli già in lista su questo account non si spostano; la lista condivisa parte da quella della casa.</div>
+      <div class="modal__actions"><button class="btn" data-act="ok">Chiudi</button></div>
+    `);
+    m.el.querySelector('[data-act="ok"]').onclick = m.close;
+    m.el.querySelector("#hCreate").onclick = () => apply(genHouseCode());
+    m.el.querySelector("#hJoin").onclick = () => {
+      const c = (m.el.querySelector("#hCode").value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (c.length < 4) { toast("Codice non valido", "error"); return; }
+      apply(c);
+    };
+  }
+}
+
 // ---------------- Navigazione ----------------
 export function mount(rootEl) {
   root = rootEl;
@@ -4114,6 +4168,7 @@ function renderShoppingList() {
   }
 
   wrap.innerHTML = `
+    ${getHousehold() ? `<button class="house-banner" id="houseBanner">👥 <span>Lista condivisa · <b>${escapeHtml(getHousehold())}</b></span></button>` : ""}
     <div class="search-bar">
       <input type="text" id="shopAdd" placeholder="Aggiungi un articolo..." />
       <button class="btn" id="shopPasteBtn" title="Incolla una lista">📋</button>
@@ -4175,6 +4230,8 @@ function renderShoppingList() {
   if (rb) rb.addEventListener("click", () => { shopManual = !shopManual; renderShoppingList(); });
   const pasteBtn = wrap.querySelector("#shopPasteBtn");
   if (pasteBtn) pasteBtn.addEventListener("click", openPasteShopping);
+  const houseBanner = wrap.querySelector("#houseBanner");
+  if (houseBanner) houseBanner.addEventListener("click", openHouseholdSheet);
 
   const tp = wrap.querySelector("#toPantry");
   if (tp) tp.addEventListener("click", () => {
@@ -5082,6 +5139,13 @@ function renderImpostazioni() {
         </div>
         <button class="btn" id="timersBtn">Apri</button>
       </div>
+      ${info.cloud ? `<div class="setting-row">
+        <div>
+          <div class="setting-row__label">Casa condivisa ${getHousehold() ? "✓" : ""}</div>
+          <div class="setting-row__desc">${getHousehold() ? "Lista della spesa condivisa (codice " + escapeHtml(getHousehold()) + ")." : "Condividi la lista della spesa in tempo reale con un'altra persona."}</div>
+        </div>
+        <button class="btn" id="householdBtn">${getHousehold() ? "Gestisci" : "Attiva"}</button>
+      </div>` : ""}
       <div class="setting-row">
         <div>
           <div class="setting-row__label">Nickname</div>
@@ -5244,6 +5308,8 @@ function renderImpostazioni() {
   root.querySelector("#convBtn").addEventListener("click", () => openConverter());
   const timersBtn = root.querySelector("#timersBtn");
   if (timersBtn) timersBtn.addEventListener("click", () => openTimersTool());
+  const householdBtn = root.querySelector("#householdBtn");
+  if (householdBtn) householdBtn.addEventListener("click", () => openHouseholdSheet());
   root.querySelector("#nickBtn").addEventListener("click", () => openChangeNickname());
   const chEmailBtn = root.querySelector("#chEmailBtn");
   if (chEmailBtn) chEmailBtn.addEventListener("click", () => openChangeEmail());

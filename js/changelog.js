@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.25",
+    d: "2026-06-16",
+    items: [
+      "Nuovo: Casa condivisa — tu e un'altra persona potete avere la STESSA lista della spesa, aggiornata in tempo reale tra i telefoni (Opzioni → Casa condivisa). Serve l'accesso cloud."
+    ]
+  },
+  {
     v: "7.24",
     d: "2026-06-16",
     minor: true,

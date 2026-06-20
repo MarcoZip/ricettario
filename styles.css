@@ -1251,3 +1251,8 @@ html[data-theme="dark"] .alert-banner { color: #ffcf94; }
 /* Morph foto lista -> dettaglio (View Transitions) */
 ::view-transition-group(vt-hero) { animation-duration: 0.38s; }
 @media (prefers-reduced-motion: reduce) { ::view-transition-group(vt-hero) { animation: none; } }
+
+/* Casa condivisa */
+.house-code { font-family: ui-monospace, monospace; font-size: 1.8rem; font-weight: 800; letter-spacing: 4px; text-align: center; background: var(--input-bg); border: 2px dashed var(--primary); border-radius: 14px; padding: 14px; color: var(--primary-2); }
+.house-banner { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: rgba(var(--primary-rgb,255,184,107),0.14); border: 1px solid rgba(var(--primary-rgb,255,184,107),0.35); color: var(--text); border-radius: 12px; padding: 8px 12px; margin-bottom: 10px; font-size: 0.92rem; cursor: pointer; }
+.house-banner b { color: var(--primary-2); letter-spacing: 1px; }

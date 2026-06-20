@@ -14,5 +14,10 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.uid == uid;
       allow read: if request.auth != null && request.auth.token.email == 'marcozeta73@gmail.com';
     }
+    // Casa condivisa: la lista della spesa condivisa vive sotto households/{code}.
+    // Vi accede chiunque sia autenticato E conosca il codice (è il "segreto" condiviso).
+    match /households/{hid}/{document=**} {
+      allow read, write: if request.auth != null;
+    }
   }
 }
