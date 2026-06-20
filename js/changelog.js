@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.26",
+    d: "2026-06-16",
+    items: [
+      "Nuovo: in Modalità cucina, col microfono attivo puoi fare DOMANDE a voce (\"posso sostituire il burro?\", \"quanto cuocio?\") e lo chef AI risponde a voce — mani libere. Oltre ai comandi avanti/indietro/timer."
+    ]
+  },
+  {
     v: "7.25",
     d: "2026-06-16",
     items: [

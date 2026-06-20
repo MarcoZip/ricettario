@@ -2931,6 +2931,8 @@ function openCookingMode(recipe) {
   let xl = localStorage.getItem("ricettario.cookXL") === "1"; // testo grande
   let voiceOn = false; // comandi vocali a mani libere
   let vrec = null;
+  let speaking = false; // sta parlando l'assistente (ascolto in pausa)
+  let asking = false;   // domanda all'AI in corso
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   const host = document.getElementById("modalRoot");
@@ -2966,6 +2968,34 @@ function openCookingMode(recipe) {
     if (mt) { addTimer(parseInt(mt[1], 10), "Voce"); return; }
     const wm = t.match(/timer\s+([a-zà]+)/);
     if (wm && NUMWORDS[wm[1]]) { addTimer(NUMWORDS[wm[1]], "Voce"); return; }
+    // Domanda libera allo chef AI: solo se suona come una domanda di cucina.
+    if (isImportConfigured() && t.trim().split(/\s+/).length >= 2 &&
+        /\b(come|quant|perch|posso|possi|devo|dobbiamo|qual|cosa|che cosa|quando|si pu|va bene|sostitu|invece di|al posto|meglio|serve|bisogna)\b/.test(t)) {
+      answerQuestion(text); return;
+    }
+  }
+  // Risponde a voce a una domanda libera, mettendo in pausa l'ascolto mentre
+  // parla (così il microfono non capta la voce dell'assistente).
+  function speakAndWait(txt) {
+    return new Promise((res) => {
+      if (!window.speechSynthesis || !txt) { res(); return; }
+      try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(txt); u.lang = "it-IT"; u.onend = res; u.onerror = res; window.speechSynthesis.speak(u); }
+      catch (e) { res(); }
+    });
+  }
+  async function answerQuestion(text) {
+    if (asking) return;
+    asking = true; speaking = true;
+    try { if (vrec) vrec.stop(); } catch (e) {}
+    try {
+      const ctx = { title: recipe.title, ingredients: (recipe.ingredients || []).map((i) => ingredientText(i)).filter(Boolean) };
+      const q = `${text} (Sto cucinando "${recipe.title}", passo ${idx + 1} di ${steps.length}: "${steps[idx]}".)`;
+      const ans = await askChef(q, ctx);
+      toast("💬 " + ans.slice(0, 90), "success");
+      await speakAndWait(ans);
+    } catch (e) { await speakAndWait("Scusa, non riesco a rispondere ora."); }
+    asking = false; speaking = false;
+    if (voiceOn) { try { startVoice(); } catch (e) {} } // riprende l'ascolto
   }
   function startVoice() {
     if (!SR) return;
@@ -2975,7 +3005,7 @@ function openCookingMode(recipe) {
       vrec.continuous = true;
       vrec.interimResults = false;
       vrec.onresult = (e) => { for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) handleVoiceCommand(e.results[i][0].transcript); };
-      vrec.onend = () => { if (voiceOn) { try { vrec.start(); } catch (e) {} } };
+      vrec.onend = () => { if (voiceOn && !speaking) { try { vrec.start(); } catch (e) {} } };
       vrec.onerror = (e) => { if (e && e.error === "not-allowed") { voiceOn = false; toast("Permesso microfono negato", "error"); draw(); } };
       vrec.start();
     } catch (e) { voiceOn = false; }
@@ -2983,7 +3013,7 @@ function openCookingMode(recipe) {
   function stopVoice() { voiceOn = false; if (vrec) { try { vrec.stop(); } catch (e) {} vrec = null; } }
   function toggleVoice() {
     voiceOn = !voiceOn;
-    if (voiceOn) { startVoice(); toast("Comandi vocali: \"avanti\", \"indietro\", \"timer 10 minuti\", \"ripeti ingredienti\", \"quanto manca\"", "success"); }
+    if (voiceOn) { startVoice(); toast("A voce: \"avanti\", \"indietro\", \"timer 10 minuti\", o fai una domanda (\"posso sostituire il burro?\")", "success"); }
     else stopVoice();
     draw();
   }
@@ -3983,7 +4013,7 @@ const GUIDE_SECTIONS = [
   { icon: "carrot", title: "Valori nutrizionali", text: "In una ricetta tocca \"Calcola\" sotto gli ingredienti: l'app stima calorie e macronutrienti (proteine, carboidrati, grassi) per porzione e totali. Per ciò che non conosce cerca online su Open Food Facts e ti mostra anche cosa non ha conteggiato. È una stima: cambia con il numero di porzioni." },
   { icon: "heart", title: "Trova al volo", text: "Dalla schermata Strumenti cerca per nome o ingrediente e usa i filtri: Preferiti, Più cucinate, Di recente, per tempo (≤15 e ≤30 min) e le categorie. Indica il tempo di preparazione nella ricetta (modifica) per usare i filtri rapidi. Dai un voto a stelle e \"Segna come cucinata\" per il conto." },
   { icon: "shopping-cart-simple", title: "Spesa & Dispensa", text: "Aggiungi gli ingredienti alla lista della spesa (uniti e per reparto). Tocca il nome per spuntare un articolo e la quantità per modificarla. Con \"Spesa fatta\" passa tutto in dispensa. In Dispensa tieni ciò che hai già — con la scadenza, e l'app ti avvisa quando qualcosa sta per scadere — e \"Cosa posso cucinare\" suggerisce le ricette con quello che hai." },
-  { icon: "fire", title: "Modalità cucina", text: "Nelle ricette con i passi, tocca \"Modalità cucina\": istruzioni passo-passo, più timer con nome (pasta, forno…), lettura vocale (🔊) e schermo sempre acceso mentre cucini." },
+  { icon: "fire", title: "Modalità cucina", text: "Nelle ricette con i passi, tocca \"Modalità cucina\": istruzioni passo-passo, più timer con nome (pasta, forno…), lettura vocale (🔊) e schermo sempre acceso. Tocca un ingrediente nel passo per vedere la quantità. Col microfono 🎤 vai avanti/indietro a voce, avvii timer e puoi anche fare domande (\"posso sostituire il burro?\") con risposta a voce." },
   { icon: "calendar-blank", title: "Pianificazione", text: "Nel calendario (vista Mese o Settimana) assegna le ricette ai giorni in pranzo o cena, usa \"Riempi le cene\" per riempire la settimana e genera la spesa del mese o della settimana." },
   { icon: "book-bookmark", title: "Menu", text: "Dalla schermata Strumenti, filtro \"Menu\": raggruppa più ricette (es. \"Cena con amici\") e genera un'unica lista della spesa." },
   { icon: "arrow-square-out", title: "Condividi", text: "Da una ricetta tocca \"Condividi\" per inviarla a qualcuno (WhatsApp, email…) con ingredienti e preparazione." },
