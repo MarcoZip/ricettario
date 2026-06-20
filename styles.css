@@ -1247,3 +1247,7 @@ html[data-theme="dark"] .alert-banner { color: #ffcf94; }
 @keyframes imgFade { from { opacity: 0; filter: blur(10px); } to { opacity: 1; filter: blur(0); } }
 /* Tocco elastico (spring) sui controlli premibili */
 .btn, .chip, .filter-chip, .accent-sw, .tag-add { transition: transform 0.2s var(--spring); }
+
+/* Morph foto lista -> dettaglio (View Transitions) */
+::view-transition-group(vt-hero) { animation-duration: 0.38s; }
+@media (prefers-reduced-motion: reduce) { ::view-transition-group(vt-hero) { animation: none; } }

@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.24",
+    d: "2026-06-16",
+    minor: true,
+    items: [
+      "Effetto wow: aprendo una ricetta con foto, l'immagine si \"espande\" fluidamente dalla card al dettaglio (come le app native)."
+    ]
+  },
+  {
     v: "7.23",
     d: "2026-06-16",
     items: [

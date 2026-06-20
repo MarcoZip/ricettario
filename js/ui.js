@@ -949,6 +949,15 @@ function openTool(toolId) {
 function openRecipe(recipeId) {
   const r = store.getRecipe(recipeId);
   haptic(6);
+  // Morph "elemento condiviso": tagga la miniatura sorgente con lo stesso nome
+  // della foto hero del dettaglio, così la View Transition la fa "espandere".
+  if (document.startViewTransition && !reduceMotion) {
+    try {
+      const sel = (typeof CSS !== "undefined" && CSS.escape) ? CSS.escape(recipeId) : recipeId;
+      const src = root.querySelector(`.pick-row[data-id="${sel}"] img, [data-recipe="${sel}"] img`);
+      if (src) src.style.viewTransitionName = "vt-hero";
+    } catch (e) { /* ignora */ }
+  }
   currentRecipeId = recipeId;
   currentToolId = r ? r.toolId : currentToolId;
   // Porzioni predefinite: se impostate e la ricetta ha le porzioni, apri già scalato.
@@ -1606,7 +1615,7 @@ function renderRecipeDetail() {
       <div class="toolbar__title" style="flex:1">${r.photo ? "" : escapeHtml(r.title)}</div>
       <button class="back-btn fav-btn ${r.favorite ? "is-fav" : ""}" id="favBtn" title="Preferito">${iconHtml("heart")}</button>
     </div>
-    ${r.photo ? `<div class="recipe-hero"><img src="${escapeHtml(proxiedImg(r.photo))}" alt="" referrerpolicy="no-referrer" /><div class="recipe-hero__grad"></div><h2 class="recipe-hero__title">${escapeHtml(r.title)}</h2></div>` : ""}
+    ${r.photo ? `<div class="recipe-hero"><img src="${escapeHtml(proxiedImg(r.photo))}" alt="" referrerpolicy="no-referrer" style="view-transition-name:vt-hero" /><div class="recipe-hero__grad"></div><h2 class="recipe-hero__title">${escapeHtml(r.title)}</h2></div>` : ""}
     <div class="detail-top">
       ${tool ? `<span class="recipe-tool-chip" style="margin:0">${iconHtml(tool.icon)} ${escapeHtml(tool.name)}</span>` : "<span></span>"}
       ${ratingRow}
