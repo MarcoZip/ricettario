@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.40",
+    d: "2026-06-20",
+    items: [
+      "Finita una ricetta in Modalità cucina ora compare una schermata \"Piatto pronto!\" con coriandoli, e da lì puoi subito dare il voto e aggiungere la foto."
+    ]
+  },
+  {
     v: "7.39",
     d: "2026-06-20",
     minor: true,

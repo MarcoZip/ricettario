@@ -3010,9 +3010,34 @@ function openCookingMode(recipe) {
 
   function goNext() {
     if (idx < steps.length - 1) { idx++; haptic(6); draw(); speakStep(); }
-    else { store.markCooked(recipe.id); close(); }
+    else finishCooking();
   }
   function goPrev() { if (idx > 0) { idx--; haptic(6); draw(); speakStep(); } }
+
+  // Schermata celebrativa di fine ricetta: coriandoli + scorciatoia al voto/foto.
+  function finishCooking() {
+    store.markCooked(recipe.id);
+    if (ticker) { clearInterval(ticker); ticker = null; }
+    if (alarmTicker) { clearInterval(alarmTicker); alarmTicker = null; }
+    stopSpeak(); stopVoice();
+    haptic(30);
+    el.classList.add("cook--done");
+    el.innerHTML = `
+      <div class="cook__done">
+        <div class="cook__done-emoji">🎉</div>
+        <h2 class="cook__done-title">Piatto pronto!</h2>
+        <p class="cook__done-text">Hai completato <b>${escapeHtml(recipe.title)}</b>.</p>
+        <p class="cook__done-sub">L'abbiamo segnata nel tuo diario di cucina.</p>
+        <div class="cook__done-btns">
+          <button class="btn btn--primary btn--block" id="ckRate">${iconHtml("star")} Com'è venuta?</button>
+          <button class="btn btn--block" id="ckDone">Chiudi</button>
+        </div>
+      </div>`;
+    try { fxBurst(window.innerWidth / 2, window.innerHeight / 3, { count: 46 }); } catch (e) {}
+    try { navigator.vibrate && navigator.vibrate([40, 60, 40]); } catch (e) {}
+    el.querySelector("#ckRate").onclick = () => { close(); openCookReview(recipe); };
+    el.querySelector("#ckDone").onclick = close;
+  }
 
   // Comandi vocali: avanti / indietro / timer N minuti / leggi.
   const NUMWORDS = { uno: 1, una: 1, un: 1, due: 2, tre: 3, quattro: 4, cinque: 5, sei: 6, sette: 7, otto: 8, nove: 9, dieci: 10, undici: 11, dodici: 12, quindici: 15, venti: 20, venticinque: 25, trenta: 30, quaranta: 40, quarantacinque: 45, sessanta: 60 };
