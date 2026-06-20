@@ -1508,7 +1508,8 @@ function renderRecipeDetail() {
           <button class="stepper__btn" id="pPlus">+</button>
         </div>
       </div>${!base ? `<div class="hint">Imposta le porzioni nella ricetta (modifica) per ricalcolare le quantità.</div>` : ""}
-      ${base && ingredients.some((it) => it.qty != null && it.unit) ? `<button class="btn btn--ghost btn--block" id="scaleByWeight" style="margin-top:8px">⚖️ Ho una quantità precisa…</button>` : ""}`
+      ${base && ingredients.some((it) => it.qty != null && it.unit) ? `<button class="btn btn--ghost btn--block" id="scaleByWeight" style="margin-top:8px">⚖️ Ho una quantità precisa…</button>` : ""}
+      ${base ? `<button class="btn btn--ghost btn--block" id="panScale" style="margin-top:8px">🍰 Adatta alla teglia/stampo</button>` : ""}`
     : "";
 
   const pantryActive = store.getPantry().length > 0;
@@ -1660,6 +1661,8 @@ function renderRecipeDetail() {
   if (pPlus) pPlus.addEventListener("click", () => { detailServings = (detailServings || base || 1) + 1; render(); });
   const sbw = root.querySelector("#scaleByWeight");
   if (sbw) sbw.addEventListener("click", () => openScaleByWeight(r, base, ingredients));
+  const pscale = root.querySelector("#panScale");
+  if (pscale) pscale.addEventListener("click", () => openPanScaler(r, base));
 
   root.querySelector("#favBtn").addEventListener("click", (e) => {
     if (!r.favorite) { fxBurstFrom(e.currentTarget, { emojis: ["❤️", "💛", "✨"] }); haptic(15); }
@@ -2569,6 +2572,52 @@ function openScaleByWeight(r, base, ingredients) {
     if (serv == null) { toast("Inserisci una quantità valida", "error"); return; }
     detailServings = serv; m.close(); render();
   });
+}
+
+// Adatta alla teglia/stampo: ricalcola le dosi in base alla superficie della
+// teglia (rotonda Ø, oppure rettangolare/quadrata A×B). Imposta le porzioni così
+// che le quantità si scalino del fattore area-target / area-ricetta.
+function openPanScaler(r, base) {
+  const st = { from: { shape: "round" }, to: { shape: "round" } };
+  const area = (s) => {
+    const a = parseFloat(String(s.a || "").replace(",", "."));
+    if (s.shape === "round") return a > 0 ? Math.PI * a * a / 4 : 0;
+    const b = parseFloat(String(s.b || "").replace(",", "."));
+    return a > 0 && b > 0 ? a * b : 0;
+  };
+  const dimsHtml = (side) => st[side].shape === "round"
+    ? `<input class="pan-in" type="number" inputmode="decimal" data-side="${side}" data-dim="a" placeholder="diametro cm" />`
+    : `<div style="display:flex;gap:8px;align-items:center"><input class="pan-in" type="number" inputmode="decimal" data-side="${side}" data-dim="a" placeholder="lato A cm" style="flex:1;min-width:0" /><span>×</span><input class="pan-in" type="number" inputmode="decimal" data-side="${side}" data-dim="b" placeholder="lato B cm" style="flex:1;min-width:0" /></div>`;
+  const m = openModal(`
+    <h3 class="modal__title">🍰 Adatta alla teglia</h3>
+    <p class="hint" style="margin-top:-8px;margin-bottom:12px">Inserisci la teglia della ricetta e la tua: ricalcolo le dosi in base alla superficie.</p>
+    <div class="field"><label>Teglia della ricetta</label><select id="panFromShape" class="mini-select" style="width:100%"><option value="round">Rotonda (Ø)</option><option value="rect">Rettangolare / quadrata</option></select><div id="panFromDims" style="margin-top:6px"></div></div>
+    <div class="field"><label>La tua teglia</label><select id="panToShape" class="mini-select" style="width:100%"><option value="round">Rotonda (Ø)</option><option value="rect">Rettangolare / quadrata</option></select><div id="panToDims" style="margin-top:6px"></div></div>
+    <div id="panResult"></div>
+    <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button><button class="btn btn--primary" data-act="ok" disabled>Adatta le dosi</button></div>
+  `);
+  const okBtn = m.el.querySelector('[data-act="ok"]');
+  let ratio = 0, newServ = 0;
+  const recalc = () => {
+    const af = area(st.from), at = area(st.to);
+    ratio = af > 0 && at > 0 ? at / af : 0;
+    newServ = ratio ? Math.max(1, Math.round(base * ratio)) : 0;
+    m.el.querySelector("#panResult").innerHTML = ratio
+      ? `<div class="nutri-box"><div class="nutri-row"><span class="nutri-lbl">Fattore dosi</span><span class="nutri-val"><b>×${ratio.toFixed(2)}</b></span></div><div class="nutri-row"><span class="nutri-lbl">Equivale a</span><span class="nutri-val"><b>${newServ}</b> ${newServ === 1 ? "porzione" : "porzioni"} (da ${base})</span></div></div>`
+      : `<div class="hint">Inserisci le misure per vedere il calcolo.</div>`;
+    okBtn.disabled = !ratio;
+  };
+  const bindDims = (side, containerId) => {
+    const c = m.el.querySelector(containerId);
+    c.innerHTML = dimsHtml(side);
+    c.querySelectorAll(".pan-in").forEach((i) => i.oninput = () => { st[side][i.dataset.dim] = i.value; recalc(); });
+  };
+  bindDims("from", "#panFromDims"); bindDims("to", "#panToDims");
+  m.el.querySelector("#panFromShape").onchange = (e) => { st.from = { shape: e.target.value }; bindDims("from", "#panFromDims"); recalc(); };
+  m.el.querySelector("#panToShape").onchange = (e) => { st.to = { shape: e.target.value }; bindDims("to", "#panToDims"); recalc(); };
+  m.el.querySelector('[data-act="cancel"]').onclick = m.close;
+  okBtn.onclick = () => { if (!ratio) return; detailServings = newServ; m.close(); render(); toast(`Dosi adattate alla teglia (×${ratio.toFixed(2)})`, "success"); };
+  recalc();
 }
 
 // Modalità ospiti: scegli per quante persone cucini, adatta le dosi e

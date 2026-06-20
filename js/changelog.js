@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.21",
+    d: "2026-06-16",
+    items: [
+      "Nuovo: \"Adatta alla teglia/stampo\" in una ricetta — hai una teglia diversa? Ricalcola le dosi in base alla superficie (rotonda o rettangolare)."
+    ]
+  },
+  {
     v: "7.20",
     d: "2026-06-16",
     minor: true,
