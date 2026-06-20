@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.29",
+    d: "2026-06-16",
+    items: [
+      "Tocchi un ingrediente di stagione e apri il Ricettario: ora la ricerca online parte da sola.",
+      "Ricerca tra le tue ricette: puoi aggiungere lo strumento (es. \"costolette friggitrice\") e trova solo quelle di quello strumento."
+    ]
+  },
+  {
     v: "7.28",
     d: "2026-06-16",
     items: [

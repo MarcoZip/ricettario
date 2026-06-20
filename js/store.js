@@ -178,12 +178,14 @@ export function getFavorites() {
 export function searchRecipes(q) {
   const s = (q || "").toLowerCase().trim();
   if (!s) return [];
+  const toolName = (r) => { const t = state.tools.find((x) => x.id === r.toolId); return t ? (t.name || "").toLowerCase() : ""; };
   const matchesTerm = (r, term) =>
     (r.title || "").toLowerCase().includes(term) ||
     (r.tags || []).some((t) => (t || "").toLowerCase().includes(term)) ||
-    (r.ingredients || []).some((i) => (i.name || "").toLowerCase().includes(term));
-  // Più ingredienti separati da virgola o " e ": devono comparire TUTTI.
-  const terms = s.split(/\s*,\s*|\s+e\s+/).map((t) => t.trim()).filter(Boolean);
+    (r.ingredients || []).some((i) => (i.name || "").toLowerCase().includes(term)) ||
+    toolName(r).includes(term); // così "costolette friggitrice" filtra anche per strumento
+  // Più parole (separate da spazi, virgole o " e ") devono comparire TUTTE.
+  const terms = s.split(/[\s,]+|\s+e\s+/).map((t) => t.trim()).filter(Boolean);
   if (terms.length > 1) return state.recipes.filter((r) => terms.every((term) => matchesTerm(r, term)));
   return state.recipes.filter((r) => matchesTerm(r, s));
 }

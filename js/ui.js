@@ -106,6 +106,7 @@ let mealTab = "online";
 let mealSource = "all"; // "all" | "mealdb" | "gz" | "misya" | "spoon"
 let mealQuery = "";
 let mealSourceCounts = []; // [{label, count}] per il riepilogo "Tutte le fonti"
+let pendingMealQuery = ""; // ricerca da avviare quando si apre il Ricettario online
 let mealResults = null;
 let mealLoading = false;
 let mealError = "";
@@ -1397,9 +1398,11 @@ function renderStrumenti() {
   const mic = root.querySelector("#homeMic");
   if (mic) mic.addEventListener("click", () => startVoiceSearch());
 
-  // "Di stagione": tocca un ingrediente per cercarlo tra le ricette salvate.
+  // "Di stagione": tocca un ingrediente per cercarlo tra le ricette salvate e
+  // prepara la ricerca online (parte da sola quando apri il Ricettario).
   root.querySelectorAll(".season-chip[data-season]").forEach((c) => c.addEventListener("click", () => {
     homeQuery = c.dataset.season; homeFilter = "";
+    pendingMealQuery = c.dataset.season; mealTab = "online";
     renderStrumenti();
     const sb = root.querySelector("#homeSearch");
     if (sb) { try { sb.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }
@@ -3844,6 +3847,12 @@ function setupPullToRefresh(body) {
 
 function renderOnlineTab() {
   const body = root.querySelector("#ricettarioBody");
+  // Ricerca "in sospeso" (es. da un ingrediente di stagione): avviala da sola.
+  if (pendingMealQuery) {
+    const q = pendingMealQuery; pendingMealQuery = "";
+    mealQuery = q;
+    setTimeout(() => performMealSearch(q), 0);
+  }
   let resultsHtml = "";
   if (mealLoading) {
     resultsHtml = Array.from({ length: 4 }, () =>
