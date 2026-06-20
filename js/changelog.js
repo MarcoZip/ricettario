@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.32",
+    d: "2026-06-16",
+    items: [
+      "Piccoli consigli \"Lo sapevi?\" in Home (uno per volta, ognuno una sola volta) per scoprire le funzioni; un puntino sul ❓ invita a provare l'assistente."
+    ]
+  },
+  {
     v: "7.31",
     d: "2026-06-16",
     items: [

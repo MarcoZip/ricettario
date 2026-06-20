@@ -343,7 +343,14 @@ export function mount(rootEl) {
     btn.addEventListener("click", () => navigate(btn.dataset.route));
   });
   const help = document.getElementById("helpBtn");
-  if (help) help.addEventListener("click", () => openHelpAssistant());
+  if (help) {
+    try { if (!localStorage.getItem("ricettario.help.seen")) help.classList.add("hot-dot"); } catch (e) {}
+    help.addEventListener("click", () => {
+      try { localStorage.setItem("ricettario.help.seen", "1"); } catch (e) {}
+      help.classList.remove("hot-dot");
+      openHelpAssistant();
+    });
+  }
   // Guida al primo avvio: mostrala SOLO dopo lo splash (e fuori dal login), e
   // segna "vista" solo quando appare davvero — così non si perde dietro lo splash.
   try {
@@ -1220,6 +1227,34 @@ function pickSuggestions(limit = 3) {
   return scored.slice(0, limit).map((x) => x.r);
 }
 
+// "Lo sapevi?": consigli a bassa pressione, uno per sessione, ognuno una volta sola.
+const APP_TIPS = [
+  { id: "t-chiedi", text: "tocca il ❓ in alto e chiedi a Fornelli come fare qualsiasi cosa.", topic: null },
+  { id: "t-voce", text: "in Modalità cucina, col microfono, puoi fare domande a voce (\"posso sostituire il burro?\").", topic: "modalita-cucina" },
+  { id: "t-casa", text: "puoi condividere la lista della spesa in tempo reale con un'altra persona.", topic: "casa-condivisa" },
+  { id: "t-adatta", text: "puoi rendere una ricetta vegana o più leggera con un tocco.", topic: "adatta-ricetta" },
+  { id: "t-frigo", text: "fotografa il frigo e l'app riconosce gli alimenti.", topic: "foto-frigo" },
+  { id: "t-teglia", text: "hai una teglia diversa? L'app riadatta le dosi.", topic: "teglia" },
+  { id: "t-menuai", text: "fatti proporre il menù della settimana dall'AI.", topic: "menu-settimana" },
+  { id: "t-robot", text: "trasforma una ricetta nei comandi del tuo Companion o Bimby.", topic: "robot" }
+];
+let tipChosen = false;     // tip della sessione già scelto
+let tipDismissed = false;  // l'utente l'ha chiuso (non ricompare nei re-render)
+let currentTip = null;
+function buildTipBanner() {
+  if (tipDismissed) return "";
+  if (!tipChosen) {
+    tipChosen = true;
+    let seen = [];
+    try { seen = JSON.parse(localStorage.getItem("ricettario.tips.seen") || "[]"); } catch (e) {}
+    const avail = APP_TIPS.filter((t) => !seen.includes(t.id));
+    currentTip = avail.length ? avail[Math.floor(Math.random() * avail.length)] : null;
+    if (currentTip) { try { localStorage.setItem("ricettario.tips.seen", JSON.stringify([...seen, currentTip.id])); } catch (e) {} }
+  }
+  if (!currentTip) return "";
+  return `<div class="didyouknow" id="dyk"><span class="dyk__ic">💡</span><button class="dyk__txt" id="dykGo"><b>Lo sapevi?</b> ${escapeHtml(currentTip.text)}</button><button class="dyk__x" id="dykX" title="Chiudi">✕</button></div>`;
+}
+
 function renderStrumenti() {
   const tools = store.getTools();
   const info = handlers.getAccountInfo();
@@ -1355,6 +1390,7 @@ function renderStrumenti() {
     ${neglectedCard}
     ${seasonCard}
     ${banner}
+    ${buildTipBanner()}
     <div class="search-bar search-bar--hero">
       <span class="search-bar__ic">${iconHtml("magnifying-glass")}</span>
       <input type="search" id="homeSearch" placeholder="Cerca una ricetta o un ingrediente…" value="${escapeHtml(homeQuery)}" />
@@ -1398,6 +1434,15 @@ function renderStrumenti() {
 
   const mic = root.querySelector("#homeMic");
   if (mic) mic.addEventListener("click", () => startVoiceSearch());
+
+  // "Lo sapevi?": tocca per andare alla funzione, ✕ per chiudere.
+  const dykGo = root.querySelector("#dykGo");
+  if (dykGo) dykGo.addEventListener("click", () => {
+    if (currentTip && currentTip.topic) { const t = HELP_TOPICS.find((x) => x.id === currentTip.topic); if (t) { executeHelpAction(t); return; } }
+    openHelpAssistant();
+  });
+  const dykX = root.querySelector("#dykX");
+  if (dykX) dykX.addEventListener("click", () => { tipDismissed = true; const b = root.querySelector("#dyk"); if (b) b.remove(); });
 
   // "Di stagione": tocca un ingrediente per cercarlo tra le ricette salvate e
   // prepara la ricerca online (parte da sola quando apri il Ricettario).
