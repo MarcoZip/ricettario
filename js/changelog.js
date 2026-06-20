@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.43",
+    d: "2026-06-20",
+    minor: true,
+    items: [
+      "App più veloce ad aprirsi, soprattutto su rete mobile: ora i file vengono serviti dalla memoria del telefono invece di riscaricarli ogni volta (gli aggiornamenti continuano ad arrivare da soli)."
+    ]
+  },
+  {
     v: "7.42",
     d: "2026-06-20",
     items: [

@@ -1,7 +1,7 @@
 // Service worker: mette in cache l'app per l'uso offline e l'installazione.
 // I dati (Firestore/TheMealDB) NON passano da qui: vanno sempre in rete / cache propria.
 
-const CACHE = "ricettario-v126";
+const CACHE = "ricettario-v127";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -39,8 +39,14 @@ const APP_SHELL = [
 ];
 
 self.addEventListener("install", (event) => {
+  // Precarico l'app con "reload" per scavalcare la cache HTTP del browser:
+  // così il nuovo service worker mette in cache SEMPRE i file aggiornati.
   event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(APP_SHELL)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then((c) => Promise.all(APP_SHELL.map((u) =>
+        fetch(u, { cache: "reload" }).then((r) => { if (r && r.ok) return c.put(u, r); }).catch(() => {})
+      )))
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -87,18 +93,22 @@ self.addEventListener("fetch", (event) => {
   // Firebase, TheMealDB e le immagini esterne vanno direttamente in rete.
   if (url.origin !== self.location.origin) return;
 
-  // Strategia "prima la rete": quando si è online si riceve sempre la versione
-  // aggiornata (così config.js e il codice nuovo arrivano subito); offline si
-  // ricade sulla copia in cache.
+  // Strategia "prima la cache": se il file è già in cache lo servo subito, così
+  // l'app si apre all'istante anche su rete lenta (niente ri-download a ogni
+  // avvio). Gli aggiornamenti arrivano quando cambia il service worker: a ogni
+  // release alziamo CACHE, il nuovo SW riscarica tutto e fa ricaricare la pagina.
   event.respondWith(
-    fetch(req, { cache: "no-store" })
-      .then((res) => {
-        if (res && res.status === 200 && res.type === "basic") {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy));
-        }
-        return res;
-      })
-      .catch(() => caches.match(req).then((cached) => cached || caches.match("./index.html")))
+    caches.match(req).then((cached) => {
+      if (cached) return cached;
+      return fetch(req)
+        .then((res) => {
+          if (res && res.status === 200 && res.type === "basic") {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match("./index.html"));
+    })
   );
 });
