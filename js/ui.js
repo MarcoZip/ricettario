@@ -1445,9 +1445,13 @@ function renderStrumenti() {
   const dykX = root.querySelector("#dykX");
   if (dykX) dykX.addEventListener("click", () => { tipDismissed = true; const b = root.querySelector("#dyk"); if (b) b.remove(); });
 
-  // "Di stagione": tocca un ingrediente → va dritto al Ricettario e cerca subito.
+  // "Di stagione": tocca un ingrediente → cerca tra le ricette salvate (in Home).
+  // Dai risultati si può poi estendere la ricerca al Ricettario online col pulsante.
   root.querySelectorAll(".season-chip[data-season]").forEach((c) => c.addEventListener("click", () => {
-    searchOnline(c.dataset.season);
+    homeQuery = c.dataset.season; homeFilter = "";
+    renderStrumenti();
+    const sb = root.querySelector("#homeSearch");
+    if (sb) { try { sb.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }
   }));
 
   renderHomeBody();

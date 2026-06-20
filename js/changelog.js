@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.36",
+    d: "2026-06-16",
+    minor: true,
+    items: [
+      "Ingredienti di stagione: tornano a cercare prima tra le tue ricette salvate; da lì puoi estendere la ricerca al Ricettario online."
+    ]
+  },
+  {
     v: "7.35",
     d: "2026-06-16",
     items: [
