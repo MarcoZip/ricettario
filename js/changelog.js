@@ -6,8 +6,16 @@
 
 export const CHANGELOG = [
   {
+    v: "7.37",
+    d: "2026-06-20",
+    minor: true,
+    items: [
+      "Corrette le date nello storico Novità: dalla v7.19 in poi era rimasta per errore sempre la stessa data."
+    ]
+  },
+  {
     v: "7.36",
-    d: "2026-06-16",
+    d: "2026-06-20",
     minor: true,
     items: [
       "Ingredienti di stagione: tornano a cercare prima tra le tue ricette salvate; da lì puoi estendere la ricerca al Ricettario online."
@@ -15,7 +23,7 @@ export const CHANGELOG = [
   },
   {
     v: "7.35",
-    d: "2026-06-16",
+    d: "2026-06-20",
     items: [
       "Risolto: la ricerca avviata toccando un ingrediente di stagione non resta più bloccata sui rettangoli grigi.",
       "Sotto i risultati del Ricettario online ora vedi il tempo impiegato dalla ricerca (es. \"· 1,2 s\")."
@@ -23,7 +31,7 @@ export const CHANGELOG = [
   },
   {
     v: "7.34",
-    d: "2026-06-16",
+    d: "2026-06-20",
     minor: true,
     items: [
       "Tocchi un ingrediente di stagione e vai dritto al Ricettario con la ricerca già avviata (un solo tocco)."
@@ -31,35 +39,35 @@ export const CHANGELOG = [
   },
   {
     v: "7.33",
-    d: "2026-06-16",
+    d: "2026-06-20",
     items: [
       "Nuovo: \"Mostrami passo-passo\" — per alcune funzioni (Casa condivisa, Menù della settimana, Fotografa il frigo) l'app ti accompagna aprendo le pagine ed evidenziando cosa toccare. Lo trovi nell'assistente (❓)."
     ]
   },
   {
     v: "7.32",
-    d: "2026-06-16",
+    d: "2026-06-20",
     items: [
       "Piccoli consigli \"Lo sapevi?\" in Home (uno per volta, ognuno una sola volta) per scoprire le funzioni; un puntino sul ❓ invita a provare l'assistente."
     ]
   },
   {
     v: "7.31",
-    d: "2026-06-16",
+    d: "2026-06-20",
     items: [
       "Nuovo: \"Chiedi a Fornelli\" (tocca il ? in alto) — scrivi cosa vuoi fare (\"come condivido la spesa?\") e l'app ti risponde e ti apre la pagina giusta."
     ]
   },
   {
     v: "7.30",
-    d: "2026-06-16",
+    d: "2026-06-20",
     items: [
       "Ricettario online: scrivi il nome di una fonte o del tuo robot nella ricerca (es. \"pollo bimby\", \"costolette moulinex\") e cerca solo lì."
     ]
   },
   {
     v: "7.29",
-    d: "2026-06-16",
+    d: "2026-06-20",
     items: [
       "Tocchi un ingrediente di stagione e apri il Ricettario: ora la ricerca online parte da sola.",
       "Ricerca tra le tue ricette: puoi aggiungere lo strumento (es. \"costolette friggitrice\") e trova solo quelle di quello strumento."
@@ -67,7 +75,7 @@ export const CHANGELOG = [
   },
   {
     v: "7.28",
-    d: "2026-06-16",
+    d: "2026-06-20",
     items: [
       "Casa condivisa: ora arriva una NOTIFICA anche ad app chiusa quando l'altra persona aggiunge qualcosa alla lista (servono le notifiche attive su entrambi i telefoni).",
       "Casella di ricerca più grande ed evidente anche nella schermata principale.",
@@ -76,7 +84,7 @@ export const CHANGELOG = [
   },
   {
     v: "7.27",
-    d: "2026-06-16",
+    d: "2026-06-20",
     items: [
       "Casa condivisa: avviso in tempo reale quando l'altra persona aggiunge qualcosa alla lista (\"👥 … ha aggiunto: latte\").",
       "Ottimizzazioni: scorrimento più fluido sui telefoni di fascia media (effetti alleggeriti)."
@@ -84,21 +92,21 @@ export const CHANGELOG = [
   },
   {
     v: "7.26",
-    d: "2026-06-16",
+    d: "2026-06-20",
     items: [
       "Nuovo: in Modalità cucina, col microfono attivo puoi fare DOMANDE a voce (\"posso sostituire il burro?\", \"quanto cuocio?\") e lo chef AI risponde a voce — mani libere. Oltre ai comandi avanti/indietro/timer."
     ]
   },
   {
     v: "7.25",
-    d: "2026-06-16",
+    d: "2026-06-20",
     items: [
       "Nuovo: Casa condivisa — tu e un'altra persona potete avere la STESSA lista della spesa, aggiornata in tempo reale tra i telefoni (Opzioni → Casa condivisa). Serve l'accesso cloud."
     ]
   },
   {
     v: "7.24",
-    d: "2026-06-16",
+    d: "2026-06-20",
     minor: true,
     items: [
       "Effetto wow: aprendo una ricetta con foto, l'immagine si \"espande\" fluidamente dalla card al dettaglio (come le app native)."
@@ -106,28 +114,28 @@ export const CHANGELOG = [
   },
   {
     v: "7.23",
-    d: "2026-06-16",
+    d: "2026-06-20",
     items: [
       "Nuovo in Home: \"Suggeriti per te\" — proposte personalizzate in base alle tue abitudini (giorno della settimana, piatti più cucinati, preferiti) e a cosa sta per scadere. Attivabile in Opzioni → Sezioni della Home."
     ]
   },
   {
     v: "7.22",
-    d: "2026-06-16",
+    d: "2026-06-20",
     items: [
       "Nuovo: \"Adatta la ricetta\" — un tocco e l'AI la riscrive in versione vegana, vegetariana, senza glutine, senza lattosio o più leggera. La salvi come nuova ricetta."
     ]
   },
   {
     v: "7.21",
-    d: "2026-06-16",
+    d: "2026-06-20",
     items: [
       "Nuovo: \"Adatta alla teglia/stampo\" in una ricetta — hai una teglia diversa? Ricalcola le dosi in base alla superficie (rotonda o rettangolare)."
     ]
   },
   {
     v: "7.20",
-    d: "2026-06-16",
+    d: "2026-06-20",
     minor: true,
     items: [
       "Tocchi grafici: bordo luminoso animato sulla Ricetta del giorno, foto che entrano in dissolvenza, finestre con apertura elastica e tasti più reattivi."
@@ -135,7 +143,7 @@ export const CHANGELOG = [
   },
   {
     v: "7.19",
-    d: "2026-06-16",
+    d: "2026-06-20",
     items: [
       "Ricerca nel Ricettario: con \"Tutte le fonti\" ora vedi TUTTI i risultati (paginati), non solo un assaggio.",
       "Riepilogo: quante ricette trovate per ogni fonte.",
