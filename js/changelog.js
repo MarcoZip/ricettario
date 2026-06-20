@@ -6,6 +6,16 @@
 
 export const CHANGELOG = [
   {
+    v: "7.19",
+    d: "2026-06-16",
+    items: [
+      "Ricerca nel Ricettario: con \"Tutte le fonti\" ora vedi TUTTI i risultati (paginati), non solo un assaggio.",
+      "Riepilogo: quante ricette trovate per ogni fonte.",
+      "Cambiando fonte il testo cercato resta e la ricerca si rifà da sola.",
+      "Casella di ricerca più grande ed evidente, spostata in alto."
+    ]
+  },
+  {
     v: "7.18",
     d: "2026-06-16",
     minor: true,

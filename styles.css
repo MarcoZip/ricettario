@@ -1142,6 +1142,17 @@ a { color: var(--primary-2); }
 .wp-day { display: flex; gap: 10px; align-items: baseline; background: var(--input-bg); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; }
 .wp-day__d { flex: 0 0 88px; font-weight: 700; color: var(--text-soft); font-size: 0.85rem; }
 .wp-day__r { min-width: 0; }
+/* Ricerca online: casella evidente + riepilogo per fonte */
+.meal-search { margin-bottom: 14px; }
+.meal-search__lbl { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 1.02rem; margin-bottom: 8px; color: var(--text); }
+.search-bar--hero { background: var(--surface); border: 2px solid var(--primary); border-radius: 16px; padding: 6px; box-shadow: var(--glow); }
+.search-bar--hero input { min-width: 0; height: 48px; font-size: 1.05rem; background: transparent; border: none; }
+.search-bar--hero input:focus { outline: none; }
+.search-bar--hero .btn--primary { height: 44px; font-weight: 800; }
+.mini-lbl { display: block; font-size: 0.78rem; color: var(--text-soft); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+.src-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+.src-chip { font-size: 0.8rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; color: var(--text-soft); }
+.src-chip b { color: var(--primary-2); }
 /* Ingredienti toccabili nel passo (Modalità cucina) */
 .cook-ing { color: var(--primary-2); border-bottom: 1.5px dotted rgba(var(--primary-rgb, 255,184,107), 0.7); cursor: pointer; font-weight: 600; }
 .cook-ing:active { background: rgba(var(--primary-rgb, 255,184,107), 0.18); border-radius: 4px; }

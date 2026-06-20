@@ -140,7 +140,8 @@
       "WebFetch(domain:uxpilot.ai)",
       "WebFetch(domain:home.organizeat.com)",
       "WebFetch(domain:nestsync.org)",
-      "WebFetch(domain:techcrunch.com)"
+      "WebFetch(domain:techcrunch.com)",
+      "WebFetch(domain:marcozip.github.io)"
     ]
   }
 }

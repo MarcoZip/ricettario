@@ -105,6 +105,7 @@ let weekAnchor = null; // data di riferimento per la vista settimana
 let mealTab = "online";
 let mealSource = "all"; // "all" | "mealdb" | "gz" | "misya" | "spoon"
 let mealQuery = "";
+let mealSourceCounts = []; // [{label, count}] per il riepilogo "Tutte le fonti"
 let mealResults = null;
 let mealLoading = false;
 let mealError = "";
@@ -3324,6 +3325,7 @@ function interleave(arrays) {
 
 // Esegue la ricerca sulla fonte scelta (o su tutte) e normalizza i risultati.
 async function runMealSearch(q) {
+  mealSourceCounts = [];
   if (mealSource === "gz") { const out = (await searchGz(q)).map(mapGz); return out; }
   if (mealSource === "misya") { const out = (await searchMisya(q)).map(mapMisya); return out; }
   if (mealSource === "cookist") { const out = (await searchCookist(q)).map(mapCookist); return out; }
@@ -3342,18 +3344,21 @@ async function runMealSearch(q) {
   }
   if (mealSource === "all") {
     const en = await translateToEnglish(q);
-    const tasks = [
-      searchGz(q).then((rs) => rs.slice(0, 5).map(mapGz)).catch(() => []),
-      searchMisya(q).then((rs) => rs.slice(0, 5).map(mapMisya)).catch(() => []),
-      searchCookist(q).then((rs) => rs.slice(0, 5).map(mapCookist)).catch(() => []),
-      searchRicettenonna(q).then((rs) => rs.slice(0, 5).map(mapRicettenonna)).catch(() => []),
-      searchMoulinex(q).then((rs) => rs.slice(0, 5).map(mapMoulinex)).catch(() => []),
-      searchBimby(q).then((rs) => rs.slice(0, 5).map(mapBimby)).catch(() => []),
-      mealdb.searchMeals(en).then((rs) => rs.slice(0, 5).map(mapMealdb)).catch(() => [])
+    // Tutte le fonti: nessun limite per fonte (prima erano 5) → mostra TUTTI i
+    // risultati, paginati. Teniamo il conteggio per fonte per il riepilogo.
+    const defs = [
+      ["GialloZafferano", searchGz(q).then((rs) => rs.map(mapGz)).catch(() => [])],
+      ["Misya", searchMisya(q).then((rs) => rs.map(mapMisya)).catch(() => [])],
+      ["Cookist", searchCookist(q).then((rs) => rs.map(mapCookist)).catch(() => [])],
+      ["Ricette della Nonna", searchRicettenonna(q).then((rs) => rs.map(mapRicettenonna)).catch(() => [])],
+      ["Moulinex", searchMoulinex(q).then((rs) => rs.map(mapMoulinex)).catch(() => [])],
+      ["Bimby", searchBimby(q).then((rs) => rs.map(mapBimby)).catch(() => [])],
+      ["TheMealDB", mealdb.searchMeals(en).then((rs) => rs.map(mapMealdb)).catch(() => [])]
     ];
-    if (SPOONACULAR_ENABLED) tasks.push(searchSpoon(en).then((rs) => rs.slice(0, 5).map(mapSpoon)).catch(() => []));
-    if (EDAMAM_ENABLED) tasks.push(searchEdamam(en).then((rs) => rs.slice(0, 5).map(mapEdamam)).catch(() => []));
-    const arrays = await Promise.all(tasks);
+    if (SPOONACULAR_ENABLED) defs.push(["Spoonacular", searchSpoon(en).then((rs) => rs.map(mapSpoon)).catch(() => [])]);
+    if (EDAMAM_ENABLED) defs.push(["Edamam", searchEdamam(en).then((rs) => rs.map(mapEdamam)).catch(() => [])]);
+    const arrays = await Promise.all(defs.map((d) => d[1]));
+    mealSourceCounts = defs.map((d, i) => ({ label: d[0], count: arrays[i].length })).filter((x) => x.count > 0).sort((a, b) => b.count - a.count);
     const merged = interleave(arrays);
     await translateMealTitles(merged);
     return merged;
@@ -3625,7 +3630,8 @@ function renderOnlineTab() {
     const totalPages = Math.max(1, Math.ceil(totalItems / MEAL_PAGE_SIZE));
     const pageItems = serverPaged ? mealResults : mealResults.slice(mealPage * MEAL_PAGE_SIZE, mealPage * MEAL_PAGE_SIZE + MEAL_PAGE_SIZE);
     const countLine = mealSource === "all"
-      ? `<div class="result-count">${iconHtml("magnifying-glass")} Un assaggio da più fonti · <b>${totalItems}</b> ricette${totalPages > 1 ? ` · pag. ${mealPage + 1}/${totalPages}` : ""}<span class="shop-cost__note"> · scegli una fonte per vederne di più</span></div>`
+      ? `<div class="result-count">${iconHtml("magnifying-glass")} Trovate <b>${totalItems}</b> ricette da ${mealSourceCounts.length} ${mealSourceCounts.length === 1 ? "fonte" : "fonti"}${totalPages > 1 ? ` · pagina ${mealPage + 1} di ${totalPages}` : ""}</div>`
+        + (mealSourceCounts.length ? `<div class="src-summary">${mealSourceCounts.map((s) => `<span class="src-chip">${escapeHtml(s.label)} <b>${s.count}</b></span>`).join("")}</div>` : "")
       : `<div class="result-count">${iconHtml("magnifying-glass")} Trovate <b>${totalItems}</b> ${totalItems === 1 ? "ricetta" : "ricette"}${totalPages > 1 ? ` · pagina ${mealPage + 1} di ${totalPages}` : ""}</div>`;
     const pager = totalPages > 1 ? `<div class="pager">
         <button class="btn btn--ghost" id="pagePrev" ${mealPage === 0 ? "disabled" : ""}>${iconHtml("caret-left")} Prec.</button>
@@ -3648,25 +3654,31 @@ function renderOnlineTab() {
 
   body.innerHTML = `
     <div class="meal-controls">
-      <div class="field" style="margin-bottom:10px"><select id="mealSource">${srcOpts}</select></div>
+      ${searchable ? `<div class="meal-search">
+        <label class="meal-search__lbl">${iconHtml("magnifying-glass")} Cerca una ricetta</label>
+        <div class="search-bar search-bar--hero">
+          <input type="search" id="mealSearch" placeholder="Es. pollo, torta, zuppa…" value="${escapeHtml(mealQuery)}" />
+          ${(("webkitSpeechRecognition" in window) || ("SpeechRecognition" in window)) ? `<button class="btn mic-btn" id="mealMic" title="Cerca a voce" aria-label="Cerca a voce">🎤</button>` : ""}
+          <button class="btn btn--primary" id="mealSearchBtn">Cerca</button>
+        </div>
+      </div>` : ""}
+      <div class="field" style="margin-bottom:10px"><label class="mini-lbl">Fonte</label><select id="mealSource">${srcOpts}</select></div>
       ${searchable ? `<button class="btn btn--ghost btn--block" id="fridgeBtn" style="margin-bottom:12px">🧊 Svuota frigo (cerca per ingredienti)</button>` : ""}
       ${(() => { const n = getToTry().length; return n ? `<button class="btn btn--ghost btn--block" id="toTryBtn" style="margin-bottom:12px">🔖 Da provare (${n})</button>` : ""; })()}
       ${mealSource === "moulinex" ? `<button class="btn btn--ghost btn--block" id="companionRandom" style="margin-bottom:12px">🎲 Sorprendimi col Companion</button>` : ""}
       ${bannerHtml}
-      ${searchable ? `<div class="search-bar">
-        <input type="search" id="mealSearch" placeholder="Cerca in italiano (es. pollo, torta...)" value="${escapeHtml(mealQuery)}" />
-        ${(("webkitSpeechRecognition" in window) || ("SpeechRecognition" in window)) ? `<button class="btn mic-btn" id="mealMic" title="Cerca a voce" aria-label="Cerca a voce">🎤</button>` : ""}
-        <button class="btn btn--primary" id="mealSearchBtn">Cerca</button>
-      </div>` : ""}
       ${mealSource === "mealdb" ? `<div style="margin-top:10px"><button class="btn btn--ghost" id="mealRandom">${iconHtml("shuffle")} Ispirami</button></div>` : ""}
     </div>
     <div id="mealResults">${resultsHtml}</div>
   `;
 
   body.querySelector("#mealSource").addEventListener("change", (e) => {
-    mealSource = e.target.value; mealResults = null; mealError = ""; mealQuery = ""; mealPage = 0; mealTotal = null;
+    mealSource = e.target.value; mealResults = null; mealError = ""; mealPage = 0; mealTotal = null;
     renderOnlineTab();
-    if (BROWSE_SOURCES.has(mealSource)) performMealSearch(""); // carica subito la lista
+    // Mantiene il testo cercato: se c'è, rifà subito la ricerca sulla nuova fonte.
+    const q = (mealQuery || "").trim();
+    if (q && !BROWSE_SOURCES.has(mealSource)) performMealSearch(q);
+    else if (BROWSE_SOURCES.has(mealSource)) performMealSearch(q); // Moulinex/Bimby: lista o ricerca
   });
 
   const input = body.querySelector("#mealSearch");
