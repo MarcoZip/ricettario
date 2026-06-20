@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.42",
+    d: "2026-06-20",
+    items: [
+      "Nuovo: \"Tutto pronto alle…\" — dici a che ora vuoi servire e l'app calcola a ritroso quando iniziare ogni piatto perché arrivino caldi in tavola insieme. Lo trovi nel dettaglio di una ricetta (\"Quando inizio?\") e nel Piano, toccando un giorno (\"A che ora inizio?\")."
+    ]
+  },
+  {
     v: "7.41",
     d: "2026-06-20",
     items: [

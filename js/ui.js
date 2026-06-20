@@ -1790,6 +1790,7 @@ function renderRecipeDetail() {
 
     <button class="btn btn--block" id="cookedBtn" style="margin-bottom:10px">${iconHtml("fire")} Segna come cucinata${r.cookCount ? ` · ${r.cookCount} ${r.cookCount === 1 ? "volta" : "volte"}` : ""}</button>
     <button class="btn btn--block" id="reviewBtn" style="margin-bottom:10px">📝 Com'è venuta? (voto, foto, nota)</button>
+    <button class="btn btn--block" id="timelineBtn" style="margin-bottom:10px">🕐 Quando inizio? (per servire in orario)</button>
     ${videoInfo(r.url) ? `<button class="btn btn--block" id="watchVideo" style="margin-bottom:10px">▶ Guarda il video</button>` : ""}
     <button class="btn btn--block" id="checkPhotoBtn" style="margin-bottom:10px">📷 Com'è venuto? Controlla con una foto</button>
     <input type="file" id="checkPhotoFile" accept="image/*" capture="environment" hidden />
@@ -1883,6 +1884,8 @@ function renderRecipeDetail() {
 
   const reviewBtn = root.querySelector("#reviewBtn");
   if (reviewBtn) reviewBtn.addEventListener("click", () => openCookReview(r));
+  const timelineBtn = root.querySelector("#timelineBtn");
+  if (timelineBtn) timelineBtn.addEventListener("click", () => openCookTimeline([r]));
   const collectionsBtn = root.querySelector("#collectionsBtn");
   if (collectionsBtn) collectionsBtn.addEventListener("click", () => openCollections(r));
   const prepRemind = root.querySelector("#prepRemind");
@@ -5080,6 +5083,61 @@ function dayNutrition(entries) {
   return { kcal: Math.round(t.kcal), p: Math.round(t.p), c: Math.round(t.c), f: Math.round(t.f), counted, total };
 }
 
+// "Tutto pronto alle…": calcola a ritroso quando iniziare ogni piatto perché
+// siano pronti tutti alla stessa ora. `initial` = array di ricette (o {title,time}).
+function openCookTimeline(initial, presetTarget) {
+  const parseMin = (t) => { const mm = String(t == null ? "" : t).match(/\d+/); return mm ? parseInt(mm[0], 10) : null; };
+  let dishes = (initial || []).filter(Boolean).map((r) => ({ id: r.id || null, title: r.title || "Piatto", time: parseMin(r.time) }));
+  const now = new Date();
+  let target = presetTarget || (now.getHours() < 15 ? "13:00" : "20:00"); // pranzo o cena
+  const fmt = (mins) => { mins = ((mins % 1440) + 1440) % 1440; return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`; };
+
+  const m = openModal(`<h3 class="modal__title">🕐 Tutto pronto alle…</h3>
+    <p class="hint" style="margin-top:-6px">Dimmi a che ora vuoi servire: calcolo io quando iniziare ogni piatto.</p>
+    <div class="field"><label>Ora in tavola</label><input type="time" id="ctTarget" value="${escapeHtml(target)}" /></div>
+    <div class="ct-dishes" id="ctDishes"></div>
+    <button class="btn btn--ghost btn--block" id="ctAdd" style="margin:8px 0">${iconHtml("plus")} Aggiungi un piatto</button>
+    <div id="ctTimeline"></div>`);
+  const dishesEl = m.el.querySelector("#ctDishes");
+  const lineEl = m.el.querySelector("#ctTimeline");
+
+  function paintDishes() {
+    dishesEl.innerHTML = dishes.length
+      ? dishes.map((d, i) => `<div class="ct-dish">
+          <span class="ct-dish__name">${escapeHtml(d.title)}</span>
+          <input type="number" class="ct-dish__time" data-i="${i}" min="0" inputmode="numeric" value="${d.time != null ? d.time : ""}" placeholder="min" />
+          <span class="ct-dish__u">min</span>
+          <button class="ct-dish__del" data-del="${i}" title="Togli">✕</button>
+        </div>`).join("")
+      : `<div class="hint">Nessun piatto. Aggiungine uno qui sotto.</div>`;
+    dishesEl.querySelectorAll(".ct-dish__time").forEach((inp) => inp.addEventListener("input", () => {
+      const i = parseInt(inp.dataset.i, 10); const v = inp.value.trim();
+      dishes[i].time = v === "" ? null : Math.max(0, parseInt(v, 10) || 0);
+      paintLine();
+    }));
+    dishesEl.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => {
+      dishes.splice(parseInt(b.dataset.del, 10), 1); paintDishes(); paintLine();
+    }));
+  }
+  function paintLine() {
+    const [h, mm] = target.split(":").map(Number); const tMin = h * 60 + mm;
+    const timed = dishes.map((d) => ({ title: d.title, time: d.time, start: d.time != null ? tMin - d.time : null }))
+      .filter((d) => d.start != null).sort((a, b) => a.start - b.start);
+    const noTime = dishes.filter((d) => d.time == null).length;
+    lineEl.innerHTML = `${timed.length ? `<div class="ct-line">
+      ${timed.map((d) => `<div class="ct-step"><span class="ct-step__time">${fmt(d.start)}</span><span class="ct-step__txt">inizia <b>${escapeHtml(d.title)}</b> <span class="ct-step__d">(${d.time} min)</span></span></div>`).join("")}
+      <div class="ct-step ct-step--end"><span class="ct-step__time">${escapeHtml(target)}</span><span class="ct-step__txt">🍽️ <b>In tavola!</b></span></div>
+    </div>` : `<div class="hint">Indica i minuti di ogni piatto per vedere quando iniziare.</div>`}
+    ${noTime ? `<div class="hint" style="margin-top:8px">${noTime} ${noTime === 1 ? "piatto senza tempo" : "piatti senza tempo"}: scrivi i minuti per includerlo.</div>` : ""}`;
+  }
+  m.el.querySelector("#ctTarget").addEventListener("input", (e) => { if (e.target.value) target = e.target.value; paintLine(); });
+  m.el.querySelector("#ctAdd").addEventListener("click", () => {
+    m.close();
+    openRecipePicker((rid) => { const r = store.getRecipe(rid); dishes.push({ id: rid, title: r ? r.title : "Piatto", time: parseMin(r && r.time) }); openCookTimeline(dishes, target); });
+  });
+  paintDishes(); paintLine();
+}
+
 function openDaySheet(date) {
   const entries = store.getPlanByDate(date);
   let groupsHtml = "";
@@ -5111,6 +5169,7 @@ function openDaySheet(date) {
       <button class="btn btn--ghost" data-slot="spuntino">${iconHtml("cookie")} Spuntino</button>
       <button class="btn btn--primary" data-slot="cena">${iconHtml("plus")} Cena</button>
     </div>
+    ${entries.length ? `<button class="btn btn--block" data-act="timeline" style="margin-top:8px">🕐 A che ora inizio? (tutto pronto in orario)</button>` : ""}
     ${entries.length ? `<button class="btn btn--block" data-act="toshop" style="margin-top:8px">${iconHtml("shopping-cart-simple")} Aggiungi ingredienti alla spesa</button>` : ""}
   `);
 
@@ -5135,6 +5194,12 @@ function openDaySheet(date) {
     const res = await store.addShoppingItems(collectIngredients(entries));
     m.close();
     toast(shoppingToast(res), "success");
+  });
+  const tl = m.el.querySelector('[data-act="timeline"]');
+  if (tl) tl.addEventListener("click", () => {
+    const recs = entries.map((e) => store.getRecipe(e.recipeId)).filter(Boolean);
+    m.close();
+    openCookTimeline(recs);
   });
 }
 
