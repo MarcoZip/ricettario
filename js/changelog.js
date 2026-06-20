@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.38",
+    d: "2026-06-20",
+    items: [
+      "Impostazioni riorganizzate: le voci sono ora raggruppate per argomento con un'intestazione (Account, Aspetto, Preferenze di cucina, Schermata Home, Promemoria, Strumenti, Dati e backup, Informazioni), così trovi tutto più in fretta."
+    ]
+  },
+  {
     v: "7.37",
     d: "2026-06-20",
     minor: true,

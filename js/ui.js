@@ -5313,20 +5313,18 @@ function wireNotify() {
 
 function renderImpostazioni() {
   const info = handlers.getAccountInfo();
-  let accountGroup = "";
+  // --- Sezione "Account": dati account + nickname + casa condivisa ---
+  let accountRows = "";
   if (!info.configured) {
-    accountGroup = `
-      <div class="setting-group">
+    accountRows = `
         <div class="setting-row">
           <div>
             <div class="setting-row__label">Backup nel cloud: non attivo</div>
             <div class="setting-row__desc">I dati sono salvati solo su questo telefono. Per attivare la sincronizzazione apri il file <b>README.md</b> e segui la guida (configurazione Firebase in <code>js/config.js</code>).</div>
           </div>
-        </div>
-      </div>`;
+        </div>`;
   } else if (info.email) {
-    accountGroup = `
-      <div class="setting-group">
+    accountRows = `
         <div class="setting-row">
           <div>
             <div class="setting-row__label">Account</div>
@@ -5353,78 +5351,54 @@ function renderImpostazioni() {
             <div class="setting-row__label">Backup nel cloud attivo ${iconHtml("cloud-check")}</div>
             <div class="setting-row__desc">Le ricette si sincronizzano automaticamente.</div>
           </div>
-        </div>
-      </div>`;
+        </div>`;
   }
+  const nickRow = `
+        <div class="setting-row">
+          <div>
+            <div class="setting-row__label">Nickname</div>
+            <div class="setting-row__desc">${getNickname() ? "Come ti salutiamo: " + escapeHtml(getNickname()) : "Scegli come farti salutare."}</div>
+          </div>
+          <button class="btn" id="nickBtn">Cambia</button>
+        </div>`;
+  const householdRow = info.cloud ? `
+        <div class="setting-row">
+          <div>
+            <div class="setting-row__label">Casa condivisa ${getHousehold() ? "✓" : ""}</div>
+            <div class="setting-row__desc">${getHousehold() ? "Lista della spesa condivisa (codice " + escapeHtml(getHousehold()) + ")." : "Condividi la lista della spesa in tempo reale con un'altra persona."}</div>
+          </div>
+          <button class="btn" id="householdBtn">${getHousehold() ? "Gestisci" : "Attiva"}</button>
+        </div>` : "";
+  const accountGroup = `
+      <h2 class="setting-section"><span class="setting-section__ic">👤</span> Account</h2>
+      <div class="setting-group">${accountRows}${nickRow}${householdRow}</div>`;
+  // --- Sezione "Amministrazione" (solo admin) ---
+  const adminGroup = info.email === ADMIN_EMAIL ? `
+      <h2 class="setting-section"><span class="setting-section__ic">🛠️</span> Amministrazione</h2>
+      <div class="setting-group">
+        <div class="setting-row">
+          <div>
+            <div class="setting-row__label">Accessi utenti</div>
+            <div class="setting-row__desc">Statistiche sugli accessi di tutti gli utenti.</div>
+          </div>
+          <button class="btn" id="accStatsBtn">Apri</button>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-row__label">Avvisa tutti</div>
+            <div class="setting-row__desc">Invia una notifica push per annunciare una novità.</div>
+          </div>
+          <button class="btn" id="bcastBtn">Invia</button>
+        </div>
+      </div>` : "";
 
   root.innerHTML = `
     <h1 class="page-title">Impostazioni</h1>
-    <p class="page-sub">Account, backup e gestione dati.</p>
+    <p class="page-sub">Tutto a portata di mano, raggruppato per argomento.</p>
     ${accountGroup}
+
+    <h2 class="setting-section"><span class="setting-section__ic">🎨</span> Aspetto</h2>
     <div class="setting-group">
-      <div class="setting-row">
-        <div>
-          <div class="setting-row__label">Come funziona l'app</div>
-          <div class="setting-row__desc">Rivedi la guida con tutte le funzioni.</div>
-        </div>
-        <button class="btn" id="guideBtn">Apri</button>
-      </div>
-      <div class="setting-row">
-        <div>
-          <div class="setting-row__label">Novità e modifiche</div>
-          <div class="setting-row__desc">Lo storico degli aggiornamenti dell'app.</div>
-        </div>
-        <button class="btn" id="changelogBtn">Apri</button>
-      </div>
-      <div class="setting-row">
-        <div>
-          <div class="setting-row__label">Diario di cucina</div>
-          <div class="setting-row__desc">Statistiche: piatti più cucinati, ingredienti top…</div>
-        </div>
-        <button class="btn" id="statsBtn">Apri</button>
-      </div>
-      <div class="setting-row">
-        <div>
-          <div class="setting-row__label">Convertitore in cucina</div>
-          <div class="setting-row__desc">Tazze, cucchiai, grammi, °C/°F.</div>
-        </div>
-        <button class="btn" id="convBtn">Apri</button>
-      </div>
-      <div class="setting-row">
-        <div>
-          <div class="setting-row__label">Timer da cucina</div>
-          <div class="setting-row__desc">Più timer con nome, sempre attivi mentre usi l'app.</div>
-        </div>
-        <button class="btn" id="timersBtn">Apri</button>
-      </div>
-      ${info.cloud ? `<div class="setting-row">
-        <div>
-          <div class="setting-row__label">Casa condivisa ${getHousehold() ? "✓" : ""}</div>
-          <div class="setting-row__desc">${getHousehold() ? "Lista della spesa condivisa (codice " + escapeHtml(getHousehold()) + ")." : "Condividi la lista della spesa in tempo reale con un'altra persona."}</div>
-        </div>
-        <button class="btn" id="householdBtn">${getHousehold() ? "Gestisci" : "Attiva"}</button>
-      </div>` : ""}
-      <div class="setting-row">
-        <div>
-          <div class="setting-row__label">Nickname</div>
-          <div class="setting-row__desc">${getNickname() ? "Come ti salutiamo: " + escapeHtml(getNickname()) : "Scegli come farti salutare."}</div>
-        </div>
-        <button class="btn" id="nickBtn">Cambia</button>
-      </div>
-      ${info.email === ADMIN_EMAIL ? `<div class="setting-row">
-        <div>
-          <div class="setting-row__label">Accessi utenti (admin)</div>
-          <div class="setting-row__desc">Statistiche sugli accessi di tutti gli utenti.</div>
-        </div>
-        <button class="btn" id="accStatsBtn">Apri</button>
-      </div>
-      <div class="setting-row">
-        <div>
-          <div class="setting-row__label">Avvisa tutti (admin)</div>
-          <div class="setting-row__desc">Invia una notifica push per annunciare una novità.</div>
-        </div>
-        <button class="btn" id="bcastBtn">Invia</button>
-      </div>` : ""}
       <div class="setting-row">
         <div>
           <div class="setting-row__label">Tema</div>
@@ -5462,9 +5436,10 @@ function renderImpostazioni() {
         <input type="checkbox" id="contrastChk" class="mini-check" ${getContrast() ? "checked" : ""} />
       </label>
     </div>
+
+    <h2 class="setting-section"><span class="setting-section__ic">🍽️</span> Preferenze di cucina</h2>
     <div class="setting-group">
-      <div class="setting-row" style="display:block">
-        <div class="setting-row__label">Preferenze alimentari</div>
+      <div class="setting-row setting-row--intro" style="display:block">
         <div class="setting-row__desc">Aggiunge il filtro "Per me" in Home e nasconde le ricette non adatte.</div>
       </div>
       <label class="setting-row" style="cursor:pointer">
@@ -5489,9 +5464,10 @@ function renderImpostazioni() {
         </select>
       </div>
     </div>
+
+    <h2 class="setting-section"><span class="setting-section__ic">🏠</span> Schermata Home</h2>
     <div class="setting-group">
-      <div class="setting-row" style="display:block">
-        <div class="setting-row__label">Sezioni della Home</div>
+      <div class="setting-row setting-row--intro" style="display:block">
         <div class="setting-row__desc">Scegli cosa mostrare nella schermata iniziale.</div>
       </div>
       <label class="setting-row" style="cursor:pointer">
@@ -5515,7 +5491,36 @@ function renderImpostazioni() {
         <input type="checkbox" class="mini-check" data-pref="homeSuggest" ${prefBool("homeSuggest", true) ? "checked" : ""} />
       </label>
     </div>
+
+    <h2 class="setting-section"><span class="setting-section__ic">🔔</span> Promemoria e notifiche</h2>
     ${notifyGroupHtml()}
+
+    <h2 class="setting-section"><span class="setting-section__ic">🧰</span> Strumenti</h2>
+    <div class="setting-group">
+      <div class="setting-row">
+        <div>
+          <div class="setting-row__label">Convertitore in cucina</div>
+          <div class="setting-row__desc">Tazze, cucchiai, grammi, °C/°F.</div>
+        </div>
+        <button class="btn" id="convBtn">Apri</button>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-row__label">Timer da cucina</div>
+          <div class="setting-row__desc">Più timer con nome, sempre attivi mentre usi l'app.</div>
+        </div>
+        <button class="btn" id="timersBtn">Apri</button>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-row__label">Ripristina strumenti predefiniti</div>
+          <div class="setting-row__desc">Aggiunge gli strumenti di base mancanti (senza duplicare né cancellare i tuoi).</div>
+        </div>
+        <button class="btn" id="seedBtn">Aggiungi</button>
+      </div>
+    </div>
+
+    <h2 class="setting-section"><span class="setting-section__ic">💾</span> Dati e backup</h2>
     <div class="setting-group">
       <div class="setting-row">
         <div>
@@ -5539,15 +5544,32 @@ function renderImpostazioni() {
         <button class="btn" id="pdfBtn">Esporta</button>
       </div>
     </div>
+
+    <h2 class="setting-section"><span class="setting-section__ic">ℹ️</span> Informazioni</h2>
     <div class="setting-group">
       <div class="setting-row">
         <div>
-          <div class="setting-row__label">Ripristina strumenti predefiniti</div>
-          <div class="setting-row__desc">Aggiunge gli strumenti di base mancanti (senza duplicare né cancellare i tuoi).</div>
+          <div class="setting-row__label">Come funziona l'app</div>
+          <div class="setting-row__desc">Rivedi la guida con tutte le funzioni.</div>
         </div>
-        <button class="btn" id="seedBtn">Aggiungi</button>
+        <button class="btn" id="guideBtn">Apri</button>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-row__label">Novità e modifiche</div>
+          <div class="setting-row__desc">Lo storico degli aggiornamenti dell'app.</div>
+        </div>
+        <button class="btn" id="changelogBtn">Apri</button>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-row__label">Diario di cucina</div>
+          <div class="setting-row__desc">Statistiche: piatti più cucinati, ingredienti top…</div>
+        </div>
+        <button class="btn" id="statsBtn">Apri</button>
       </div>
     </div>
+    ${adminGroup}
     <p style="text-align:center;color:var(--text-soft);font-size:0.78rem;margin-top:24px">
       Fornelli · versione ${escapeHtml(APP_VERSION)}<br>Ricette online da TheMealDB
     </p>

@@ -471,6 +471,18 @@ a { color: var(--primary-2); }
   padding: 4px 16px;
   margin-bottom: 16px;
 }
+/* Intestazione di una sezione di Impostazioni (es. "Account", "Aspetto"). */
+.setting-section {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.74rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.07em;
+  color: var(--primary-2);
+  margin: 24px 6px 9px;
+}
+.setting-section:first-of-type { margin-top: 6px; }
+.setting-section__ic { font-size: 1.05rem; line-height: 1; }
+.setting-section + .setting-group { margin-top: 0; }
+.setting-row--intro { padding: 12px 0 8px; }
 .setting-row {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; padding: 15px 0;
