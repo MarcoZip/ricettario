@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.22",
+    d: "2026-06-16",
+    items: [
+      "Nuovo: \"Adatta la ricetta\" — un tocco e l'AI la riscrive in versione vegana, vegetariana, senza glutine, senza lattosio o più leggera. La salvi come nuova ricetta."
+    ]
+  },
+  {
     v: "7.21",
     d: "2026-06-16",
     items: [

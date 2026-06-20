@@ -403,6 +403,7 @@ export default {
     if (url.pathname === "/robot") return handleRobot(request, env);
     if (url.pathname === "/fridge") return handleFridge(request, env);
     if (url.pathname === "/planweek") return handlePlanWeek(request, env);
+    if (url.pathname === "/convert") return handleConvert(request, env);
     if (url.pathname === "/img") return handleImageProxy(url.searchParams.get("u"));
     if (url.pathname === "/moulinex-img") return handleMoulinexImg(url.searchParams.get("u"));
     if (url.pathname === "/searchbimby") return handleSearchBimby(url.searchParams.get("q"), url.searchParams.get("page"));
@@ -815,6 +816,42 @@ async function handlePlanWeek(request, env) {
     if (!r || !Array.isArray(r.days) || !r.days.length) return json({ error: "parse", message: "Non sono riuscito a creare il menù. Riprova." }, 200);
     return json({
       days: r.days.slice(0, 7).map((d) => ({ pranzo: String((d && d.pranzo) || "").slice(0, 140), cena: String((d && d.cena) || "").slice(0, 140) }))
+    }, 200);
+  } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova tra poco." + (e && (e.detail || e.message) ? " (" + String(e.detail || e.message).slice(0, 140) + ")" : "") }, 200); }
+}
+
+// "Adatta la ricetta" a una dieta (vegano, senza glutine, più leggero…): l'AI
+// riscrive l'intera ricetta in modo coerente. POST { title, ingredients[], steps[], diet }.
+const DIET_PROMPTS = {
+  vegano: "Adatta la ricetta in versione VEGANA: sostituisci ogni ingrediente di origine animale (carne, pesce, uova, latte, burro, formaggio, miele) con alternative vegetali adeguate, regolando tecniche e tempi di conseguenza.",
+  vegetariano: "Adatta la ricetta in versione VEGETARIANA: elimina carne e pesce sostituendoli con alternative adeguate (uova e latticini sono ammessi).",
+  senzaglutine: "Adatta la ricetta in versione SENZA GLUTINE: sostituisci farine e ingredienti con glutine con alternative senza glutine, regolando dosi/liquidi se serve.",
+  senzalattosio: "Adatta la ricetta in versione SENZA LATTOSIO: sostituisci latte, burro, panna e formaggi con alternative senza lattosio.",
+  leggero: "Adatta la ricetta in versione PIÙ LEGGERA: riduci grassi e zuccheri, usa metodi di cottura più leggeri e alleggerisci gli ingredienti mantenendo il gusto."
+};
+async function handleConvert(request, env) {
+  if (request.method !== "POST") return json({ error: "method", message: "Usa POST" }, 405);
+  if (!env || !env.AI) return json({ error: "noai", message: "Workers AI non collegato (binding AI mancante)." }, 200);
+  let body;
+  try { body = await request.json(); } catch (e) { return json({ error: "badreq" }, 400); }
+  const diet = String((body && body.diet) || "").toLowerCase();
+  if (!DIET_PROMPTS[diet]) return json({ error: "baddiet", message: "Dieta non valida" }, 400);
+  const title = String((body && body.title) || "").slice(0, 140);
+  const ingredients = Array.isArray(body.ingredients) ? body.ingredients.map((x) => String(x)).slice(0, 50) : [];
+  const steps = Array.isArray(body.steps) ? body.steps.map((x) => String(x)).slice(0, 50) : [];
+  if (!ingredients.length) return json({ error: "norecipe", message: "Ricetta insufficiente" }, 400);
+  const sys = `Sei uno chef esperto di cucina adattata. ${DIET_PROMPTS[diet]} Mantieni il piatto realistico e gustoso. Rispondi SOLO con JSON valido: {"title": string, "servings": number|null, "ingredients": [string], "steps": [string], "note": string}. Il titolo deve indicare la variante (es. "... (vegano)"). Gli ingredienti come stringhe "quantità + nome". La nota (1 frase) spiega le sostituzioni principali. Tutto in italiano, nessun markdown.`;
+  const userMsg = `Ricetta originale: ${title}\nIngredienti:\n${ingredients.join("\n")}\n\nPreparazione:\n${steps.join("\n")}`;
+  try {
+    const raw = await aiText(env, [{ role: "system", content: sys }, { role: "user", content: userMsg.slice(0, 3500) }], 1000, RECIPE_SCHEMA);
+    const r = extractJson(raw);
+    if (!r || !r.title || !Array.isArray(r.ingredients)) return json({ error: "parse", message: "Non sono riuscito ad adattare la ricetta. Riprova." }, 200);
+    return json({
+      title: String(r.title).slice(0, 140),
+      servings: Number(r.servings) > 0 ? Math.min(20, Math.round(Number(r.servings))) : null,
+      ingredients: r.ingredients.map((x) => String(x)).slice(0, 50),
+      steps: Array.isArray(r.steps) ? r.steps.map((x) => String(x)).slice(0, 50) : [],
+      note: String(r.note || "").slice(0, 300)
     }, 200);
   } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova tra poco." + (e && (e.detail || e.message) ? " (" + String(e.detail || e.message).slice(0, 140) + ")" : "") }, 200); }
 }

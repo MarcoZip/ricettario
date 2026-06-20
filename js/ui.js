@@ -7,7 +7,7 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo, robotProgram, fridgeIngredients, planWeekAI } from "./import-recipe.js";
+import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo, robotProgram, fridgeIngredients, planWeekAI, convertRecipe } from "./import-recipe.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage, shareMenuImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
@@ -1629,6 +1629,7 @@ function renderRecipeDetail() {
     <input type="file" id="checkPhotoFile" accept="image/*" capture="environment" hidden />
     ${isImportConfigured() ? `<button class="btn btn--block" id="askChefBtn" style="margin-bottom:10px">💬 Chiedi allo chef (AI)</button>` : ""}
     ${isImportConfigured() && (steps.length || ingredients.length) ? `<button class="btn btn--block" id="robotBtn" style="margin-bottom:10px">🤖 Modalità robot (Companion / Bimby)</button>` : ""}
+    ${isImportConfigured() && ingredients.length ? `<button class="btn btn--block" id="convertBtn" style="margin-bottom:10px">🥗 Adatta la ricetta (vegano, leggero…)</button>` : ""}
     <button class="btn btn--block" id="collectionsBtn" style="margin-bottom:10px">${iconHtml("book-bookmark")} Aggiungi a una raccolta</button>
     <button class="btn btn--block" id="shareImg" style="margin-bottom:10px">${iconHtml("image")} Condividi come immagine</button>
     <button class="btn btn--block" id="qrBtn" style="margin-bottom:10px">${iconHtml("qr-code")} Mostra codice QR</button>
@@ -1736,6 +1737,8 @@ function renderRecipeDetail() {
   if (watchVideo) watchVideo.addEventListener("click", () => openVideoPlayer(r.url));
   const robotBtn = root.querySelector("#robotBtn");
   if (robotBtn) robotBtn.addEventListener("click", () => openRobotMode(r));
+  const convertBtn = root.querySelector("#convertBtn");
+  if (convertBtn) convertBtn.addEventListener("click", () => openConvertRecipe(r));
 
   const galFile = root.querySelector("#galFile");
   const galAdd = root.querySelector("#galAdd");
@@ -2401,6 +2404,36 @@ function openWeekPlanner(days) {
     catch (e) { if (!body.isConnected) return; body.innerHTML = `<div class="hint" style="color:var(--danger)">${escapeHtml(e.message || "Non riuscito.")}</div><div class="modal__actions"><button class="btn btn--primary" id="wpClose">Chiudi</button></div>`; const c = body.querySelector("#wpClose"); if (c) c.onclick = m.close; }
   };
   load();
+}
+
+// "Adatta la ricetta" a una dieta (vegano, leggero…): l'AI riscrive la ricetta,
+// poi la salvi come NUOVA ricetta (l'originale resta intatta).
+function openConvertRecipe(r) {
+  const ingredients = (r.ingredients || []).map((it) => ingredientText(it)).filter(Boolean);
+  const diets = [["vegano", "🌱 Vegano"], ["vegetariano", "🥚 Vegetariano"], ["senzaglutine", "🌾 Senza glutine"], ["senzalattosio", "🥛 Senza lattosio"], ["leggero", "🍃 Più leggero"]];
+  const run = async (diet, label) => {
+    const m = openModal(`
+      <h3 class="modal__title">🥗 Adatta: ${escapeHtml(label)}</h3>
+      <div id="cvBody"><div style="text-align:center;padding:8px 0"><div class="spinner"></div><div class="hint">Adatto la ricetta…</div></div></div>
+      <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
+    `);
+    m.el.querySelector('[data-act="ok"]').onclick = m.close;
+    const body = m.el.querySelector("#cvBody");
+    try {
+      const d = await convertRecipe({ title: r.title, ingredients, steps: r.steps || [] }, diet);
+      if (!body.isConnected) return;
+      body.innerHTML = `${d.note ? `<div class="hint" style="margin-bottom:10px">${escapeHtml(d.note)}</div>` : ""}
+        <div class="dish-feedback"><b>${escapeHtml(d.title)}</b><br><br><b>Ingredienti</b><br>${d.ingredients.map(escapeHtml).join("<br>")}${d.steps && d.steps.length ? `<br><br><b>Preparazione</b><br>${d.steps.map((s, i) => (i + 1) + ". " + escapeHtml(s)).join("<br>")}` : ""}</div>
+        <button class="btn btn--primary btn--block" id="cvSave" style="margin-top:12px">${iconHtml("plus")} Salva come nuova ricetta</button>`;
+      body.querySelector("#cvSave").onclick = () => { m.close(); openRecipeForm({ prefill: { title: d.title, servings: d.servings || r.servings, ingredients: d.ingredients, steps: d.steps, tags: (r.tags || []).slice() } }); };
+    } catch (e) { if (!body.isConnected) return; body.innerHTML = `<div class="hint" style="color:var(--danger)">${escapeHtml(e.message || "Non riuscito.")}</div>`; }
+  };
+  const m = openModal(`
+    <h3 class="modal__title">🥗 Adatta la ricetta</h3>
+    <p class="hint" style="margin-top:-8px;margin-bottom:12px">L'AI riscrive "${escapeHtml(r.title)}" nella versione scelta. La salvi come nuova ricetta: l'originale resta com'è.</p>
+    <div class="modal__actions" style="flex-direction:column;gap:8px">${diets.map(([k, l]) => `<button class="btn btn--block" data-diet="${k}">${l}</button>`).join("")}</div>
+  `);
+  m.el.querySelectorAll("[data-diet]").forEach((b) => b.onclick = () => { const label = b.textContent.trim(); m.close(); run(b.dataset.diet, label); });
 }
 
 // "Modalità robot": converte la ricetta in comandi per Companion o Bimby (AI).
@@ -3846,7 +3879,7 @@ const GUIDE_SECTIONS = [
   { icon: "cooking-pot", title: "Strumenti & ricette", text: "Organizza le ricette per strumento di cottura. Crea uno strumento (forno, friggitrice ad aria…) e salva sotto le ricette con foto, link, ingredienti, porzioni, passi e categorie." },
   { icon: "calendar-dots", title: "Oggi si mangia", text: "In cima alla schermata Strumenti trovi le ricette che hai pianificato per oggi: toccale per aprirle al volo." },
   { icon: "image", title: "Aggiungi senza fatica", text: "Nel form ricetta: incolla un link e tocca \"Importa\", \"Scansiona da una foto\" per leggere da un libro o quaderno, \"Importa da video social\" per TikTok/Instagram/YouTube, oppure \"Inventa una ricetta (AI)\" dagli ingredienti che hai. O salva dal Ricettario online." },
-  { icon: "sparkle", title: "Aiuto AI", text: "Tre aiuti intelligenti (gratis): \"Inventa una ricetta\" dagli ingredienti, \"Chiedi allo chef\" per dubbi e sostituzioni mentre cucini, e \"Com'è venuto?\" che dà un parere guardando la foto del tuo piatto. Sono un aiuto, non infallibili." },
+  { icon: "sparkle", title: "Aiuto AI", text: "Aiuti intelligenti (gratis): \"Inventa una ricetta\" dagli ingredienti, \"Chiedi allo chef\" per dubbi e sostituzioni, \"Com'è venuto?\" che giudica la foto del piatto, \"Adatta la ricetta\" (vegano/leggero…), \"Modalità robot\" per Companion/Bimby, \"Fotografa il frigo\" e il \"Menù AI\" della settimana. Sono un aiuto, non infallibili." },
   { icon: "book-open", title: "Ricettario", text: "Cerca idee online o tra i siti italiani; tocca \"Salva\" per aggiungerle a uno dei tuoi strumenti. Le ricette online sono in inglese: al salvataggio vengono tradotte in italiano in automatico." },
   { icon: "fork-knife", title: "Porzioni su misura", text: "Apri una ricetta e cambia il numero di persone con + e −: le quantità degli ingredienti si ricalcolano da sole." },
   { icon: "carrot", title: "Valori nutrizionali", text: "In una ricetta tocca \"Calcola\" sotto gli ingredienti: l'app stima calorie e macronutrienti (proteine, carboidrati, grassi) per porzione e totali. Per ciò che non conosce cerca online su Open Food Facts e ti mostra anche cosa non ha conteggiato. È una stima: cambia con il numero di porzioni." },

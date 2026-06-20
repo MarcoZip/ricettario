@@ -130,6 +130,22 @@ export async function planWeekAI(titles, includeLunch, expiring) {
   throw new Error((d && d.message) || "Non sono riuscito a creare il menù. Riprova.");
 }
 
+// "Adatta la ricetta" a una dieta (vegano/leggero…) → ricetta riscritta dall'AI.
+export async function convertRecipe(recipe, diet) {
+  if (!WORKER_URL) throw new Error("Funzione non disponibile (worker non configurato).");
+  let res;
+  try {
+    res = await fetch(`${WORKER_URL}/convert`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: recipe.title, ingredients: recipe.ingredients || [], steps: recipe.steps || [], diet })
+    });
+  } catch (e) { throw new Error("Servizio non raggiungibile. Controlla la connessione."); }
+  const d = await res.json().catch(() => ({}));
+  if (d && d.title) return d;
+  if (d && d.error === "noai") throw new Error("La funzione non è ancora attiva sul worker (manca il collegamento all'AI).");
+  throw new Error((d && d.message) || "Non sono riuscito ad adattare la ricetta. Riprova.");
+}
+
 // Abbinamento vino consigliato per un piatto (via Spoonacular).
 export async function winePairing(food) {
   if (!WORKER_URL || !food) return null;
