@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.66",
+    d: "2026-06-20",
+    minor: true,
+    items: [
+      "Tocco grafico: le icone fanno un piccolo \"schiaccia\" quando le tocchi e il tasto \"Cosa cucino oggi?\" ammicca ogni tanto per invitarti a usarlo."
+    ]
+  },
+  {
     v: "7.65",
     d: "2026-06-20",
     minor: true,

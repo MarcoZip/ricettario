@@ -671,6 +671,13 @@ a { color: var(--primary-2); }
 .btn .ic, .chip .ic, .home-hero__btn .ic, .tab-btn .ic, .recipe-item__link .ic { font-size: 1.1em; }
 .fab .ic { font-size: 1.25em; }
 .recipe-item__link .ic { color: var(--primary-2); }
+/* Micro-animazioni icone: "schiaccia" tattile al tocco + invito sul tasto sorpresa */
+@media (prefers-reduced-motion: no-preference) {
+  .ic { transition: transform 0.16s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .btn:active .ic, .chip:active .ic, .tab-btn:active .ic, .home-hero__btn:active .ic, .filter-chip:active .ic, .icon-btn:active .ic { transform: scale(0.78) rotate(-6deg); }
+  #surpriseBtn .ic { animation: shuffleWiggle 3.4s ease-in-out infinite; }
+}
+@keyframes shuffleWiggle { 0%, 82%, 100% { transform: rotate(0); } 86% { transform: rotate(-18deg); } 90% { transform: rotate(16deg); } 94% { transform: rotate(-10deg); } 98% { transform: rotate(0); } }
 
 .toolbar__icon {
   width: 42px; height: 42px; border-radius: 13px;
