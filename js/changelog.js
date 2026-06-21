@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.70",
+    d: "2026-06-20",
+    items: [
+      "Nuova fonte di ricerca: \"Blog GialloZafferano\" — nel Ricettario online scegli la fonte e cerca tra i tanti blog del network di GialloZafferano (es. \"risotto peperoni\"), poi importi la ricetta che preferisci."
+    ]
+  },
+  {
     v: "7.69",
     d: "2026-06-20",
     items: [

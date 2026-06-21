@@ -26,6 +26,37 @@ const BROWSER_HEADERS = {
 };
 
 // Ricerca diretta su GialloZafferano (in italiano): ritorna titolo + link.
+// Ricerca nel network dei blog di GialloZafferano (blog.giallozafferano.it) usando
+// il motore di ricerca jina (s.jina.ai) ristretto al dominio. Serve il secret JINA_KEY.
+async function handleSearchBlog(q, env) {
+  if (!q || !q.trim()) return json({ results: [] }, 200);
+  if (!env || !env.JINA_KEY) return json({ error: "nokey", message: "Ricerca blog non configurata: aggiungi il secret JINA_KEY al worker.", results: [] }, 200);
+  try {
+    const query = "site:blog.giallozafferano.it " + q.trim() + " ricetta";
+    const r = await fetch("https://s.jina.ai/?q=" + encodeURIComponent(query), {
+      headers: { "Authorization": "Bearer " + env.JINA_KEY, "Accept": "application/json", "X-Respond-With": "no-content" }
+    });
+    if (!r.ok) return json({ error: "fail", results: [] }, 200);
+    const d = await r.json();
+    const items = (d && (d.data || d.results)) || [];
+    const seen = new Set();
+    const results = [];
+    for (const x of items) {
+      let url = x && (x.url || x.link);
+      if (!url) continue;
+      url = String(url).split("#")[0];
+      // solo pagine-ricetta di un blog (dominio/autore/slug), non home o categorie
+      if (!/^https?:\/\/blog\.giallozafferano\.it\/[^/]+\/[^/]+/.test(url)) continue;
+      if (seen.has(url)) continue;
+      seen.add(url);
+      let title = clean(x.title || "").replace(/\s*[-|–·]\s*[^-|–·]*$/, "").trim() || clean(x.title || "");
+      results.push({ title: title.slice(0, 120), url, image: x.image || x.thumbnail || "" });
+      if (results.length >= 16) break;
+    }
+    return json({ results }, 200);
+  } catch (e) { return json({ error: "fail", results: [] }, 200); }
+}
+
 async function handleSearchGz(q) {
   if (!q || !q.trim()) return json({ results: [] }, 200);
   try {
@@ -411,6 +442,7 @@ export default {
     if (url.pathname === "/moulinex-img") return handleMoulinexImg(url.searchParams.get("u"));
     if (url.pathname === "/searchbimby") return handleSearchBimby(url.searchParams.get("q"), url.searchParams.get("page"));
     if (url.pathname === "/searchgz") return handleSearchGz(url.searchParams.get("q"));
+    if (url.pathname === "/searchblog") return handleSearchBlog(url.searchParams.get("q"), env);
     if (url.pathname === "/searchmisya") return handleSearchMisya(url.searchParams.get("q"));
     if (url.pathname === "/searchcookist") return handleSearchCookist(url.searchParams.get("q"));
     if (url.pathname === "/searchricettenonna") return handleSearchRicettenonna(url.searchParams.get("q"));

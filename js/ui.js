@@ -7,7 +7,7 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo, robotProgram, fridgeIngredients, planWeekAI, convertRecipe, appHelp, structureRecipeText, dishNameFromPhoto } from "./import-recipe.js";
+import { importFromUrl, searchGz, searchBlogGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo, robotProgram, fridgeIngredients, planWeekAI, convertRecipe, appHelp, structureRecipeText, dishNameFromPhoto } from "./import-recipe.js";
 import { HELP_TOPICS, findHelpTopics } from "./app-help.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage, shareMenuImage } from "./share-image.js";
@@ -3787,7 +3787,7 @@ function renderRicettario() {
   else renderSitiTab();
 }
 
-const SOURCE_LABEL = { mealdb: "TheMealDB", gz: "GialloZafferano", misya: "Misya", cookist: "Cookist", ricettenonna: "Ricette della Nonna", moulinex: "Moulinex Companion", bimby: "Bimby", spoon: "Spoonacular", edamam: "Edamam" };
+const SOURCE_LABEL = { mealdb: "TheMealDB", gz: "GialloZafferano", blog: "Blog GialloZafferano", misya: "Misya", cookist: "Cookist", ricettenonna: "Ricette della Nonna", moulinex: "Moulinex Companion", bimby: "Bimby", spoon: "Spoonacular", edamam: "Edamam" };
 // Riconosce la fonte di una ricetta dal dominio del link (per quelle importate).
 const HOST_SOURCE = [
   [/blog\.giallozafferano\.it/i, "Blog GialloZafferano"], [/giallozafferano\.it/i, "GialloZafferano"], [/fattoincasadabenedetta\.it/i, "Fatto in casa da Benedetta"],
@@ -3811,6 +3811,7 @@ function onlineSources() {
   const list = [
     { k: "all", label: "Tutte le fonti" },
     { k: "gz", label: "GialloZafferano (IT)" },
+    { k: "blog", label: "Blog GialloZafferano (IT)" },
     { k: "misya", label: "Misya (IT)" },
     { k: "cookist", label: "Cookist (IT)" },
     { k: "ricettenonna", label: "Ricette della Nonna (IT)" },
@@ -3825,6 +3826,7 @@ function onlineSources() {
 
 const mapMealdb = (r) => ({ source: "mealdb", title: r.title, image: r.thumb || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], meta: [r.category, r.area].filter(Boolean).join(" · ") });
 const mapGz = (r) => ({ source: "gz", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "GialloZafferano" });
+const mapBlog = (r) => ({ source: "blog", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "Blog GialloZafferano" });
 const mapMisya = (r) => ({ source: "misya", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "Misya" });
 const mapCookist = (r) => ({ source: "cookist", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "Cookist" });
 const mapRicettenonna = (r) => ({ source: "ricettenonna", title: r.title, title_it: r.title, image: r.image || "", link: r.url, meta: "Ricette della Nonna" });
@@ -3845,6 +3847,7 @@ function interleave(arrays) {
 async function runMealSearch(q) {
   mealSourceCounts = [];
   if (mealSource === "gz") { const out = (await searchGz(q)).map(mapGz); return out; }
+  if (mealSource === "blog") { const out = (await searchBlogGz(q)).map(mapBlog); return out; }
   if (mealSource === "misya") { const out = (await searchMisya(q)).map(mapMisya); return out; }
   if (mealSource === "cookist") { const out = (await searchCookist(q)).map(mapCookist); return out; }
   if (mealSource === "ricettenonna") { const out = (await searchRicettenonna(q)).map(mapRicettenonna); return out; }
@@ -4001,7 +4004,7 @@ async function performMealRandom() {
 
 // Salva/importa un risultato online (riusato da card e da "Da provare").
 async function saveMealResult(data, onProgress = () => {}) {
-  if (data.source === "gz" || data.source === "misya" || data.source === "cookist" || data.source === "ricettenonna" || data.source === "moulinex" || data.source === "bimby") {
+  if (data.source === "gz" || data.source === "blog" || data.source === "misya" || data.source === "cookist" || data.source === "ricettenonna" || data.source === "moulinex" || data.source === "bimby") {
     onProgress(`${iconHtml("download-simple")} Importo...`);
     try {
       const r = await importFromUrl(data.link);
@@ -4355,7 +4358,7 @@ function mealCardHtml(m, i = 0) {
         <div class="meal-card__meta"><span class="meal-src meal-src--${m.source}">${SOURCE_LABEL[m.source] || ""}</span>${m.meta ? " · " + escapeHtml(m.meta) : ""}</div>
         <div class="meal-card__actions">
           ${m.link ? `<a class="chip" href="${escapeHtml(safeUrl(m.link))}" target="_blank" rel="noopener">${iconHtml("arrow-square-out")} Apri</a>` : ""}
-          <button class="chip" data-act="save">${iconHtml("plus")} ${(m.source === "gz" || m.source === "misya" || m.source === "cookist" || m.source === "ricettenonna" || m.source === "moulinex" || m.source === "bimby") ? "Importa" : "Salva"}</button>
+          <button class="chip" data-act="save">${iconHtml("plus")} ${(m.source === "gz" || m.source === "blog" || m.source === "misya" || m.source === "cookist" || m.source === "ricettenonna" || m.source === "moulinex" || m.source === "bimby") ? "Importa" : "Salva"}</button>
           <button class="chip chip--bookmark ${isToTry(m.link) ? "is-on" : ""}" data-act="totry" title="Da provare">🔖</button>
         </div>
       </div>

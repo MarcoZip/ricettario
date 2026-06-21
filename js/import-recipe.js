@@ -13,6 +13,16 @@ export async function searchGz(query) {
   return Array.isArray(d.results) ? d.results : [];
 }
 
+// Ricerca nel network dei blog di GialloZafferano (via motore jina sul worker).
+export async function searchBlogGz(query) {
+  if (!WORKER_URL || !query.trim()) return [];
+  const res = await fetch(`${WORKER_URL}/searchblog?q=${encodeURIComponent(query.trim())}`);
+  if (!res.ok) throw new Error("Servizio non raggiungibile.");
+  const d = await res.json().catch(() => ({}));
+  if (d && d.error === "nokey") { const e = new Error("Ricerca blog non attiva (manca la chiave jina sul worker)."); e.code = "nokey"; throw e; }
+  return Array.isArray(d.results) ? d.results : [];
+}
+
 // Analisi della foto del piatto: invia l'immagine (base64) al Worker, che
 // chiede a un'AI di visione un breve parere in italiano su come sembra venuto.
 // `image` è una base64 (con o senza prefisso data:). Ritorna il testo o lancia.
