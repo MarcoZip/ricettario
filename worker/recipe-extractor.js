@@ -474,7 +474,6 @@ export default {
 // (r.jina.ai) che restituisce il testo pulito della pagina da un altro IP, poi
 // struttura la ricetta con l'AI. Ritorna null se non ci riesce.
 async function readerFallback(target, env) {
-  if (!env || !env.AI) return null; // serve l'AI per strutturare il testo
   let md = "";
   try {
     const rr = await fetch("https://r.jina.ai/" + target, {
@@ -485,30 +484,61 @@ async function readerFallback(target, env) {
     md = await rr.text();
   } catch (e) { return null; }
   if (!md || md.length < 200) return null;
-  const region = recipeRegion(md);
-  try {
-    const messages = [
-      { role: "system", content: "Estrai la ricetta dal testo dato. Rispondi SOLO in JSON valido con i campi: title (stringa), servings (numero o null), ingredients (array di stringhe, una per ingrediente con quantità), steps (array di stringhe, un passo per elemento). Tutto in italiano. Usa solo ciò che è presente nel testo, non inventare." },
-      { role: "user", content: region.slice(0, 6000) }
-    ];
-    const out = await aiText(env, messages, 900, RECIPE_SCHEMA);
-    const j = extractJson(out);
-    if (j && ((Array.isArray(j.ingredients) && j.ingredients.length) || (Array.isArray(j.steps) && j.steps.length))) {
-      const v = extractVideo(md);
-      const title = j.title || (md.match(/^#\s*(.+)$/m) || [])[1] || (md.match(/Title:\s*(.+)/) || [])[1] || "";
-      return {
-        title: String(title).trim(),
-        image: "",
-        servings: typeof j.servings === "number" ? j.servings : null,
-        time: null,
-        ingredients: (j.ingredients || []).map((s) => String(s)).filter(Boolean),
-        steps: (j.steps || []).map((s) => String(s)).filter(Boolean),
-        tags: [],
-        video: v || ""
-      };
-    }
-  } catch (e) { /* l'AI non ha strutturato: rinuncio */ }
+  md = md.replace(/_([^_\n]+)_/g, "$1"); // toglie l'enfasi markdown (_q.b._ -> q.b.)
+
+  // 1) Ingredienti: li prendo VERBATIM dalla lista puntata della pagina (così
+  //    restano quantità e nomi esatti, senza che l'AI li "corregga").
+  const ingredients = parseMdIngredients(md);
+  const title = (md.match(/^#\s*(.+?)(?:\s*[-–]\s*Ricetta.*)?$/m) || [])[1]
+    || (md.match(/Title:\s*(.+)/) || [])[1] || "";
+
+  // 2) Passi: li struttura l'AI (se disponibile) con un prompt severo.
+  let steps = [];
+  if (env && env.AI) {
+    try {
+      const region = recipeRegion(md).slice(0, 6000);
+      const messages = [
+        { role: "system", content: "Dal testo di una pagina di ricetta, estrai SOLO i passi di preparazione, in ordine. Rispondi in JSON: {\"steps\":[\"...\"]}. Ogni passo deve essere un'ISTRUZIONE OPERATIVA concreta presa dal testo (es. \"Rosola il guanciale in padella\"), NON un titolo o una descrizione generica. In italiano. Ignora intro, aneddoti, pubblicità, ingredienti e commenti." },
+        { role: "user", content: region }
+      ];
+      const out = await aiText(env, messages, 800, STEPS_SCHEMA);
+      const j = extractJson(out);
+      if (j && Array.isArray(j.steps)) steps = j.steps.map((s) => String(s).trim()).filter((s) => s.length > 10);
+    } catch (e) { /* niente passi dall'AI */ }
+  }
+
+  if (ingredients.length >= 2 || steps.length >= 1) {
+    return { title: String(title).trim(), image: "", servings: null, time: null, ingredients, steps, tags: [], video: extractVideo(md) || "" };
+  }
   return null;
+}
+
+// Estrae gli ingredienti dalla lista puntata sotto l'intestazione "Ingredienti"
+// nel markdown restituito dal lettore (preserva quantità e nomi esatti).
+function parseMdIngredients(md) {
+  // Scorre tutte le occorrenze di "Ingredienti" e prende la prima seguita da una
+  // vera lista puntata (così evita il contatore "Ingredienti 7" in cima).
+  const re = /Ingredienti/gi;
+  let m;
+  while ((m = re.exec(md))) {
+    const lines = md.slice(m.index, m.index + 2500).split(/\r?\n/);
+    const out = [];
+    let started = false;
+    for (const ln of lines) {
+      const bm = ln.match(/^\s*[\*\-•]\s+(.+)$/);
+      if (bm) {
+        started = true;
+        const t = bm[1].replace(/\[.*?\]\(.*?\)/g, "").replace(/!\[.*?\]/g, "").replace(/\s+/g, " ").trim();
+        if (t && t.length < 80 && !/^https?:/i.test(t)) out.push(t);
+      } else if (started && ln.trim() === "") {
+        if (out.length) break; // riga vuota dopo la lista = fine
+      } else if (started && ln.trim() && !/^\s*[\*\-•]/.test(ln)) {
+        break; // testo non puntato = fine lista
+      }
+    }
+    if (out.length >= 2) return out.slice(0, 30);
+  }
+  return [];
 }
 
 // Ritaglia dal testo (markdown del lettore) la zona della ricetta, centrata
@@ -679,6 +709,12 @@ const RECIPE_SCHEMA = {
     steps: { type: "array", items: { type: "string" } }
   },
   required: ["title", "ingredients", "steps"]
+};
+// Schema JSON per i soli passi (usato dal lettore di fallback).
+const STEPS_SCHEMA = {
+  type: "object",
+  properties: { steps: { type: "array", items: { type: "string" } } },
+  required: ["steps"]
 };
 // Schema JSON per un "programma robot" (Companion/Bimby): passi con azione + impostazioni.
 const ROBOT_SCHEMA = {
