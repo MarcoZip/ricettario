@@ -109,6 +109,7 @@ let mealSource = "all"; // "all" | "mealdb" | "gz" | "misya" | "spoon"
 let mealQuery = "";
 let mealSourceCounts = []; // [{label, count}] per il riepilogo "Tutte le fonti"
 let pendingMealQuery = ""; // ricerca da avviare quando si apre il Ricettario online
+let pendingVideoForImport = ""; // link video da agganciare alla prossima ricetta importata (flusso "cerca dal video")
 let mealResults = null;
 let mealLoading = false;
 let mealError = "";
@@ -2334,6 +2335,7 @@ function openVideoImport(prefillUrl, onRecipe) {
     if (!q) { body.innerHTML = `<div class="hint" style="color:var(--danger)">Non riconosco questo video. Funziona con i link di YouTube o TikTok.</div>`; return; }
     closeAllModals(); // chiude anche il form della ricetta sotto, altrimenti copre i risultati
     searchOnline(q);
+    if (videoInfo(url)) pendingVideoForImport = url; // aggancia il video alla ricetta che importerai
   };
   m.el.querySelector("#viSearchNow").onclick = () => doSearchOnline(m.el.querySelector("#viUrl").value.trim());
   const okBtn = m.el.querySelector('[data-act="ok"]');
@@ -2359,7 +2361,7 @@ function openVideoImport(prefillUrl, onRecipe) {
         const q = dishQueryFromTitle(meta.title, meta.author);
         body.insertAdjacentHTML("beforeend", `<div class="hint" style="margin-top:12px">🎬 Riconosciuto: <b>${escapeHtml(meta.title)}</b>${meta.author ? ` · ${escapeHtml(meta.author)}` : ""}.</div>${q ? `<button class="btn btn--primary btn--block" id="viSearch" style="margin-top:8px">${iconHtml("magnifying-glass")} Cerca "${escapeHtml(q)}" nel Ricettario online</button>` : ""}`);
         const sb = body.querySelector("#viSearch");
-        if (sb) sb.onclick = () => { closeAllModals(); searchOnline(q); };
+        if (sb) sb.onclick = () => { closeAllModals(); searchOnline(q); if (videoInfo(url)) pendingVideoForImport = url; };
       }
     }
   };
@@ -3395,7 +3397,11 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
   const servings = recipe ? (recipe.servings || "") : (prefill && prefill.servings ? prefill.servings : "");
   const time = recipe ? (recipe.time || "") : (prefill && prefill.time ? prefill.time : "");
   const difficulty = recipe ? (recipe.difficulty || "") : "";
-  const videoUrl = recipe ? (recipe.videoUrl || "") : (prefill && prefill.video ? prefill.video : "");
+  // Se arrivi dalla ricerca avviata da un video, aggancia quel video alla ricetta
+  // importata (vale una sola volta).
+  const carryVideo = (!recipe && !(prefill && prefill.video) && pendingVideoForImport && videoInfo(pendingVideoForImport)) ? pendingVideoForImport : "";
+  pendingVideoForImport = "";
+  const videoUrl = recipe ? (recipe.videoUrl || "") : (prefill && prefill.video ? prefill.video : carryVideo);
   const source = recipe ? (recipe.source || "") : (prefill && prefill.source ? prefill.source : "");
   const ingText = recipe
     ? (recipe.ingredients || []).map((i) => i.raw || ingredientText(i)).join("\n")
@@ -3836,6 +3842,7 @@ function detectSource(q) {
 function searchOnline(term) {
   const q = (term || "").trim();
   if (!q) return;
+  pendingVideoForImport = ""; // una ricerca normale non porta dietro alcun video
   mealTab = "online";
   if (BROWSE_SOURCES.has(mealSource)) mealSource = "all"; // una fonte con ricerca testuale
   // Avvia la ricerca DOPO che la pagina Ricettario è disegnata: la consuma

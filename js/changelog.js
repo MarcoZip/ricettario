@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.56",
+    d: "2026-06-20",
+    items: [
+      "Importa da video: quando cerchi la ricetta online partendo da un video e poi la importi, ora il link del video viene agganciato in automatico alla ricetta (campo \"Link video\"), così trovi subito \"▶ Guarda il video\"."
+    ]
+  },
+  {
     v: "7.55",
     d: "2026-06-20",
     items: [
