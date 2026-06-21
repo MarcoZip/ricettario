@@ -3790,7 +3790,7 @@ function renderRicettario() {
 const SOURCE_LABEL = { mealdb: "TheMealDB", gz: "GialloZafferano", misya: "Misya", cookist: "Cookist", ricettenonna: "Ricette della Nonna", moulinex: "Moulinex Companion", bimby: "Bimby", spoon: "Spoonacular", edamam: "Edamam" };
 // Riconosce la fonte di una ricetta dal dominio del link (per quelle importate).
 const HOST_SOURCE = [
-  [/giallozafferano\.it/i, "GialloZafferano"], [/fattoincasadabenedetta\.it/i, "Fatto in casa da Benedetta"],
+  [/blog\.giallozafferano\.it/i, "Blog GialloZafferano"], [/giallozafferano\.it/i, "GialloZafferano"], [/fattoincasadabenedetta\.it/i, "Fatto in casa da Benedetta"],
   [/misya\.info/i, "Misya"], [/cookist\.it/i, "Cookist"], [/ricettedellanonna\.net/i, "Ricette della Nonna"],
   [/cookaround\.com/i, "Cookaround"], [/buttalapasta\.it/i, "Buttalapasta"], [/lacucinaitaliana\.it/i, "La Cucina Italiana"],
   [/salepepe\.it/i, "Sale&Pepe"], [/cucchiaio\.it/i, "Cucchiaio d'Argento"], [/tavolartegusto\.it/i, "Tavolartegusto"],

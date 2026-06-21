@@ -3,6 +3,7 @@
 
 export const ITALIAN_SITES = [
   { name: "GialloZafferano", emoji: "🍋", url: "https://www.giallozafferano.it/" },
+  { name: "Blog di GialloZafferano", emoji: "✍️", url: "https://blog.giallozafferano.it/" },
   { name: "Fatto in casa da Benedetta", emoji: "🏡", url: "https://www.fattoincasadabenedetta.it/" },
   { name: "Cookaround", emoji: "🥘", url: "https://www.cookaround.com/ricette" },
   { name: "Misya", emoji: "👩‍🍳", url: "https://www.misya.info/" },

@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.69",
+    d: "2026-06-20",
+    items: [
+      "Puoi importare le ricette dal Blog di GialloZafferano (blog.giallozafferano.it): incolla il link nella ricetta e tocca \"Importa\". Aggiunto anche tra i \"Siti italiani\" da sfogliare; la fonte viene segnata come \"Blog GialloZafferano\"."
+    ]
+  },
+  {
     v: "7.68",
     d: "2026-06-20",
     items: [
