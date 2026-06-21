@@ -2273,6 +2273,33 @@ async function openDishCheck(file, title) {
 }
 
 // Importa una ricetta da un link video social (o da testo incollato), via AI worker.
+// Riconosce titolo e autore di un video (YouTube/TikTok) senza chiavi, via oEmbed.
+async function videoMeta(url) {
+  try {
+    const u = new URL(url); const h = u.hostname.replace(/^www\./, "");
+    let endpoint = null;
+    if (/youtube\.com|youtu\.be/.test(h)) endpoint = "https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(url);
+    else if (/tiktok\.com/.test(h)) endpoint = "https://www.tiktok.com/oembed?url=" + encodeURIComponent(url);
+    if (!endpoint) return null;
+    const c = new AbortController(); const t = setTimeout(() => c.abort(), 8000);
+    const r = await fetch(endpoint, { signal: c.signal }); clearTimeout(t);
+    if (!r.ok) return null;
+    const d = await r.json();
+    return { title: d.title || "", author: d.author_name || "" };
+  } catch (e) { return null; }
+}
+// Dal titolo del video ricava una query "pulita" col nome del piatto (toglie il
+// canale, parole di contorno, emoji, punteggiatura).
+function dishQueryFromTitle(title, author) {
+  let t = " " + (title || "") + " ";
+  if (author) t = t.replace(new RegExp(author.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "ig"), " ");
+  t = t.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}]/gu, " ")
+    .replace(/[“”"'|•·–—_\-]+/g, " ")
+    .replace(/\b(ricetta|ricette|la mia|le mie|il mio|i miei|come si fa|come fare|tutorial|video ?ricetta|originale|facile|veloce|perfett[ao]|cremos[ao]|buonissim[ao]|anni\s*\d0)\b/ig, " ")
+    .replace(/\s+/g, " ").trim().toLowerCase();
+  return t;
+}
+
 function openVideoImport(prefillUrl, onRecipe) {
   const m = openModal(`
     <h3 class="modal__title">📱 Importa da video</h3>
@@ -2300,6 +2327,14 @@ function openVideoImport(prefillUrl, onRecipe) {
       okBtn.disabled = false;
       const hint = e.code === "nocaption" ? " Apri il video, copia la descrizione e incollala nel riquadro qui sopra." : "";
       body.innerHTML = `<div class="hint" style="color:var(--danger)">${escapeHtml(e.message || "Import non riuscito.")}${hint}</div>`;
+      // Passo in più: riconosco il video e propongo di cercarne la ricetta online.
+      const meta = url ? await videoMeta(url) : null;
+      if (meta && meta.title) {
+        const q = dishQueryFromTitle(meta.title, meta.author);
+        body.insertAdjacentHTML("beforeend", `<div class="hint" style="margin-top:12px">🎬 Riconosciuto: <b>${escapeHtml(meta.title)}</b>${meta.author ? ` · ${escapeHtml(meta.author)}` : ""}.</div>${q ? `<button class="btn btn--primary btn--block" id="viSearch" style="margin-top:8px">${iconHtml("magnifying-glass")} Cerca "${escapeHtml(q)}" nel Ricettario online</button>` : ""}`);
+        const sb = body.querySelector("#viSearch");
+        if (sb) sb.onclick = () => { m.close(); searchOnline(q); };
+      }
     }
   };
 }

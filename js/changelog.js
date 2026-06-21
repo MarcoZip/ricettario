@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.50",
+    d: "2026-06-20",
+    items: [
+      "Importa da video: se l'AI non riesce a ricavare la ricetta dal video, ora riconosce comunque titolo e autore e ti propone di cercare quella ricetta nel Ricettario online (es. \"carbonara sbagliata\"), da dove la importi con ingredienti e passi."
+    ]
+  },
+  {
     v: "7.49",
     d: "2026-06-20",
     items: [
