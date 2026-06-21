@@ -12,6 +12,7 @@ import { HELP_TOPICS, findHelpTopics } from "./app-help.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage, shareMenuImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
+import { GUEST_ALLERGENS, GUEST_DIETS, checkRecipeForGuests, guestsSummary } from "./diets.js";
 import { estimateCost } from "./cost.js";
 import { seasonalProduce, recipeSeasonalMatches, monthName, currentMonth } from "./seasonal.js";
 import { convertMeasures } from "./measures.js";
@@ -5372,28 +5373,45 @@ function guessDishDefaults(recipe) {
   };
 }
 
-function eventDishRow(d) {
+function dishSafetyChip(d, guests) {
+  if (!guests || !guests.length || !d.recipeId) return "";
+  const r = store.getRecipe(d.recipeId);
+  if (!r) return "";
+  const res = checkRecipeForGuests(r, guests);
+  if (!res.safe) return `<span class="ev-chip ev-chip--bad">⚠️ no: ${escapeHtml([...new Set(res.hard.map((h) => h.name))].join(", "))}</span>`;
+  if (res.soft.length) return `<span class="ev-chip ev-chip--warn">ok tranne: ${escapeHtml([...new Set(res.soft.map((s) => s.name))].join(", "))}</span>`;
+  return `<span class="ev-chip ev-chip--ok">✓ per tutti</span>`;
+}
+function eventDishRow(d, guests) {
   const chips = [];
   if (d.broughtByGuest) chips.push(`<span class="ev-chip ev-chip--guest">👤 ${escapeHtml(d.guestName || "ospite")}</span>`);
   if (d.reheatOnly) chips.push(`<span class="ev-chip">🔥 da scaldare</span>`);
   else if ((+d.prepDay || 0) > 0) chips.push(`<span class="ev-chip ev-chip--ahead">${PREP_DAY_SHORT[+d.prepDay] || "prima"}</span>`);
   if (d.time) chips.push(`<span class="ev-chip">${d.time}′</span>`);
   if (d.usesOven && d.ovenTemp) chips.push(`<span class="ev-chip">🔥 ${d.ovenTemp}°</span>`);
+  const safety = dishSafetyChip(d, guests);
+  if (safety) chips.push(safety);
   return `<button class="ev-dish" data-dish="${d.id}"><span class="ev-dish__name">${escapeHtml(d.title || "Piatto")}</span><span class="ev-dish__chips">${chips.join("")}</span></button>`;
+}
+// Portata di una ricetta salvata (dal tag o dal titolo).
+function eventCourseOf(r) {
+  return EVENT_COURSES.find((c) => (r.tags || []).includes(c)) || guessCategory(r.title) || null;
 }
 
 function openEventSheet(eventId) {
   const ev = store.getEvent(eventId);
   if (!ev) { renderHomeBody(); return; }
   const dishes = ev.dishes || [];
+  const guests = ev.guestProfiles || [];
   let groups = "";
   for (const course of EVENT_COURSES) {
     const list = dishes.filter((d) => d.course === course);
-    if (list.length) groups += `<div class="ev-course"><div class="ev-course__t">${course}</div>${list.map(eventDishRow).join("")}</div>`;
+    if (list.length) groups += `<div class="ev-course"><div class="ev-course__t">${course}</div>${list.map((d) => eventDishRow(d, guests)).join("")}</div>`;
   }
   const other = dishes.filter((d) => !EVENT_COURSES.includes(d.course));
-  if (other.length) groups += `<div class="ev-course"><div class="ev-course__t">Altro</div>${other.map(eventDishRow).join("")}</div>`;
+  if (other.length) groups += `<div class="ev-course"><div class="ev-course__t">Altro</div>${other.map((d) => eventDishRow(d, guests)).join("")}</div>`;
   const hasGuests = dishes.some((d) => d.broughtByGuest);
+  const gSummary = guests.length ? guestsSummary(guests) : "";
 
   const m = openModal(`
     <h3 class="modal__title">🎉 ${escapeHtml(ev.name)}</h3>
@@ -5401,8 +5419,10 @@ function openEventSheet(eventId) {
       <label class="ev-field"><span>Quando (in tavola)</span><input type="datetime-local" id="evWhen" value="${ev.servingAt ? escapeHtml(ev.servingAt) : ""}" /></label>
       <label class="ev-field"><span>Ospiti a tavola</span><input type="number" id="evGuests" min="1" inputmode="numeric" value="${ev.guests || ""}" placeholder="es. 8" /></label>
     </div>
+    <button class="btn btn--block" id="evDiets" style="margin-bottom:14px">👥 Invitati e diete${guests.length ? ` · ${guests.length}` : ""}${gSummary ? `<span class="ev-gsum">${escapeHtml(gSummary)}</span>` : ""}</button>
     <div id="evDishes">${groups || `<div class="hint">Nessun piatto ancora. Aggiungi i tuoi piatti, per portata.</div>`}</div>
-    <button class="btn btn--primary btn--block" id="evAdd" style="margin:10px 0 16px">${iconHtml("plus")} Aggiungi un piatto</button>
+    <button class="btn btn--primary btn--block" id="evAdd" style="margin:10px 0 8px">${iconHtml("plus")} Aggiungi un piatto</button>
+    <button class="btn btn--block" id="evSuggest" style="margin-bottom:16px">✨ Completa il menù (di stagione, sicuro per tutti)</button>
     <button class="btn btn--block" id="evPlan" style="margin-bottom:8px">📋 Piano di battaglia</button>
     <button class="btn btn--block" id="evShop" style="margin-bottom:8px">${iconHtml("shopping-cart-simple")} Lista della spesa</button>
     <button class="btn btn--block" id="evRemind" style="margin-bottom:8px">🔔 Imposta i promemoria</button>
@@ -5416,7 +5436,9 @@ function openEventSheet(eventId) {
   m.el.querySelector("#evWhen").addEventListener("change", (e) => store.updateEvent(eventId, { servingAt: e.target.value || null }));
   m.el.querySelector("#evGuests").addEventListener("change", (e) => store.updateEvent(eventId, { guests: parseInt(e.target.value, 10) || null }));
   m.el.querySelectorAll("[data-dish]").forEach((row) => row.addEventListener("click", () => { m.close(); openEventDishEditor(eventId, dishes.find((d) => d.id === row.dataset.dish)); }));
+  m.el.querySelector("#evDiets").addEventListener("click", () => { m.close(); openEventGuests(eventId); });
   m.el.querySelector("#evAdd").addEventListener("click", () => { m.close(); openEventAddChooser(eventId); });
+  m.el.querySelector("#evSuggest").addEventListener("click", () => { m.close(); openEventSuggest(eventId); });
   m.el.querySelector("#evPlan").addEventListener("click", () => { m.close(); openEventPlan(eventId); });
   m.el.querySelector("#evShop").addEventListener("click", () => eventAddToShopping(eventId));
   m.el.querySelector("#evRemind").addEventListener("click", () => eventSetReminders(eventId));
@@ -5633,6 +5655,155 @@ function openEventGuestMessage(eventId) {
       else { await navigator.clipboard.writeText(t); toast("Messaggio copiato", "success"); }
     } catch (e) { try { await navigator.clipboard.writeText(t); toast("Messaggio copiato", "success"); } catch (e2) {} }
   };
+}
+
+// ---- Invitati e diete ----
+function openEventGuests(eventId) {
+  const ev = store.getEvent(eventId); if (!ev) return;
+  const guests = ev.guestProfiles || [];
+  const rows = guests.length
+    ? guests.map((g, i) => {
+        const bits = [...(g.tags || []), ...(g.dislikes || []).map((d) => "no " + d)];
+        return `<button class="ev-dish" data-gi="${i}"><span class="ev-dish__name">${escapeHtml(g.name || "Invitato " + (i + 1))}</span><span class="ev-dish__chips">${bits.length ? bits.map((b) => `<span class="ev-chip">${escapeHtml(b)}</span>`).join("") : `<span class="ev-chip ev-chip--ok">nessun vincolo</span>`}</span></button>`;
+      }).join("")
+    : `<div class="hint">Aggiungi gli invitati con allergie, intolleranze o cibi non graditi. Poi "Completa il menù" proporrà piatti di stagione sicuri per tutti.</div>`;
+  const m = openModal(`
+    <h3 class="modal__title">👥 Invitati e diete</h3>
+    ${guests.length ? `<p class="hint" style="margin-top:-6px">${escapeHtml(guestsSummary(guests) || "nessun vincolo")}</p>` : ""}
+    <div id="evgList">${rows}</div>
+    <button class="btn btn--primary btn--block" id="evgAdd" style="margin-top:10px">${iconHtml("plus")} Aggiungi un invitato</button>
+    <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Fatto</button></div>
+  `);
+  m.el.querySelector('[data-act="ok"]').onclick = () => { m.close(); openEventSheet(eventId); };
+  m.el.querySelectorAll("[data-gi]").forEach((b) => b.addEventListener("click", () => { m.close(); openEventGuestEditor(eventId, parseInt(b.dataset.gi, 10)); }));
+  m.el.querySelector("#evgAdd").addEventListener("click", () => { m.close(); openEventGuestEditor(eventId, -1); });
+}
+
+function openEventGuestEditor(eventId, index) {
+  const ev = store.getEvent(eventId); if (!ev) return;
+  const guests = [...(ev.guestProfiles || [])];
+  const g = index >= 0 ? { ...guests[index] } : { name: "", tags: [], dislikes: [] };
+  const tags = new Set(g.tags || []);
+  const chip = (t) => `<button type="button" class="diet-chip ${tags.has(t) ? "is-on" : ""}" data-t="${escapeHtml(t)}">${escapeHtml(t)}</button>`;
+  const m = openModal(`
+    <h3 class="modal__title">${index >= 0 ? "Modifica invitato" : "Nuovo invitato"}</h3>
+    <label class="ev-field"><span>Nome (facoltativo)</span><input type="text" id="gName" value="${escapeHtml(g.name || "")}" placeholder="Es. Marco" /></label>
+    <div class="ev-field"><span>Allergie / intolleranze</span><div class="diet-chips">${GUEST_ALLERGENS.map(chip).join("")}</div></div>
+    <div class="ev-field"><span>Dieta</span><div class="diet-chips">${GUEST_DIETS.map(chip).join("")}</div></div>
+    <label class="ev-field"><span>Non graditi (separati da virgola)</span><input type="text" id="gDislikes" value="${escapeHtml((g.dislikes || []).join(", "))}" placeholder="Es. funghi, coriandolo" /></label>
+    <div class="modal__actions">
+      ${index >= 0 ? `<button class="btn" data-act="del" style="color:var(--danger)">Elimina</button>` : `<button class="btn" data-act="c">Annulla</button>`}
+      <button class="btn btn--primary" data-act="ok">Salva</button>
+    </div>
+  `);
+  m.el.querySelectorAll(".diet-chip").forEach((b) => b.addEventListener("click", () => { const t = b.dataset.t; if (tags.has(t)) tags.delete(t); else tags.add(t); b.classList.toggle("is-on"); }));
+  const back = () => { m.close(); openEventGuests(eventId); };
+  const c = m.el.querySelector('[data-act="c"]'); if (c) c.onclick = back;
+  const del = m.el.querySelector('[data-act="del"]'); if (del) del.onclick = async () => { guests.splice(index, 1); await store.updateEvent(eventId, { guestProfiles: guests }); back(); };
+  m.el.querySelector('[data-act="ok"]').onclick = async () => {
+    const prof = {
+      name: (m.el.querySelector("#gName").value || "").trim(),
+      tags: [...tags],
+      dislikes: (m.el.querySelector("#gDislikes").value || "").split(",").map((s) => s.trim()).filter(Boolean)
+    };
+    if (index >= 0) guests[index] = prof; else guests.push(prof);
+    await store.updateEvent(eventId, { guestProfiles: guests });
+    back();
+  };
+}
+
+// ---- Completa il menù: suggerimenti di stagione, sicuri per tutti ----
+function openEventSuggest(eventId) {
+  const ev = store.getEvent(eventId); if (!ev) return;
+  const guests = ev.guestProfiles || [];
+  const month = ev.servingAt ? new Date(ev.servingAt).getMonth() + 1 : currentMonth();
+  const usedIds = new Set((ev.dishes || []).map((d) => d.recipeId).filter(Boolean));
+  const haveByCourse = {}; EVENT_COURSES.forEach((c) => { haveByCourse[c] = (ev.dishes || []).filter((d) => d.course === c).length; });
+  let course = EVENT_COURSES.find((c) => !haveByCourse[c]) || "Primi";
+  let showAll = false;
+
+  const m = openModal(`<h3 class="modal__title">✨ Completa il menù</h3><div id="evsBody"></div>`);
+
+  function candidates(c) {
+    return allRecipes().filter((r) => eventCourseOf(r) === c && !usedIds.has(r.id)).map((r) => {
+      const safety = checkRecipeForGuests(r, guests);
+      const seasonal = recipeSeasonalMatches(r, month);
+      let score = safety.safe ? 100 : -1000;
+      if (seasonal.length) score += 30;
+      score -= 10 * safety.soft.length;
+      return { r, safety, seasonal, score };
+    }).sort((a, b) => b.score - a.score);
+  }
+
+  function draw() {
+    const safe = candidates(course).filter((x) => x.safety.safe);
+    const shown = showAll ? safe : safe.slice(0, 3);
+    const cards = shown.map(({ r, safety, seasonal }) => {
+      const badges = [];
+      if (!safety.soft.length) badges.push(`<span class="ev-chip ev-chip--ok">✓ per tutti</span>`);
+      else badges.push(`<span class="ev-chip ev-chip--warn">tranne ${escapeHtml([...new Set(safety.soft.map((s) => s.name))].join(", "))}</span>`);
+      if (seasonal.length) badges.push(`<span class="ev-chip ev-chip--season">di stagione · ${escapeHtml(seasonal.slice(0, 2).map((p) => p.name).join(", "))}</span>`);
+      badges.push(`<span class="ev-chip">dal tuo ricettario</span>`);
+      return `<button class="ev-dish" data-add="${r.id}"><span class="ev-dish__name">${escapeHtml(r.title)}</span><span class="ev-dish__chips">${badges.join("")}</span></button>`;
+    }).join("");
+    const empty = !safe.length ? `<div class="hint">Nessuna ricetta salvata di questa portata è sicura per tutti${guests.length ? "" : " (aggiungi prima gli invitati)"}. Prova un'idea nuova qui sotto.</div>` : "";
+    const more = (!showAll && safe.length > 3) ? `<button class="btn btn--ghost btn--block" id="evsMore">Mostra altri (${safe.length - 3})</button>` : "";
+    m.el.querySelector("#evsBody").innerHTML = `
+      ${guests.length ? `<p class="hint" style="margin-top:-6px">Per ${guests.length} invitati: ${escapeHtml(guestsSummary(guests) || "nessun vincolo")}. Mese: ${escapeHtml(monthName(month))}.</p>` : `<p class="hint" style="margin-top:-6px">Suggerimenti di stagione (${escapeHtml(monthName(month))}). Aggiungi gli invitati (👥) per filtrare anche per allergie e diete.</p>`}
+      <div class="diet-chips" style="margin-bottom:12px">${EVENT_COURSES.map((c) => `<button type="button" class="diet-chip ${c === course ? "is-on" : ""}" data-c="${c}">${c}${haveByCourse[c] ? ` ·${haveByCourse[c]}` : ""}</button>`).join("")}</div>
+      <div>${cards}${empty}</div>
+      ${more}
+      ${isImportConfigured() ? `<button class="btn btn--block" id="evsAi" style="margin-top:10px">✨ Chiedi un'idea nuova all'AI</button>` : ""}
+      <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>`;
+    m.el.querySelector('[data-act="ok"]').onclick = () => { m.close(); openEventSheet(eventId); };
+    m.el.querySelectorAll(".diet-chip[data-c]").forEach((b) => b.addEventListener("click", () => { course = b.dataset.c; showAll = false; draw(); }));
+    m.el.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", async () => {
+      const r = store.getRecipe(b.dataset.add); if (!r) return;
+      const dish = { id: (window.crypto && crypto.randomUUID ? crypto.randomUUID() : "d-" + Date.now().toString(36)), recipeId: r.id, title: r.title, reheatOnly: false, broughtByGuest: false, ...guessDishDefaults(r) };
+      dish.course = course;
+      const cur = store.getEvent(eventId);
+      await store.updateEvent(eventId, { dishes: [...(cur.dishes || []), dish] });
+      usedIds.add(r.id); haveByCourse[course] = (haveByCourse[course] || 0) + 1;
+      toast(`Aggiunto: ${r.title}`, "success");
+      draw();
+    }));
+    const moreB = m.el.querySelector("#evsMore"); if (moreB) moreB.onclick = () => { showAll = true; draw(); };
+    const aiB = m.el.querySelector("#evsAi"); if (aiB) aiB.onclick = () => eventSuggestAI(eventId, course, month, guests);
+  }
+  draw();
+}
+
+async function eventSuggestAI(eventId, course, month, guests) {
+  const avoid = [];
+  for (const g of guests) { (g.tags || []).forEach((t) => avoid.push(t)); (g.dislikes || []).forEach((d) => avoid.push(d)); }
+  const avoidStr = [...new Set(avoid)].join(", ");
+  const note = `${course} della tradizione italiana per le feste, di stagione nel mese di ${monthName(month)}.` + (avoidStr ? ` IMPORTANTISSIMO: senza ${avoidStr}.` : "");
+  const ingHint = seasonalProduce(month).map((p) => p.name).slice(0, 8).join(", ");
+  toast("Sto pensando a un'idea…", "");
+  try {
+    const r = await generateRecipe(ingHint, note);
+    if (!r || !r.title) { toast("Nessuna idea trovata. Riprova.", "error"); return; }
+    const pseudo = { title: r.title, ingredients: (r.ingredients || []).map((s) => ({ name: s })), allergens: [] };
+    const res = checkRecipeForGuests(pseudo, guests);
+    const m = openModal(`
+      <h3 class="modal__title">✨ ${escapeHtml(r.title)}</h3>
+      ${res.safe
+        ? `<p class="hint" style="color:var(--primary-2)">✓ Sembra sicura per tutti — ma controlla sempre gli ingredienti.</p>`
+        : `<p class="hint" style="color:var(--danger)">⚠️ Potrebbe non andare bene (${escapeHtml([...new Set(res.hard.map((h) => h.reason))].join(", "))}). Controlla gli ingredienti.</p>`}
+      <div class="hint" style="margin-bottom:8px"><b>Ingredienti:</b> ${escapeHtml((r.ingredients || []).join(", "))}</div>
+      <p class="hint">È un'idea generata dall'AI: va controllata. Salvala nel ricettario per poterla aggiungere al menù.</p>
+      <div class="modal__actions">
+        <button class="btn" data-act="c">Chiudi</button>
+        <button class="btn" data-act="another">Un'altra idea</button>
+        <button class="btn btn--primary" data-act="save">Salva nel ricettario</button>
+      </div>
+    `);
+    m.el.querySelector('[data-act="c"]').onclick = () => m.close();
+    m.el.querySelector('[data-act="another"]').onclick = () => { m.close(); eventSuggestAI(eventId, course, month, guests); };
+    m.el.querySelector('[data-act="save"]').onclick = () => { m.close(); openRecipeForm({ prefill: { title: r.title, servings: r.servings, ingredients: r.ingredients, steps: r.steps, tags: [course] } }); };
+  } catch (e) {
+    toast("Non riesco a generare un'idea ora. Riprova.", "error");
+  }
 }
 
 // ---------------- Schermata: Impostazioni ----------------

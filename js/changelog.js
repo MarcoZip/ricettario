@@ -6,6 +6,16 @@
 
 export const CHANGELOG = [
   {
+    v: "7.46",
+    d: "2026-06-20",
+    items: [
+      "Menù delle feste: aggiungi gli invitati con le loro allergie, intolleranze, diete (vegetariano/vegano) e cibi non graditi (👥 Invitati e diete).",
+      "Ogni piatto del menù mostra un'etichetta: ✓ \"per tutti\", \"ok tranne…\" (un cibo non gradito) oppure ⚠️ se non va bene per qualcuno.",
+      "\"Completa il menù\": ti propone, portata per portata, ricette del tuo ricettario di stagione e sicure per tutti gli invitati; se non bastano, chiede un'idea nuova all'AI (sempre da controllare).",
+      "I suggerimenti tengono conto del mese della festa per la stagionalità."
+    ]
+  },
+  {
     v: "7.45",
     d: "2026-06-20",
     items: [
