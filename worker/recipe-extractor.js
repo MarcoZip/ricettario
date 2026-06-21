@@ -402,6 +402,8 @@ export default {
     if (url.pathname === "/importvideo") return handleImportVideo(request, env);
     if (url.pathname === "/robot") return handleRobot(request, env);
     if (url.pathname === "/fridge") return handleFridge(request, env);
+    if (url.pathname === "/structure") return handleStructure(request, env);
+    if (url.pathname === "/dishname") return handleDishName(request, env);
     if (url.pathname === "/planweek") return handlePlanWeek(request, env);
     if (url.pathname === "/convert") return handleConvert(request, env);
     if (url.pathname === "/apphelp") return handleAppHelp(request, env);
@@ -906,6 +908,57 @@ async function handleFridge(request, env) {
     } catch (e) { lastErr = (e && e.message) || String(e); }
   }
   return json({ error: "empty", message: "Non ho riconosciuto alimenti. Riprova con una foto più chiara." + (lastErr ? " (" + lastErr.slice(0, 100) + ")" : "") }, 200);
+}
+
+// "Fotografa una ricetta": riceve il TESTO (OCR fatto sul telefono) di una pagina
+// di ricetta e lo struttura. POST { text } → { title, servings, ingredients[], steps[] }.
+async function handleStructure(request, env) {
+  if (request.method !== "POST") return json({ error: "method", message: "Usa POST" }, 405);
+  if (!env || !env.AI) return json({ error: "noai", message: "Workers AI non collegato (binding AI mancante)." }, 200);
+  let body;
+  try { body = await request.json(); } catch (e) { return json({ error: "badreq" }, 400); }
+  const text = String((body && body.text) || "").trim().slice(0, 6000);
+  if (text.length < 20) return json({ error: "few", message: "Testo troppo corto: riprova con una foto più nitida." }, 200);
+  const sys = "Dal testo di una ricetta (riconosciuto da una foto con OCR, può contenere errori di lettura) ricava la ricetta. Correggi i piccoli errori OCR evidenti. Rispondi SOLO in JSON valido con: title (stringa), servings (numero o null), ingredients (array di stringhe, una per ingrediente CON la quantità se presente), steps (array di stringhe, un passo per elemento). Tutto in italiano. Usa solo ciò che è nel testo, non inventare.";
+  try {
+    const raw = await aiText(env, [{ role: "system", content: sys }, { role: "user", content: text }], 1100, RECIPE_SCHEMA);
+    const r = extractJson(raw);
+    if (!r || (!((r.ingredients || []).length) && !((r.steps || []).length))) return json({ error: "parse", message: "Non sono riuscito a leggere la ricetta dalla foto. Riprova con una foto più nitida." }, 200);
+    return json({
+      title: String(r.title || "").slice(0, 140),
+      servings: typeof r.servings === "number" ? r.servings : null,
+      ingredients: (r.ingredients || []).map((s) => String(s)).filter(Boolean),
+      steps: (r.steps || []).map((s) => String(s)).filter(Boolean)
+    }, 200);
+  } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova." }, 200); }
+}
+
+// "Riconosci il piatto da foto": l'AI di visione dice come si chiama il piatto.
+// POST { image: base64 } → { name }.
+async function handleDishName(request, env) {
+  if (request.method !== "POST") return json({ error: "method", message: "Usa POST" }, 405);
+  if (!env || !env.AI) return json({ error: "noai", message: "Workers AI non collegato (binding AI mancante)." }, 200);
+  let body;
+  try { body = await request.json(); } catch (e) { return json({ error: "badreq" }, 400); }
+  const b64 = String((body && body.image) || "").replace(/^data:[^,]+,/, "");
+  if (!b64) return json({ error: "noimage", message: "Foto mancante" }, 400);
+  let bytes;
+  try { const bin = atob(b64); bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); }
+  catch (e) { return json({ error: "badimage", message: "Foto non leggibile" }, 400); }
+  const prompt = "Guarda la foto di questo piatto di cucina e dimmi SOLO come si chiama il piatto, in italiano, in poche parole (es: 'lasagne al forno', 'tiramisù', 'risotto ai funghi'). Niente spiegazioni, niente frasi: solo il nome del piatto.";
+  const models = ["@cf/meta/llama-3.2-11b-vision-instruct", "@cf/llava-hf/llava-1.5-7b-hf"];
+  let lastErr = "";
+  for (const model of models) {
+    try {
+      const out = await env.AI.run(model, { image: [...bytes], prompt, max_tokens: 40 });
+      let name = String((out && (out.response || out.description || out.text)) || "").trim();
+      name = clean(name).replace(/^[^:]*:/, "").replace(/["'.]+/g, "")
+        .replace(/\b(questo|piatto|sembra|e? un|e? una|il|la|si chiama|foto di|immagine di)\b/gi, " ")
+        .replace(/\s+/g, " ").trim();
+      if (name && name.length >= 3 && name.length <= 60) return json({ name: name.toLowerCase() }, 200);
+    } catch (e) { lastErr = (e && e.message) || String(e); }
+  }
+  return json({ error: "empty", message: "Non ho riconosciuto il piatto. Riprova con una foto più chiara." + (lastErr ? " (" + lastErr.slice(0, 80) + ")" : "") }, 200);
 }
 
 // Pianificatore settimanale: l'AI compone 7 giorni scegliendo tra i titoli forniti.

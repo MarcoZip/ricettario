@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.58",
+    d: "2026-06-20",
+    items: [
+      "Nuovo: \"Fotografa una ricetta\" — fotografi una ricetta da un libro o una rivista e l'AI la compila intera (titolo, ingredienti, passi). Lo trovi nel form della ricetta.",
+      "Nuovo: \"Riconosci un piatto da una foto\" — nel Ricettario online scatti la foto di un piatto e l'app capisce cos'è e ne cerca la ricetta."
+    ]
+  },
+  {
     v: "7.57",
     d: "2026-06-20",
     items: [

@@ -64,6 +64,38 @@ export async function generateRecipe(ingredients, note) {
   throw new Error((d && d.message) || "Non sono riuscito a creare la ricetta. Riprova.");
 }
 
+// "Fotografa una ricetta": dal testo OCR di una pagina → ricetta strutturata.
+export async function structureRecipeText(text) {
+  if (!WORKER_URL) throw new Error("Funzione non disponibile (worker non configurato).");
+  let res;
+  try {
+    res = await fetch(`${WORKER_URL}/structure`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: text || "" })
+    });
+  } catch (e) { throw new Error("Servizio non raggiungibile. Controlla la connessione."); }
+  const d = await res.json().catch(() => ({}));
+  if (d && (Array.isArray(d.ingredients) && d.ingredients.length || Array.isArray(d.steps) && d.steps.length)) return d;
+  if (d && d.error === "noai") throw new Error("La funzione non è ancora attiva sul worker (manca il collegamento all'AI).");
+  throw new Error((d && d.message) || "Non sono riuscito a leggere la ricetta dalla foto. Riprova.");
+}
+
+// "Riconosci il piatto da foto": immagine → nome del piatto.
+export async function dishNameFromPhoto(dataUrl) {
+  if (!WORKER_URL) throw new Error("Funzione non disponibile (worker non configurato).");
+  let res;
+  try {
+    res = await fetch(`${WORKER_URL}/dishname`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image: dataUrl || "" })
+    });
+  } catch (e) { throw new Error("Servizio non raggiungibile. Controlla la connessione."); }
+  const d = await res.json().catch(() => ({}));
+  if (d && d.name) return d.name;
+  if (d && d.error === "noai") throw new Error("La funzione non è ancora attiva sul worker (manca il collegamento all'AI).");
+  throw new Error((d && d.message) || "Non ho riconosciuto il piatto. Riprova.");
+}
+
 // Import da link video social (o testo incollato) → ricetta strutturata.
 export async function importFromVideo(url, text) {
   if (!WORKER_URL) throw new Error("Funzione non disponibile (worker non configurato).");

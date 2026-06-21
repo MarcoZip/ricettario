@@ -7,7 +7,7 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo, robotProgram, fridgeIngredients, planWeekAI, convertRecipe, appHelp } from "./import-recipe.js";
+import { importFromUrl, searchGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo, robotProgram, fridgeIngredients, planWeekAI, convertRecipe, appHelp, structureRecipeText, dishNameFromPhoto } from "./import-recipe.js";
 import { HELP_TOPICS, findHelpTopics } from "./app-help.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage, shareMenuImage } from "./share-image.js";
@@ -2956,16 +2956,31 @@ function openGuestMode(r, base, ingredients) {
 function openOcrChooser(text, form) {
   const om = openModal(`
     <h3 class="modal__title">Testo riconosciuto</h3>
-    <p class="hint" style="margin-top:-8px;margin-bottom:10px">Controlla il testo e scegli dove inserirlo.</p>
+    <p class="hint" style="margin-top:-8px;margin-bottom:10px">Controlla il testo e scegli cosa farne.</p>
     <div class="field"><textarea id="ocrText" rows="9">${escapeHtml(text)}</textarea></div>
+    ${isImportConfigured() ? `<button class="btn btn--primary btn--block" data-act="full" style="margin-bottom:10px">📖 È una ricetta intera: compilala con l'AI</button>` : ""}
     <div class="modal__actions">
       <button class="btn" data-act="ing">Negli ingredienti</button>
-      <button class="btn btn--primary" data-act="steps">Nella preparazione</button>
+      <button class="btn" data-act="steps">Nella preparazione</button>
     </div>
   `);
   const getText = () => om.el.querySelector("#ocrText").value;
   om.el.querySelector('[data-act="ing"]').onclick = () => { appendToField(form, "#rIngredients", getText()); om.close(); toast("Aggiunto agli ingredienti", "success"); };
   om.el.querySelector('[data-act="steps"]').onclick = () => { appendToField(form, "#rSteps", getText()); om.close(); toast("Aggiunto alla preparazione", "success"); };
+  const fullBtn = om.el.querySelector('[data-act="full"]');
+  if (fullBtn) fullBtn.onclick = async () => {
+    const old = fullBtn.innerHTML;
+    fullBtn.disabled = true; fullBtn.textContent = "Leggo la ricetta…";
+    try {
+      const data = await structureRecipeText(getText());
+      const tEl = form.el.querySelector("#rTitle"); if (tEl && !tEl.value.trim() && data.title) tEl.value = data.title;
+      const sEl = form.el.querySelector("#rServings"); if (sEl && !sEl.value.trim() && data.servings) sEl.value = data.servings;
+      if (data.ingredients && data.ingredients.length) appendToField(form, "#rIngredients", data.ingredients.join("\n"));
+      if (data.steps && data.steps.length) appendToField(form, "#rSteps", data.steps.join("\n"));
+      om.close();
+      toast("Ricetta letta dalla foto! Controllala e salva.", "success");
+    } catch (e) { fullBtn.disabled = false; fullBtn.innerHTML = old; toast(e.message || "Non riuscito", "error"); }
+  };
 }
 function appendToField(form, sel, text) {
   const ta = form.el.querySelector(sel);
@@ -3497,7 +3512,7 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
     <div class="field">
       <label>Ingredienti (uno per riga)</label>
       <textarea id="rIngredients" rows="6" placeholder="200 g di farina&#10;2 uova&#10;1 bustina di lievito&#10;sale q.b.">${escapeHtml(ingText)}</textarea>
-      <button type="button" class="btn btn--ghost" id="rOcr" style="margin-top:8px">${iconHtml("image")} Scansiona da una foto</button>
+      <button type="button" class="btn btn--ghost" id="rOcr" style="margin-top:8px">${iconHtml("image")} Fotografa una ricetta (o ingredienti)</button>
       <input type="file" id="rOcrFile" accept="image/*" capture="environment" hidden />
       ${isImportConfigured() ? `<button type="button" class="btn btn--ghost" id="rGenerate" style="margin-top:8px">✨ Inventa una ricetta (AI)</button>` : ""}
     </div>
@@ -4012,6 +4027,27 @@ function openToTry() {
   });
 }
 
+// "Riconosci un piatto da foto": l'AI di visione dice che piatto è, poi cerca online.
+async function recognizeDishPhoto(file) {
+  let dataUrl;
+  try { dataUrl = await fileToDataUrl(file, 672, 0.6); } catch (e) { toast("Foto non valida", "error"); return; }
+  const m = openModal(`
+    <h3 class="modal__title">📸 Che piatto è?</h3>
+    <div id="dpBody" style="text-align:center;padding:8px 0"><div class="spinner"></div><div class="hint">Guardo la foto…</div></div>
+    <div class="modal__actions"><button class="btn" data-act="c">Chiudi</button></div>
+  `);
+  m.el.querySelector('[data-act="c"]').onclick = m.close;
+  try {
+    const name = await dishNameFromPhoto(dataUrl);
+    if (!m.el.isConnected) return;
+    m.el.querySelector("#dpBody").innerHTML = `<p style="margin:4px 0">Sembra: <b>${escapeHtml(name)}</b></p><button class="btn btn--primary btn--block" id="dpSearch" style="margin-top:10px">${iconHtml("magnifying-glass")} Cerca "${escapeHtml(name)}" online</button>`;
+    m.el.querySelector("#dpSearch").onclick = () => { m.close(); searchOnline(name); };
+  } catch (e) {
+    if (!m.el.isConnected) return;
+    m.el.querySelector("#dpBody").innerHTML = `<div class="hint" style="color:var(--danger)">${escapeHtml(e.message || "Non riconosciuto.")}</div>`;
+  }
+}
+
 // Svuota frigo: cerca online ricette che usano gli ingredienti che hai.
 function openFridgeSearch() {
   const m = openModal(`
@@ -4128,6 +4164,7 @@ function renderOnlineTab() {
       </div>` : ""}
       <div class="field" style="margin-bottom:10px"><label class="mini-lbl">Fonte</label><select id="mealSource">${srcOpts}</select></div>
       ${searchable ? `<button class="btn btn--ghost btn--block" id="fridgeBtn" style="margin-bottom:12px">🧊 Svuota frigo (cerca per ingredienti)</button>` : ""}
+      ${searchable && isImportConfigured() ? `<button class="btn btn--ghost btn--block" id="dishPhotoBtn" style="margin-bottom:12px">📸 Riconosci un piatto da una foto</button><input type="file" id="dishPhotoFile" accept="image/*" capture="environment" hidden />` : ""}
       ${(() => { const n = getToTry().length; return n ? `<button class="btn btn--ghost btn--block" id="toTryBtn" style="margin-bottom:12px">🔖 Da provare (${n})</button>` : ""; })()}
       ${mealSource === "moulinex" ? `<button class="btn btn--ghost btn--block" id="companionRandom" style="margin-bottom:12px">🎲 Sorprendimi col Companion</button>` : ""}
       ${bannerHtml}
@@ -4166,6 +4203,10 @@ function renderOnlineTab() {
 
   const fridgeBtn = body.querySelector("#fridgeBtn");
   if (fridgeBtn) fridgeBtn.addEventListener("click", () => openFridgeSearch());
+  const dishPhotoBtn = root.querySelector("#dishPhotoBtn");
+  const dishPhotoFile = root.querySelector("#dishPhotoFile");
+  if (dishPhotoBtn) dishPhotoBtn.addEventListener("click", () => dishPhotoFile.click());
+  if (dishPhotoFile) dishPhotoFile.addEventListener("change", async () => { const f = dishPhotoFile.files[0]; dishPhotoFile.value = ""; if (f) recognizeDishPhoto(f); });
 
   const companionRandom = body.querySelector("#companionRandom");
   if (companionRandom) companionRandom.addEventListener("click", async () => {
