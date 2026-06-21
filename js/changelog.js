@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.67",
+    d: "2026-06-20",
+    items: [
+      "Nuovo: \"Tema festa\" (Opzioni → Aspetto) — attiva coriandoli e palloncini animati di sottofondo per le occasioni speciali. Si può spegnere quando vuoi."
+    ]
+  },
+  {
     v: "7.66",
     d: "2026-06-20",
     minor: true,

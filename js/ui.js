@@ -20,7 +20,7 @@ import { getNickname, setNickname } from "./profile.js";
 import { isImportConfigured, APP_VERSION, PUSH_WORKER_URL, SPOONACULAR_ENABLED, EDAMAM_ENABLED, WORKER_URL } from "./config.js";
 import { CHANGELOG } from "./changelog.js";
 import { fileToDataUrl } from "./image.js";
-import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS, getTextScale, setTextScale, getContrast, setContrast } from "./theme.js";
+import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS, getTextScale, setTextScale, getContrast, setContrast, getFesta, setFesta } from "./theme.js";
 
 // Tag suggeriti nel form ricetta.
 const TAG_SUGGESTIONS = ["Primi", "Secondi", "Contorni", "Antipasti", "Dolci", "Colazione", "Merenda", "Zuppe", "Insalate", "Lievitati", "Veloce", "Vegetariano", "Vegano", "Pesce", "Carne", "Senza glutine", "Per ospiti", "Bambini"];
@@ -6420,6 +6420,13 @@ function renderImpostazioni() {
         </div>
         <input type="checkbox" id="contrastChk" class="mini-check" ${getContrast() ? "checked" : ""} />
       </label>
+      <label class="setting-row" style="cursor:pointer">
+        <div>
+          <div class="setting-row__label">🎉 Tema festa</div>
+          <div class="setting-row__desc">Coriandoli e palloncini animati di sottofondo, per le occasioni speciali.</div>
+        </div>
+        <input type="checkbox" id="festaChk" class="mini-check" ${getFesta() ? "checked" : ""} />
+      </label>
     </div>
 
     <h2 class="setting-section"><span class="setting-section__ic">🍽️</span> Preferenze di cucina</h2>
@@ -6592,6 +6599,8 @@ function renderImpostazioni() {
   if (textSizeSel) { textSizeSel.value = String(getTextScale()); textSizeSel.addEventListener("change", () => setTextScale(parseInt(textSizeSel.value, 10))); }
   const contrastChk = root.querySelector("#contrastChk");
   if (contrastChk) contrastChk.addEventListener("change", () => setContrast(contrastChk.checked));
+  const festaChk = root.querySelector("#festaChk");
+  if (festaChk) festaChk.addEventListener("change", () => setFesta(festaChk.checked));
   const defServSel = root.querySelector("#defServSel");
   if (defServSel) { defServSel.value = String(prefNum("defServings", 0)); defServSel.addEventListener("change", () => setPrefNum("defServings", parseInt(defServSel.value, 10))); }
   root.querySelectorAll("[data-pref]").forEach((cb) => cb.addEventListener("change", () => setPrefBool(cb.dataset.pref, cb.checked)));

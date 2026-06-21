@@ -80,3 +80,37 @@ export function setContrast(on) {
   try { localStorage.setItem(CONTRAST_KEY, on ? "1" : "0"); } catch {}
   applyContrast(on);
 }
+
+// ---- Tema "festa" (coriandoli e palloncini animati di sottofondo) ----
+const FESTA_KEY = "ricettario.festa";
+export function getFesta() { try { return localStorage.getItem(FESTA_KEY) === "1"; } catch { return false; } }
+export function applyFesta(on) {
+  const v = on == null ? getFesta() : on;
+  document.documentElement.classList.toggle("theme-festa", !!v);
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let layer = document.getElementById("festa");
+  if (v && !reduce) {
+    if (!layer) {
+      layer = document.createElement("div");
+      layer.id = "festa";
+      layer.setAttribute("aria-hidden", "true");
+      const colors = ["#ff7a3d", "#ffd166", "#06d6a0", "#ef476f", "#5aa9ff", "#c77dff"];
+      let html = "";
+      for (let i = 0; i < 14; i++) {
+        const left = Math.round((i / 14) * 96 + (i % 3) * 2);
+        const dur = 6 + (i % 5);
+        const delay = -(i * 0.9).toFixed(1);
+        html += `<span class="festa__bit" style="left:${left}%;background:${colors[i % colors.length]};animation-duration:${dur}s;animation-delay:${delay}s"></span>`;
+      }
+      for (let i = 0; i < 3; i++) {
+        html += `<span class="festa__balloon" style="left:${18 + i * 32}%;animation-duration:${14 + i * 3}s;animation-delay:${-(i * 5)}s">🎈</span>`;
+      }
+      layer.innerHTML = html;
+      document.body.appendChild(layer);
+    }
+  } else if (layer) { layer.remove(); }
+}
+export function setFesta(on) {
+  try { localStorage.setItem(FESTA_KEY, on ? "1" : "0"); } catch {}
+  applyFesta(on);
+}
