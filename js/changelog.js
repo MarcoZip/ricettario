@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.59",
+    d: "2026-06-20",
+    items: [
+      "Nuovo: \"Prepara in anticipo\" nel Piano (vista Settimana) — guarda cosa hai pianificato nei prossimi giorni e ti ricorda cosa fare la sera prima (scongelare la carne/pesce, mettere in ammollo i legumi, tirare fuori burro e uova per i dolci)."
+    ]
+  },
+  {
     v: "7.58",
     d: "2026-06-20",
     items: [

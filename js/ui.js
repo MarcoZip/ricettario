@@ -5009,6 +5009,66 @@ function startOfWeek(d) {
   return x;
 }
 
+// Dagli ingredienti di una ricetta ricava le preparazioni da fare in anticipo
+// (scongelare, ammollo, tirare fuori dal frigo). Lista di {type, item}.
+function detectPrepAhead(recipe) {
+  const out = [];
+  const seen = new Set();
+  const dolci = (recipe.tags || []).some((t) => /dolc/i.test(t)) || /dolc|torta|crostata|tiramis/i.test(recipe.title || "");
+  for (const it of (recipe.ingredients || [])) {
+    const n = (it.name || "").toLowerCase();
+    if (!n) continue;
+    let type = null;
+    if (/surgelat|congelat/.test(n)) type = "scongela";
+    else if (/\b(gamber|scampi|pesce|merluzz|salmon|calamar|sepp|vongol|cozze|baccal|polpo|pollo|tacchin|carne|manzo|maiale|vitello|spezzatin|hamburger|macinat|coniglio|agnello)\b/.test(n)) type = "scongela";
+    else if (/\b(ceci|fagioli|cannellini|borlotti|cicerchie)\b/.test(n) || (/secch/.test(n) && /(ceci|fagioli|legumi|cannellini|borlotti|lenticch)/.test(n))) type = "ammollo";
+    else if (dolci && /\b(burro|uova|uovo)\b/.test(n)) type = "frigo";
+    if (type) {
+      const item = cleanIngName(it.name) || it.name;
+      const key = type + "|" + item;
+      if (item && !seen.has(key)) { seen.add(key); out.push({ type, item }); }
+    }
+  }
+  return out;
+}
+const PREP_AHEAD_LBL = { scongela: "❄️ Scongela (se surgelato)", ammollo: "💧 Metti in ammollo", frigo: "🧈 Tira fuori dal frigo" };
+
+// "Promemoria intelligenti": guarda i prossimi giorni del Piano e propone le
+// preparazioni da fare in anticipo, con promemoria la sera prima.
+function openPrepAheadPlan() {
+  const today = new Date();
+  let html = "", any = false;
+  for (let i = 1; i <= 3; i++) {
+    const d = new Date(today); d.setDate(today.getDate() + i);
+    const ds = ymd(d.getFullYear(), d.getMonth(), d.getDate());
+    const tips = [];
+    for (const e of store.getPlanByDate(ds)) {
+      const r = store.getRecipe(e.recipeId); if (!r) continue;
+      for (const t of detectPrepAhead(r)) tips.push({ ...t, dish: r.title });
+    }
+    if (!tips.length) continue;
+    any = true;
+    html += `<div class="ev-phase"><div class="ev-phase__t">📅 ${WEEKDAYS_IT[(d.getDay() + 6) % 7]} ${d.getDate()} ${MONTHS_IT[d.getMonth()].slice(0, 3).toLowerCase()}</div>
+      ${tips.map((t) => `<div class="ev-task"><span>${PREP_AHEAD_LBL[t.type]}: <b>${escapeHtml(t.item)}</b> <span class="ev-task__d">(per ${escapeHtml(t.dish)})</span></span></div>`).join("")}
+      <button class="btn btn--ghost btn--block" data-remind="${ds}" style="margin-top:6px">🔔 Ricordamelo la sera prima</button></div>`;
+  }
+  const m = openModal(`<h3 class="modal__title">🧠 Da preparare in anticipo</h3>${any ? `<p class="hint" style="margin-top:-6px">In base a cosa hai pianificato nei prossimi giorni.</p>${html}` : `<div class="hint">Niente da preparare in anticipo per i prossimi 3 giorni. Pianifica delle ricette nel Piano e ricontrolla.</div>`}<div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>`);
+  m.el.querySelector('[data-act="ok"]').onclick = m.close;
+  m.el.querySelectorAll("[data-remind]").forEach((b) => b.addEventListener("click", () => {
+    const ds = b.dataset.remind;
+    const [y, mo, da] = ds.split("-").map(Number);
+    const due = new Date(y, mo - 1, da - 1, 19, 0, 0, 0).getTime();
+    const items = [];
+    for (const e of store.getPlanByDate(ds)) { const r = store.getRecipe(e.recipeId); if (r) for (const t of detectPrepAhead(r)) items.push(t.item); }
+    if (due <= Date.now() || !items.length) { toast("Niente da ricordare (è già passata la sera prima?)", "error"); return; }
+    const list = getPrepReminders().filter((x) => !((x.recipeId || "") + "").startsWith("prep:" + ds));
+    list.push({ recipeId: "prep:" + ds, title: `Prepara per domani: ${[...new Set(items)].slice(0, 5).join(", ")}`, due });
+    setPrepReminders(list);
+    try { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
+    toast("Promemoria impostato per la sera prima (19:00)", "success");
+  }));
+}
+
 function renderPlan() {
   if (planView === "week") return renderPlanWeek();
   const today = new Date();
@@ -5114,6 +5174,7 @@ function renderPlanWeek() {
       <button class="btn btn--ghost" id="genWeek">${iconHtml("sparkle")} Menù settimana</button>
       <button class="btn btn--ghost" id="fillWeek">${iconHtml("sparkle")} Riempi le cene</button>
       <button class="btn btn--ghost" id="weekShop">${iconHtml("shopping-cart-simple")} Spesa settimana</button>
+      <button class="btn btn--ghost" id="prepAhead">🧠 Prepara in anticipo</button>
       <button class="btn btn--ghost" id="weekShare">${iconHtml("image")} Condividi il menù</button>
     </div>
   `;
@@ -5122,6 +5183,7 @@ function renderPlanWeek() {
   root.querySelector("#prevW").addEventListener("click", () => { const a = new Date(start); a.setDate(a.getDate() - 7); weekAnchor = a; render(); });
   root.querySelector("#nextW").addEventListener("click", () => { const a = new Date(start); a.setDate(a.getDate() + 7); weekAnchor = a; render(); });
   root.querySelector("#weekToday").addEventListener("click", () => { weekAnchor = startOfWeek(new Date()); render(); });
+  root.querySelector("#prepAhead").addEventListener("click", () => openPrepAheadPlan());
   root.querySelectorAll(".week-day__h").forEach((b) => b.addEventListener("click", () => openDaySheet(b.dataset.date)));
   root.querySelectorAll(".week-meal").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); if (b.dataset.recipe) openRecipe(b.dataset.recipe); }));
   wireUpcomingEvents();
