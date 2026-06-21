@@ -1109,7 +1109,9 @@ function recipeResultRow(r, i = 0) {
   const cooked = r.cookCount ? ` <span class="meta-cooked">${iconHtml("fire")} ${r.cookCount}</span>` : "";
   const tm = r.time ? ` <span class="meta-time">${iconHtml("timer")} ${r.time}′</span>` : "";
   const diff = r.difficulty ? ` <span class="meta-diff">${diffDots(r.difficulty)}</span>` : "";
-  return `<button class="pick-row stagger" data-id="${r.id}" style="--i:${i}"><span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span><span class="day-row__name">${escapeHtml(r.title)}${fav}${rate}${cooked}${tm}${diff}</span></button>`;
+  const srcLbl = recipeSourceLabel(r);
+  const src = srcLbl ? ` <span class="meta-src">${iconHtml("link-simple")} ${escapeHtml(srcLbl)}</span>` : "";
+  return `<button class="pick-row stagger" data-id="${r.id}" style="--i:${i}"><span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span><span class="day-row__name">${escapeHtml(r.title)}${fav}${rate}${cooked}${tm}${diff}${src}</span></button>`;
 }
 
 function renderHomeBody() {
@@ -1747,6 +1749,7 @@ function renderRecipeDetail() {
     ${(() => { const pa = prepAheadLabel(r); return pa ? `<div class="tag-row"><span class="tagchip tagchip--ahead">⏳ Richiede anticipo · ${pa}</span><button class="chip" id="prepRemind" style="margin-left:6px">⏰ Ricordamelo</button></div>` : ""; })()}
     ${(tagsArr.length || r.time || r.difficulty) ? `<div class="tag-row">${r.time ? `<span class="tagchip tagchip--ro">${iconHtml("timer")} ${r.time} min</span>` : ""}${r.difficulty ? `<span class="tagchip tagchip--ro">${diffDots(r.difficulty)} ${diffLabel(r.difficulty)}</span>` : ""}${tagsArr.map((t) => `<span class="tagchip tagchip--ro">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
     ${Array.isArray(r.allergens) && r.allergens.length ? `<div class="tag-row">${r.allergens.map((a) => `<span class="tagchip tagchip--allerg">⚠ ${escapeHtml(a)}</span>`).join("")}</div>` : ""}
+    ${(() => { const s = recipeSourceLabel(r); return s ? `<div class="tag-row"><span class="tagchip tagchip--src">${iconHtml("link-simple")} Fonte: ${escapeHtml(s)}</span></div>` : ""; })()}
     ${url ? `<a class="btn btn--block" id="openLink" href="${escapeHtml(url)}" target="_blank" rel="noopener" style="margin-bottom:16px">${iconHtml("arrow-square-out")} Apri la ricetta</a>` : ""}
 
     <div class="section-card">
@@ -3332,6 +3335,7 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
   const time = recipe ? (recipe.time || "") : (prefill && prefill.time ? prefill.time : "");
   const difficulty = recipe ? (recipe.difficulty || "") : "";
   const videoUrl = recipe ? (recipe.videoUrl || "") : (prefill && prefill.video ? prefill.video : "");
+  const source = recipe ? (recipe.source || "") : (prefill && prefill.source ? prefill.source : "");
   const ingText = recipe
     ? (recipe.ingredients || []).map((i) => i.raw || ingredientText(i)).join("\n")
     : (prefill && prefill.ingredients ? prefill.ingredients.join("\n") : "");
@@ -3565,7 +3569,8 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       photo: photo,
       tags: tags,
       allergens: allergens,
-      videoUrl: m.el.querySelector("#rVideo").value.trim()
+      videoUrl: m.el.querySelector("#rVideo").value.trim(),
+      source: source
     };
     if (!data.title) { toast("Inserisci un titolo", "error"); return; }
     // Se cambiano gli ingredienti o le porzioni, la stima nutrizionale salvata
@@ -3606,6 +3611,25 @@ function renderRicettario() {
 }
 
 const SOURCE_LABEL = { mealdb: "TheMealDB", gz: "GialloZafferano", misya: "Misya", cookist: "Cookist", ricettenonna: "Ricette della Nonna", moulinex: "Moulinex Companion", bimby: "Bimby", spoon: "Spoonacular", edamam: "Edamam" };
+// Riconosce la fonte di una ricetta dal dominio del link (per quelle importate).
+const HOST_SOURCE = [
+  [/giallozafferano\.it/i, "GialloZafferano"], [/fattoincasadabenedetta\.it/i, "Fatto in casa da Benedetta"],
+  [/misya\.info/i, "Misya"], [/cookist\.it/i, "Cookist"], [/ricettedellanonna\.net/i, "Ricette della Nonna"],
+  [/cookaround\.com/i, "Cookaround"], [/buttalapasta\.it/i, "Buttalapasta"], [/lacucinaitaliana\.it/i, "La Cucina Italiana"],
+  [/salepepe\.it/i, "Sale&Pepe"], [/cucchiaio\.it/i, "Cucchiaio d'Argento"], [/tavolartegusto\.it/i, "Tavolartegusto"],
+  [/cookidoo|thermomix|vorwerk/i, "Bimby · Cookidoo"], [/moulinex|clubcompanion|cookeo/i, "Moulinex Companion"],
+  [/themealdb\.com/i, "TheMealDB"], [/spoonacular\.com/i, "Spoonacular"], [/edamam\.com/i, "Edamam"],
+  [/youtube\.com|youtu\.be/i, "YouTube"], [/tiktok\.com/i, "TikTok"], [/instagram\.com/i, "Instagram"]
+];
+// Etichetta della fonte: prima quella salvata (import online), poi dal link.
+function recipeSourceLabel(recipe) {
+  if (!recipe) return "";
+  if (recipe.source) return SOURCE_LABEL[recipe.source] || recipe.source;
+  const url = recipe.url || "";
+  if (!url) return "";
+  for (const [re, label] of HOST_SOURCE) if (re.test(url)) return label;
+  try { return new URL(url).hostname.replace(/^www\./, ""); } catch (e) { return ""; }
+}
 function onlineSources() {
   const list = [
     { k: "all", label: "Tutte le fonti" },
@@ -3803,7 +3827,7 @@ async function saveMealResult(data, onProgress = () => {}) {
     onProgress(`${iconHtml("download-simple")} Importo...`);
     try {
       const r = await importFromUrl(data.link);
-      openRecipeForm({ prefill: { title: r.title, url: data.link, image: r.image, servings: r.servings, time: r.time, ingredients: r.ingredients, steps: r.steps, tags: r.tags } });
+      openRecipeForm({ prefill: { title: r.title, url: data.link, image: r.image, servings: r.servings, time: r.time, ingredients: r.ingredients, steps: r.steps, tags: r.tags, video: r.video, source: data.source } });
     } catch (e) { toast(e.message || "Import non riuscito", "error"); }
     return;
   }
@@ -3823,7 +3847,7 @@ async function saveMealResult(data, onProgress = () => {}) {
   src.ingredients = (src.ingredients || []).map(convertMeasures);
   src.steps = (src.steps || []).map(convertMeasures);
   onProgress(`${iconHtml("download-simple")} Traduco...`);
-  let prefill = { title: src.title, url: src.link, image: src.image, servings: src.servings, time: src.time, ingredients: src.ingredients, steps: src.steps };
+  let prefill = { title: src.title, url: src.link, image: src.image, servings: src.servings, time: src.time, ingredients: src.ingredients, steps: src.steps, source: data.source };
   try {
     const tr = await translateRecipe({ title: src.title, ingredients: prefill.ingredients, steps: prefill.steps });
     prefill = { ...prefill, title: tr.title, ingredients: tr.ingredients, steps: tr.steps };

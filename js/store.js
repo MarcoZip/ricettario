@@ -139,7 +139,7 @@ export async function deleteTool(id) {
   await adapter.deleteTool(id);
 }
 
-export async function addRecipe({ toolId, title, url, notes, ingredients, servings, steps, favorite, rating, photo, tags, time, allergens, difficulty, videoUrl }) {
+export async function addRecipe({ toolId, title, url, notes, ingredients, servings, steps, favorite, rating, photo, tags, time, allergens, difficulty, videoUrl, source }) {
   await adapter.addRecipe({
     id: newId(),
     toolId,
@@ -157,6 +157,7 @@ export async function addRecipe({ toolId, title, url, notes, ingredients, servin
     photo: photo || "",
     tags: Array.isArray(tags) ? tags : [],
     videoUrl: (videoUrl || "").trim(),
+    source: source || "",
     createdAt: now(),
     updatedAt: now()
   });

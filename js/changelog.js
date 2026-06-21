@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.49",
+    d: "2026-06-20",
+    items: [
+      "Ora vedi la fonte delle ricette importate (GialloZafferano, Misya, Cookist, Moulinex, Bimby…): un'etichetta \"Fonte\" nel dettaglio della ricetta e accanto al titolo negli elenchi.",
+      "Vale anche per le ricette già salvate: la fonte si ricava dal link, senza doverle reimportare."
+    ]
+  },
+  {
     v: "7.48",
     d: "2026-06-20",
     items: [
