@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.61",
+    d: "2026-06-20",
+    minor: true,
+    items: [
+      "Tocco grafico: in Modalità cucina i timer hanno un anello che si svuota col conto alla rovescia e vira all'arancione/rosso verso la fine."
+    ]
+  },
+  {
     v: "7.60",
     d: "2026-06-20",
     items: [

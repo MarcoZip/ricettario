@@ -3250,7 +3250,27 @@ function openCookingMode(recipe) {
     }
     ensureTicker();
     ensureAlarm();
-    paintTimers();
+    tickPaint();
+  }
+  // Aggiorna SOLO testo e anello dei timer esistenti (così l'anello si anima in
+  // modo fluido grazie alla transizione CSS, senza ridisegnare tutto).
+  function tickPaint() {
+    const box = el.querySelector("#ckTimers"); if (!box) return;
+    for (const t of timers) {
+      const row = box.querySelector(`.ctimer[data-id="${t.id}"]`);
+      if (!row) { paintTimers(); return; }
+      row.classList.toggle("is-done", t.remaining <= 0);
+      row.classList.toggle("is-alarm", !!t.alarming);
+      const tEl = row.querySelector(".ctimer__time"); if (tEl) tEl.textContent = t.alarming ? "Finito!" : fmt(t.remaining);
+      const fg = row.querySelector(".ctimer__ring-fg");
+      if (fg && t.total) {
+        const C = parseFloat(fg.dataset.c) || 94.2;
+        const frac = Math.max(0, Math.min(1, t.remaining / t.total));
+        fg.style.strokeDashoffset = (C * (1 - frac)).toFixed(1);
+        fg.style.stroke = t.alarming || t.remaining <= 0 ? "var(--danger)" : (frac <= 0.2 ? "#ff9f43" : "var(--primary)");
+      }
+      const tog = row.querySelector('[data-act="toggle"]'); if (tog) tog.textContent = t.alarming ? "🔕 OK" : (t.running ? "⏸" : "▶");
+    }
   }
   // Allarme ripetuto (suono + vibrazione) finché non lo si ferma toccando il timer.
   function ensureAlarm() {
@@ -3260,7 +3280,7 @@ function openCookingMode(recipe) {
   }
   function addTimer(mins, label) {
     const m = Math.max(1, parseInt(mins, 10) || 0);
-    timers.push({ id: ++tseq, label: (label || "").trim() || `Timer ${timers.length + 1}`, remaining: m * 60, running: true });
+    timers.push({ id: ++tseq, label: (label || "").trim() || `Timer ${timers.length + 1}`, remaining: m * 60, total: m * 60, running: true });
     ensureTicker();
     paintTimers();
   }
@@ -3268,12 +3288,21 @@ function openCookingMode(recipe) {
     const box = el.querySelector("#ckTimers");
     if (!box) return;
     if (!timers.length) { box.innerHTML = `<div class="cook__notim">Nessun timer attivo</div>`; return; }
-    box.innerHTML = timers.map((t) => `<div class="ctimer ${t.remaining <= 0 ? "is-done" : ""}${t.alarming ? " is-alarm" : ""}" data-id="${t.id}">
+    const C = 94.2; // circonferenza dell'anello (r=15)
+    box.innerHTML = timers.map((t) => {
+      const frac = t.total ? Math.max(0, Math.min(1, t.remaining / t.total)) : 0;
+      const off = (C * (1 - frac)).toFixed(1);
+      const col = t.alarming || t.remaining <= 0 ? "var(--danger)" : (frac <= 0.2 ? "#ff9f43" : "var(--primary)");
+      return `<div class="ctimer ${t.remaining <= 0 ? "is-done" : ""}${t.alarming ? " is-alarm" : ""}" data-id="${t.id}">
+      <span class="ctimer__ringwrap"><svg class="ctimer__ring" viewBox="0 0 38 38">
+        <circle class="ctimer__ring-bg" cx="19" cy="19" r="15"></circle>
+        <circle class="ctimer__ring-fg" cx="19" cy="19" r="15" data-c="${C}" stroke-dasharray="${C}" stroke-dashoffset="${off}" style="stroke:${col}" transform="rotate(-90 19 19)"></circle>
+      </svg></span>
       <span class="ctimer__lbl">${escapeHtml(t.label)}</span>
       <span class="ctimer__time">${t.alarming ? "Finito!" : fmt(t.remaining)}</span>
       <button class="ctimer__btn" data-act="toggle">${t.alarming ? "🔕 OK" : (t.running ? "⏸" : "▶")}</button>
       <button class="ctimer__btn" data-act="del">✕</button>
-    </div>`).join("");
+    </div>`; }).join("");
     box.querySelectorAll(".ctimer").forEach((row) => {
       const id = parseInt(row.dataset.id, 10);
       const t = timers.find((x) => x.id === id);

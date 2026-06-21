@@ -1313,6 +1313,11 @@ html[data-theme="dark"] .alert-banner { color: #ffcf94; }
 .ctimer.is-done { border-color: var(--primary); animation: pulse 1s infinite; }
 .ctimer.is-alarm { border-color: #ff5a5a; background: rgba(255, 90, 90, 0.16); animation: alarmFlash 0.7s steps(1) infinite; }
 @keyframes alarmFlash { 50% { background: rgba(255, 90, 90, 0.42); } }
+.ctimer__ringwrap { width: 38px; height: 38px; flex-shrink: 0; }
+.ctimer__ring { width: 38px; height: 38px; display: block; }
+.ctimer__ring-bg { fill: none; stroke: #2c2d36; stroke-width: 3.5; }
+.ctimer__ring-fg { fill: none; stroke: var(--primary); stroke-width: 3.5; stroke-linecap: round; }
+@media (prefers-reduced-motion: no-preference) { .ctimer__ring-fg { transition: stroke-dashoffset 1s linear, stroke 0.4s ease; } }
 .ctimer__lbl { flex: 1; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ctimer__time { font-variant-numeric: tabular-nums; font-weight: 800; font-size: 1.1rem; min-width: 58px; text-align: right; }
 .ctimer__btn { background: #2c2d36; border: none; color: #fff; width: 34px; height: 34px; border-radius: 9px; font-size: 0.95rem; flex-shrink: 0; }
