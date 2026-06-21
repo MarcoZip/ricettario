@@ -1150,6 +1150,7 @@ a { color: var(--primary-2); }
 .ev-dish__chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .ev-chip { font-size: 0.72rem; font-weight: 700; color: var(--text-soft); background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; }
 .ev-chip--guest { color: #5aa9ff; }
+.ev-chip--who { color: #c77dff; }
 .ev-chip--ahead { color: var(--primary-2); }
 .ev-chip--ok { color: #06d6a0; border-color: rgba(6, 214, 160, 0.4); background: rgba(6, 214, 160, 0.12); }
 .ev-chip--warn { color: #e9a23b; border-color: rgba(233, 162, 59, 0.4); background: rgba(233, 162, 59, 0.12); }

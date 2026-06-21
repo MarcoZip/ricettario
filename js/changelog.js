@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.60",
+    d: "2026-06-20",
+    items: [
+      "Cuciniamo in due: nei Menù delle feste puoi assegnare ogni piatto a un cuoco (\"Chi lo prepara\"). Nel Piano di battaglia compare il riepilogo \"Chi fa cosa\" e ogni passo mostra a chi tocca."
+    ]
+  },
+  {
     v: "7.59",
     d: "2026-06-20",
     items: [

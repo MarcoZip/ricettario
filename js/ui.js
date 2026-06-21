@@ -5611,6 +5611,7 @@ function eventDishRow(d, guests) {
   else if ((+d.prepDay || 0) > 0) chips.push(`<span class="ev-chip ev-chip--ahead">${PREP_DAY_SHORT[+d.prepDay] || "prima"}</span>`);
   if (d.time) chips.push(`<span class="ev-chip">${d.time}′</span>`);
   if (d.usesOven && d.ovenTemp) chips.push(`<span class="ev-chip">🔥 ${d.ovenTemp}°</span>`);
+  if (d.assignedTo) chips.push(`<span class="ev-chip ev-chip--who">👩‍🍳 ${escapeHtml(d.assignedTo)}</span>`);
   const safety = dishSafetyChip(d, guests);
   if (safety) chips.push(safety);
   return `<button class="ev-dish" data-dish="${d.id}"><span class="ev-dish__name">${escapeHtml(d.title || "Piatto")}</span><span class="ev-dish__chips">${chips.join("")}</span></button>`;
@@ -5707,6 +5708,7 @@ function openEventDishEditor(eventId, dish) {
     <label class="ev-field"><span>Tempo (minuti)</span><input type="number" id="dTime" min="0" inputmode="numeric" value="${dish.time != null ? dish.time : ""}" placeholder="${isGuest ? "minuti per scaldarlo" : "minuti di cottura"}" /></label>
     <label class="ev-field" id="dPrepWrap"><span>Quando prepararlo</span><select id="dPrep">${prepOpts}</select></label>
     <label class="ev-field"><span>Come si serve</span><select id="dTemp">${tempOpts}</select></label>
+    <label class="ev-field"><span>Chi lo prepara (facoltativo)</span><input type="text" id="dWho" value="${escapeHtml(dish.assignedTo || "")}" placeholder="Es. Io, Federica…" /></label>
     <label class="ev-row-chk"><span>Usa il forno</span><input type="checkbox" id="dOven" class="mini-check" ${dish.usesOven ? "checked" : ""} /></label>
     <label class="ev-field" id="dOvenTempWrap" style="${dish.usesOven ? "" : "display:none"}"><span>Temperatura forno (°C)</span><input type="number" id="dOvenTemp" min="0" inputmode="numeric" value="${dish.ovenTemp != null ? dish.ovenTemp : ""}" placeholder="es. 180" /></label>
     <div class="modal__actions">
@@ -5743,7 +5745,8 @@ function openEventDishEditor(eventId, dish) {
       ovenTemp: ovenChk.checked && ovenTempVal !== "" ? (parseInt(ovenTempVal, 10) || null) : null,
       reheatOnly: reheat,
       broughtByGuest: !!dish.broughtByGuest,
-      guestName: isGuest && m.el.querySelector("#dGuest") ? m.el.querySelector("#dGuest").value.trim() : ""
+      guestName: isGuest && m.el.querySelector("#dGuest") ? m.el.querySelector("#dGuest").value.trim() : "",
+      assignedTo: (m.el.querySelector("#dWho").value || "").trim()
     };
     const list = [...(ev.dishes || [])];
     const i = list.findIndex((d) => d.id === updated.id);
@@ -5764,7 +5767,12 @@ function openEventPlan(eventId) {
   const dayName = (d) => `${WEEKDAYS_IT[(d.getDay() + 6) % 7].toLowerCase()} ${d.getDate()} ${MONTHS_IT[d.getMonth()].slice(0, 3).toLowerCase()}`;
   const clock = (dt) => `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
 
-  let html = `<div class="ev-phase"><div class="ev-phase__t">🛒 Spesa</div>
+  // "Chi fa cosa": raggruppa i piatti per cuoco assegnato (cuciniamo in due).
+  const byCook = {};
+  for (const d of dishes) { const w = (d.assignedTo || "").trim(); if (w) (byCook[w] = byCook[w] || []).push(d.title); }
+  const cooks = Object.keys(byCook);
+  let html = cooks.length ? `<div class="ev-phase"><div class="ev-phase__t">👥 Chi fa cosa</div>${cooks.map((w) => `<div class="ev-task"><span>👩‍🍳 <b>${escapeHtml(w)}</b>: ${byCook[w].map(escapeHtml).join(", ")}</span></div>`).join("")}</div>` : "";
+  html += `<div class="ev-phase"><div class="ev-phase__t">🛒 Spesa</div>
     <label class="ev-task">${chk("shop-big")}<span>Spesa grossa (dispensa, surgelati, non deperibili) — qualche giorno prima</span></label>
     <label class="ev-task">${chk("shop-fresh")}<span>Spesa fresca (verdure, pesce, pane) — 1-2 giorni prima</span></label>
     <button class="btn btn--ghost btn--block" id="evpShop" style="margin-top:6px">${iconHtml("shopping-cart-simple")} Aggiungi tutto alla lista della spesa</button></div>`;
@@ -5774,7 +5782,7 @@ function openEventPlan(eventId) {
     const d0 = new Date(serving); d0.setDate(d0.getDate() - pd);
     const list = dishes.filter((d) => !d.reheatOnly && (+d.prepDay || 0) === pd);
     html += `<div class="ev-phase"><div class="ev-phase__t">📅 ${PREP_DAY_LABELS[pd] || pd + " giorni prima"} <span class="ev-phase__d">(${dayName(d0)})</span></div>
-      ${list.map((d) => `<label class="ev-task">${chk("ah:" + d.id)}<span>Prepara <b>${escapeHtml(d.title)}</b>${d.time ? ` <span class="ev-task__d">(${d.time}′)</span>` : ""}</span></label>`).join("")}</div>`;
+      ${list.map((d) => `<label class="ev-task">${chk("ah:" + d.id)}<span>Prepara <b>${escapeHtml(d.title)}</b>${d.time ? ` <span class="ev-task__d">(${d.time}′)</span>` : ""}${d.assignedTo ? ` <span class="ev-task__d">· 👩‍🍳 ${escapeHtml(d.assignedTo)}</span>` : ""}</span></label>`).join("")}</div>`;
   }
 
   const sched = dishes.filter((d) => (d.reheatOnly || (+d.prepDay || 0) === 0) && d.time != null)
@@ -5782,7 +5790,7 @@ function openEventPlan(eventId) {
     .sort((a, b) => a.start - b.start);
   const noTime = dishes.filter((d) => (d.reheatOnly || (+d.prepDay || 0) === 0) && d.time == null);
   const warmAhead = dishes.filter((d) => !d.reheatOnly && (+d.prepDay || 0) > 0 && d.servedTemp === "caldo");
-  let dayHtml = sched.map(({ d, start }) => `<div class="ct-step"><span class="ct-step__time">${clock(start)}</span><span class="ct-step__txt">${d.reheatOnly ? "scalda" : "inizia"} <b>${escapeHtml(d.title)}</b> <span class="ct-step__d">(${d.time}′${d.usesOven && d.ovenTemp ? `, forno ${d.ovenTemp}°` : ""})</span></span></div>`).join("");
+  let dayHtml = sched.map(({ d, start }) => `<div class="ct-step"><span class="ct-step__time">${clock(start)}</span><span class="ct-step__txt">${d.reheatOnly ? "scalda" : "inizia"} <b>${escapeHtml(d.title)}</b> <span class="ct-step__d">(${d.time}′${d.usesOven && d.ovenTemp ? `, forno ${d.ovenTemp}°` : ""})</span>${d.assignedTo ? ` <span class="ct-step__d">· 👩‍🍳 ${escapeHtml(d.assignedTo)}</span>` : ""}</span></div>`).join("");
   dayHtml += `<div class="ct-step ct-step--end"><span class="ct-step__time">${clock(serving)}</span><span class="ct-step__txt">🍽️ <b>In tavola!</b></span></div>`;
   html += `<div class="ev-phase"><div class="ev-phase__t">🔥 Il giorno della festa <span class="ev-phase__d">(${dayName(serving)})</span></div>
     ${warmAhead.length ? `<div class="hint" style="margin-bottom:8px">Da tirare fuori dal frigo / scaldare: ${warmAhead.map((d) => escapeHtml(d.title)).join(", ")}.</div>` : ""}
