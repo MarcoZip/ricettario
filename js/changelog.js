@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.57",
+    d: "2026-06-20",
+    items: [
+      "Importa da video: la ricerca online ora filtra sulla fonte del video (es. da un video di Cookist cerca su Cookist, da uno di GialloZafferano su GialloZafferano), così trovi proprio la ricetta dello stesso autore. Se serve, puoi sempre passare a \"Tutte le fonti\"."
+    ]
+  },
+  {
     v: "7.56",
     d: "2026-06-20",
     items: [

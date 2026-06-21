@@ -2314,6 +2314,19 @@ function dishQueryFromTitle(title, author) {
   return t;
 }
 
+// Dall'autore/canale del video ricava la fonte del Ricettario online su cui
+// filtrare la ricerca (così cerca sullo stesso sito del video). null = tutte.
+function sourceFromAuthor(author) {
+  const a = (author || "").toLowerCase();
+  if (/giallo\s*zafferano/.test(a)) return "gz";
+  if (/cookist/.test(a)) return "cookist";
+  if (/misya/.test(a)) return "misya";
+  if (/ricette\s*della\s*nonna|\bnonna\b/.test(a)) return "ricettenonna";
+  if (/moulinex|companion|cookeo/.test(a)) return "moulinex";
+  if (/bimby|cookidoo|thermomix/.test(a)) return "bimby";
+  return null;
+}
+
 function openVideoImport(prefillUrl, onRecipe) {
   const m = openModal(`
     <h3 class="modal__title">📱 Importa da video</h3>
@@ -2333,6 +2346,8 @@ function openVideoImport(prefillUrl, onRecipe) {
     const meta = await videoMeta(url);
     const q = meta && meta.title ? dishQueryFromTitle(meta.title, meta.author) : "";
     if (!q) { body.innerHTML = `<div class="hint" style="color:var(--danger)">Non riconosco questo video. Funziona con i link di YouTube o TikTok.</div>`; return; }
+    const src = meta ? sourceFromAuthor(meta.author) : null;
+    if (src) mealSource = src; // filtra sulla fonte del video (es. Cookist)
     closeAllModals(); // chiude anche il form della ricetta sotto, altrimenti copre i risultati
     searchOnline(q);
     if (videoInfo(url)) pendingVideoForImport = url; // aggancia il video alla ricetta che importerai
@@ -2359,9 +2374,11 @@ function openVideoImport(prefillUrl, onRecipe) {
       const meta = url ? await videoMeta(url) : null;
       if (meta && meta.title) {
         const q = dishQueryFromTitle(meta.title, meta.author);
-        body.insertAdjacentHTML("beforeend", `<div class="hint" style="margin-top:12px">🎬 Riconosciuto: <b>${escapeHtml(meta.title)}</b>${meta.author ? ` · ${escapeHtml(meta.author)}` : ""}.</div>${q ? `<button class="btn btn--primary btn--block" id="viSearch" style="margin-top:8px">${iconHtml("magnifying-glass")} Cerca "${escapeHtml(q)}" nel Ricettario online</button>` : ""}`);
+        const src = sourceFromAuthor(meta.author);
+        const where = src ? `su ${escapeHtml(SOURCE_LABEL[src] || src)}` : "nel Ricettario online";
+        body.insertAdjacentHTML("beforeend", `<div class="hint" style="margin-top:12px">🎬 Riconosciuto: <b>${escapeHtml(meta.title)}</b>${meta.author ? ` · ${escapeHtml(meta.author)}` : ""}.</div>${q ? `<button class="btn btn--primary btn--block" id="viSearch" style="margin-top:8px">${iconHtml("magnifying-glass")} Cerca "${escapeHtml(q)}" ${where}</button>` : ""}`);
         const sb = body.querySelector("#viSearch");
-        if (sb) sb.onclick = () => { closeAllModals(); searchOnline(q); if (videoInfo(url)) pendingVideoForImport = url; };
+        if (sb) sb.onclick = () => { if (src) mealSource = src; closeAllModals(); searchOnline(q); if (videoInfo(url)) pendingVideoForImport = url; };
       }
     }
   };
