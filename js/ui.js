@@ -1792,7 +1792,7 @@ function renderRecipeDetail() {
     <button class="btn btn--block" id="cookedBtn" style="margin-bottom:10px">${iconHtml("fire")} Segna come cucinata${r.cookCount ? ` · ${r.cookCount} ${r.cookCount === 1 ? "volta" : "volte"}` : ""}</button>
     <button class="btn btn--block" id="reviewBtn" style="margin-bottom:10px">📝 Com'è venuta? (voto, foto, nota)</button>
     <button class="btn btn--block" id="timelineBtn" style="margin-bottom:10px">🕐 Quando inizio? (per servire in orario)</button>
-    ${videoInfo(r.url) ? `<button class="btn btn--block" id="watchVideo" style="margin-bottom:10px">▶ Guarda il video</button>` : ""}
+    ${(videoInfo(r.videoUrl) || videoInfo(r.url)) ? `<button class="btn btn--block" id="watchVideo" style="margin-bottom:10px">▶ Guarda il video</button>` : ""}
     <button class="btn btn--block" id="checkPhotoBtn" style="margin-bottom:10px">📷 Com'è venuto? Controlla con una foto</button>
     <input type="file" id="checkPhotoFile" accept="image/*" capture="environment" hidden />
     ${isImportConfigured() ? `<button class="btn btn--block" id="askChefBtn" style="margin-bottom:10px">💬 Chiedi allo chef (AI)</button>` : ""}
@@ -1904,7 +1904,7 @@ function renderRecipeDetail() {
   const askChefBtn = root.querySelector("#askChefBtn");
   if (askChefBtn) askChefBtn.addEventListener("click", () => openAskChef(r));
   const watchVideo = root.querySelector("#watchVideo");
-  if (watchVideo) watchVideo.addEventListener("click", () => openVideoPlayer(r.url));
+  if (watchVideo) watchVideo.addEventListener("click", () => openVideoPlayer(videoInfo(r.videoUrl) ? r.videoUrl : r.url));
   const robotBtn = root.querySelector("#robotBtn");
   if (robotBtn) robotBtn.addEventListener("click", () => openRobotMode(r));
   const convertBtn = root.querySelector("#convertBtn");
@@ -2482,7 +2482,7 @@ function videoInfo(url) {
     if (mm) return { kind: "tiktok", embed: `https://www.tiktok.com/embed/v2/${mm[1]}`, tall: true };
     return { kind: "external" };
   }
-  if (h === "vimeo.com") { const mm = u.pathname.match(/\/(\d+)/); if (mm) return { kind: "vimeo", embed: `https://player.vimeo.com/video/${mm[1]}`, tall: false }; }
+  if (h === "vimeo.com" || h === "player.vimeo.com") { const mm = u.pathname.match(/\/(\d+)/); if (mm) return { kind: "vimeo", embed: `https://player.vimeo.com/video/${mm[1]}`, tall: false }; }
   if (h.endsWith("instagram.com") || h.endsWith("facebook.com") || h.endsWith("fb.watch")) return { kind: "external" };
   return null;
 }
@@ -3331,6 +3331,7 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
   const servings = recipe ? (recipe.servings || "") : (prefill && prefill.servings ? prefill.servings : "");
   const time = recipe ? (recipe.time || "") : (prefill && prefill.time ? prefill.time : "");
   const difficulty = recipe ? (recipe.difficulty || "") : "";
+  const videoUrl = recipe ? (recipe.videoUrl || "") : (prefill && prefill.video ? prefill.video : "");
   const ingText = recipe
     ? (recipe.ingredients || []).map((i) => i.raw || ingredientText(i)).join("\n")
     : (prefill && prefill.ingredients ? prefill.ingredients.join("\n") : "");
@@ -3380,6 +3381,11 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       <input type="url" id="rUrl" inputmode="url" placeholder="https://..." value="${escapeHtml(url)}" />
       ${importBtn}
       ${isImportConfigured() ? `<button type="button" class="btn btn--ghost" id="rImportVideo" style="margin-top:8px">📱 Importa da video social (TikTok/Instagram/YouTube)</button>` : ""}
+    </div>
+    <div class="field">
+      <label>Link video (facoltativo)</label>
+      <input type="url" id="rVideo" inputmode="url" placeholder="https://youtu.be/... (YouTube, TikTok, Vimeo)" value="${escapeHtml(videoUrl)}" />
+      <div class="hint" style="margin-top:4px">Se la pagina della ricetta ha un video, lo trovo in automatico all'import; oppure incollalo qui.</div>
     </div>
     <div class="field-row">
       <div class="field">
@@ -3512,6 +3518,7 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       if (data.steps && data.steps.length) m.el.querySelector("#rSteps").value = data.steps.join("\n");
       if (data.image && !photo) { photo = data.image; renderPhoto(); }
       if (data.tags && data.tags.length) data.tags.forEach((tg) => addTag(tg));
+      if (data.video && !m.el.querySelector("#rVideo").value.trim()) { m.el.querySelector("#rVideo").value = data.video; toast("Trovato anche un video 🎬", "success"); }
       toast("Ricetta importata", "success");
     } catch (e) {
       toast(e.message || "Import non riuscito", "error");
@@ -3534,6 +3541,8 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
     }
     if (data.image && !photo) { photo = data.image; renderPhoto(); }
     if (data.sourceUrl && !m.el.querySelector("#rUrl").value.trim()) m.el.querySelector("#rUrl").value = data.sourceUrl;
+    // Se l'import arriva da un video social, salvo anche il link video.
+    if (data.sourceUrl && videoInfo(data.sourceUrl) && !m.el.querySelector("#rVideo").value.trim()) m.el.querySelector("#rVideo").value = data.sourceUrl;
     if (data.tags && data.tags.length) data.tags.forEach((tg) => addTag(tg));
   };
   const rImportVideo = m.el.querySelector("#rImportVideo");
@@ -3555,7 +3564,8 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       steps: m.el.querySelector("#rSteps").value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean),
       photo: photo,
       tags: tags,
-      allergens: allergens
+      allergens: allergens,
+      videoUrl: m.el.querySelector("#rVideo").value.trim()
     };
     if (!data.title) { toast("Inserisci un titolo", "error"); return; }
     // Se cambiano gli ingredienti o le porzioni, la stima nutrizionale salvata

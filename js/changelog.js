@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.48",
+    d: "2026-06-20",
+    items: [
+      "Se la pagina di una ricetta contiene un video, ora viene salvato il link: nella ricetta trovi \"▶ Guarda il video\" e lo guardi dentro l'app.",
+      "Puoi anche incollare a mano un link video (YouTube, TikTok, Vimeo) nella ricetta (campo \"Link video\")."
+    ]
+  },
+  {
     v: "7.47",
     d: "2026-06-20",
     items: [

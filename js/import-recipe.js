@@ -302,6 +302,7 @@ export async function importFromUrl(url) {
     time: typeof data.time === "number" ? data.time : (parseInt(data.time, 10) || null),
     ingredients: Array.isArray(data.ingredients) ? data.ingredients : [],
     steps: Array.isArray(data.steps) ? data.steps : [],
-    tags: cleanTags(data.tags)
+    tags: cleanTags(data.tags),
+    video: typeof data.video === "string" ? data.video : ""
   };
 }

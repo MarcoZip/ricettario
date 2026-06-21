@@ -449,7 +449,11 @@ export default {
 
     html = await res.text();
     const recipe = extractRecipe(html) || extractMicrodata(html) || extractHeuristic(html);
-    if (recipe) return json(recipe, 200);
+    if (recipe) {
+      // Se la pagina contiene anche un video (YouTube/Vimeo/TikTok), allego il link.
+      if (!recipe.video) { const v = extractVideo(html); if (v) recipe.video = v; }
+      return json(recipe, 200);
+    }
 
     // Nessuna ricetta trovata: distingui una pagina di sfida anti-bot da una
     // pagina senza dati. Qui l'estrazione è GIÀ fallita, quindi i segnali tipici
@@ -461,6 +465,27 @@ export default {
     return json({ error: "notfound", message: "Nessuna ricetta strutturata trovata" }, 404);
   }
 };
+
+// Cerca nella pagina un video incorporato (YouTube/Vimeo/TikTok) e ne ricava il
+// link da salvare con la ricetta. Restituisce "" se non trova nulla.
+function extractVideo(html) {
+  const deEsc = (s) => String(s || "").replace(/\\\//g, "/").replace(/&amp;/g, "&").replace(/&#0?38;/g, "&");
+  const fix = (u) => { u = deEsc(u).trim(); if (u.startsWith("//")) u = "https:" + u; return u; };
+  // 1) meta og:video (spesso un embed YouTube/Vimeo)
+  let m = html.match(/<meta[^>]+(?:property|name)=["']og:video(?::secure_url|:url)?["'][^>]+content=["']([^"']+)["']/i);
+  if (m && /youtu|vimeo|tiktok/i.test(m[1])) return fix(m[1]);
+  // 2) iframe di embed
+  m = html.match(/<iframe[^>]+src=["']([^"']*(?:youtube(?:-nocookie)?\.com\/embed|player\.vimeo\.com\/video|youtu\.be|tiktok\.com\/embed)[^"']*)["']/i);
+  if (m) return fix(m[1]);
+  // 3) JSON-LD VideoObject (embedUrl o contentUrl)
+  m = html.match(/"(?:embedUrl|contentUrl)"\s*:\s*"([^"]*(?:youtu|vimeo|tiktok)[^"]*)"/i);
+  if (m) return fix(m[1]);
+  // 4) primo link YouTube/Vimeo trovato nel testo (anche con slash escappati)
+  const flat = deEsc(html);
+  m = flat.match(/https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=[A-Za-z0-9_\-]{6,}|youtu\.be\/[A-Za-z0-9_\-]{6,}|vimeo\.com\/\d{6,})/i);
+  if (m) return m[0];
+  return "";
+}
 
 // Prende gli <li> della prima lista (ul/ol) che segue un'intestazione (h1-h4)
 // il cui testo combacia con `re`. Usato dall'estrazione euristica.
