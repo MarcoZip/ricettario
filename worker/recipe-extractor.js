@@ -476,8 +476,12 @@ export default {
 async function readerFallback(target, env) {
   let md = "";
   try {
+    const headers = { "Accept": "text/plain", "X-Return-Format": "markdown" };
+    // Chiave jina opzionale (secret JINA_KEY): senza, vale la quota gratuita per
+    // IP (può venire limitata); con la chiave i limiti sono molto più alti.
+    if (env && env.JINA_KEY) headers["Authorization"] = "Bearer " + env.JINA_KEY;
     const rr = await fetch("https://r.jina.ai/" + target, {
-      headers: { "Accept": "text/plain", "X-Return-Format": "markdown" },
+      headers,
       cf: { cacheTtl: 1800, cacheEverything: true }
     });
     if (!rr.ok) return null;
