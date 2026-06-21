@@ -247,6 +247,12 @@ function openModal(innerHtml) {
   return { el: backdrop.querySelector(".modal"), close };
 }
 
+// Chiude tutti i modali aperti (usato quando si esce dai modali per andare in
+// un'altra schermata, es. la ricerca online dal modale "Importa da video").
+function closeAllModals() {
+  document.querySelectorAll("#modalRoot .modal-backdrop").forEach((b) => b.remove());
+}
+
 export function confirmDialog({ title, message, confirmText = "Conferma", danger = false }) {
   return new Promise((resolve) => {
     const m = openModal(`
@@ -2326,7 +2332,7 @@ function openVideoImport(prefillUrl, onRecipe) {
     const meta = await videoMeta(url);
     const q = meta && meta.title ? dishQueryFromTitle(meta.title, meta.author) : "";
     if (!q) { body.innerHTML = `<div class="hint" style="color:var(--danger)">Non riconosco questo video. Funziona con i link di YouTube o TikTok.</div>`; return; }
-    m.close();
+    closeAllModals(); // chiude anche il form della ricetta sotto, altrimenti copre i risultati
     searchOnline(q);
   };
   m.el.querySelector("#viSearchNow").onclick = () => doSearchOnline(m.el.querySelector("#viUrl").value.trim());
@@ -2353,7 +2359,7 @@ function openVideoImport(prefillUrl, onRecipe) {
         const q = dishQueryFromTitle(meta.title, meta.author);
         body.insertAdjacentHTML("beforeend", `<div class="hint" style="margin-top:12px">🎬 Riconosciuto: <b>${escapeHtml(meta.title)}</b>${meta.author ? ` · ${escapeHtml(meta.author)}` : ""}.</div>${q ? `<button class="btn btn--primary btn--block" id="viSearch" style="margin-top:8px">${iconHtml("magnifying-glass")} Cerca "${escapeHtml(q)}" nel Ricettario online</button>` : ""}`);
         const sb = body.querySelector("#viSearch");
-        if (sb) sb.onclick = () => { m.close(); searchOnline(q); };
+        if (sb) sb.onclick = () => { closeAllModals(); searchOnline(q); };
       }
     }
   };

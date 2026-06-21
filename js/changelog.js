@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.55",
+    d: "2026-06-20",
+    items: [
+      "Risolto: toccando \"Cerca questa ricetta online\" dalla finestra Importa da video, ora la finestra della ricetta si chiude e vedi davvero i risultati della ricerca (prima restava aperta e li copriva)."
+    ]
+  },
+  {
     v: "7.54",
     d: "2026-06-20",
     minor: true,
