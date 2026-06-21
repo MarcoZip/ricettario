@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.54",
+    d: "2026-06-20",
+    minor: true,
+    items: [
+      "Importa da video: il nome del piatto viene ricavato ancora meglio dal titolo (taglia anche al primo emoji e toglie i caratteri invisibili), quindi la ricerca online è più mirata (es. da un video di tempura trova proprio le ricette di tempura)."
+    ]
+  },
+  {
     v: "7.53",
     d: "2026-06-20",
     minor: true,
