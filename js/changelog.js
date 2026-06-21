@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.52",
+    d: "2026-06-20",
+    items: [
+      "Import da link più potente: se un sito blocca la lettura automatica (es. Fatto in Casa da Benedetta), l'app riprova con un lettore alternativo e riesce comunque a ricavare ingredienti e passi."
+    ]
+  },
+  {
     v: "7.51",
     d: "2026-06-20",
     items: [

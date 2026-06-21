@@ -443,6 +443,8 @@ export default {
     // codice di errore. NB: la sola presenza di script Cloudflare in una pagina
     // valida non è un blocco, quindi prima si prova comunque a estrarre.
     if (res.status === 403 || res.status === 503 || res.status === 429) {
+      const viaReader = await readerFallback(target, env);
+      if (viaReader) return json(viaReader, 200);
       return json({ error: "blocked", message: "Questo sito blocca la lettura automatica." }, 200);
     }
     if (!res.ok) return json({ error: "unreachable", message: "Pagina non raggiungibile" }, 502);
@@ -460,11 +462,64 @@ export default {
     // di Cloudflare/Turnstile indicano con buona certezza un blocco (su una
     // ricetta vera la pagina sarebbe stata estratta sopra).
     if (/Just a moment|cf-browser-verification|Checking your browser|Attention Required|challenge-platform|turnstile|cf-chl|_cf_chl|enable javascript and cookies/i.test(html)) {
+      const viaReader = await readerFallback(target, env);
+      if (viaReader) return json(viaReader, 200);
       return json({ error: "blocked", message: "Questo sito blocca la lettura automatica." }, 200);
     }
     return json({ error: "notfound", message: "Nessuna ricetta strutturata trovata" }, 404);
   }
 };
+
+// Quando un sito blocca la lettura diretta, riprova con un "lettore" esterno
+// (r.jina.ai) che restituisce il testo pulito della pagina da un altro IP, poi
+// struttura la ricetta con l'AI. Ritorna null se non ci riesce.
+async function readerFallback(target, env) {
+  if (!env || !env.AI) return null; // serve l'AI per strutturare il testo
+  let md = "";
+  try {
+    const rr = await fetch("https://r.jina.ai/" + target, {
+      headers: { "Accept": "text/plain", "X-Return-Format": "markdown" },
+      cf: { cacheTtl: 1800, cacheEverything: true }
+    });
+    if (!rr.ok) return null;
+    md = await rr.text();
+  } catch (e) { return null; }
+  if (!md || md.length < 200) return null;
+  const region = recipeRegion(md);
+  try {
+    const messages = [
+      { role: "system", content: "Estrai la ricetta dal testo dato. Rispondi SOLO in JSON valido con i campi: title (stringa), servings (numero o null), ingredients (array di stringhe, una per ingrediente con quantità), steps (array di stringhe, un passo per elemento). Tutto in italiano. Usa solo ciò che è presente nel testo, non inventare." },
+      { role: "user", content: region.slice(0, 6000) }
+    ];
+    const out = await aiText(env, messages, 900, RECIPE_SCHEMA);
+    const j = extractJson(out);
+    if (j && ((Array.isArray(j.ingredients) && j.ingredients.length) || (Array.isArray(j.steps) && j.steps.length))) {
+      const v = extractVideo(md);
+      const title = j.title || (md.match(/^#\s*(.+)$/m) || [])[1] || (md.match(/Title:\s*(.+)/) || [])[1] || "";
+      return {
+        title: String(title).trim(),
+        image: "",
+        servings: typeof j.servings === "number" ? j.servings : null,
+        time: null,
+        ingredients: (j.ingredients || []).map((s) => String(s)).filter(Boolean),
+        steps: (j.steps || []).map((s) => String(s)).filter(Boolean),
+        tags: [],
+        video: v || ""
+      };
+    }
+  } catch (e) { /* l'AI non ha strutturato: rinuncio */ }
+  return null;
+}
+
+// Ritaglia dal testo (markdown del lettore) la zona della ricetta, centrata
+// sugli "Ingredienti" (così non sprechiamo il contesto su intro e menu).
+function recipeRegion(md) {
+  const i = md.search(/#{0,3}\s*Ingredienti/i);
+  if (i >= 0) return md.slice(Math.max(0, i - 3000), i + 3500);
+  const p = md.search(/Preparazione|Procedimento|Esecuzione/i);
+  if (p >= 0) return md.slice(Math.max(0, p - 3000), p + 3000);
+  return md.slice(0, 6000);
+}
 
 // Cerca nella pagina un video incorporato (YouTube/Vimeo/TikTok) e ne ricava il
 // link da salvare con la ricetta. Restituisce "" se non trova nulla.
