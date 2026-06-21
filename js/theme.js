@@ -82,10 +82,47 @@ export function setContrast(on) {
 }
 
 // ---- Tema "festa" (coriandoli e palloncini animati di sottofondo) ----
+// Tre modalità: "off" | "on" (sempre) | "auto" (solo nei giorni di festa o
+// quando c'è un Menù delle feste in programma per oggi).
 const FESTA_KEY = "ricettario.festa";
-export function getFesta() { try { return localStorage.getItem(FESTA_KEY) === "1"; } catch { return false; } }
-export function applyFesta(on) {
-  const v = on == null ? getFesta() : on;
+let festaEventToday = false; // impostato dall'app se oggi cade un evento salvato
+export function getFestaMode() {
+  try { const v = localStorage.getItem(FESTA_KEY); if (v === "1") return "on"; if (v === "0") return "off"; return v || "auto"; }
+  catch { return "auto"; }
+}
+// Data della Pasqua (algoritmo di Meeus/Butcher, calendario gregoriano).
+function easterDate(Y) {
+  const a = Y % 19, b = Math.floor(Y / 100), c = Y % 100, d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mo = Math.floor((h + l - 7 * m + 114) / 31), da = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(Y, mo - 1, da);
+}
+// Oggi è un giorno di festa? (festività italiane principali + Pasqua/Pasquetta)
+function isFestaDay() {
+  const d = new Date(), m = d.getMonth() + 1, day = d.getDate();
+  if (m === 12 && day >= 24 && day <= 26) return true;   // Natale
+  if (m === 12 && day === 31) return true;               // San Silvestro
+  if (m === 1 && (day === 1 || day === 6)) return true;   // Capodanno, Epifania
+  if (m === 8 && day === 15) return true;                 // Ferragosto
+  if (m === 10 && day === 31) return true;                // Halloween
+  const e = easterDate(d.getFullYear());
+  const pasquetta = new Date(e); pasquetta.setDate(e.getDate() + 1);
+  if ((m === e.getMonth() + 1 && day === e.getDate()) || (m === pasquetta.getMonth() + 1 && day === pasquetta.getDate())) return true;
+  return false;
+}
+// L'app segnala se oggi cade un Menù delle feste salvato (gli eventi vivono nello store).
+export function setFestaEventToday(v) { festaEventToday = !!v; applyFesta(); }
+export function festaActive() {
+  const mode = getFestaMode();
+  if (mode === "on") return true;
+  if (mode === "off") return false;
+  return isFestaDay() || festaEventToday; // auto
+}
+export function getFesta() { return festaActive(); } // compat
+export function applyFesta() {
+  const v = festaActive();
   document.documentElement.classList.toggle("theme-festa", !!v);
   const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let layer = document.getElementById("festa");
@@ -110,7 +147,8 @@ export function applyFesta(on) {
     }
   } else if (layer) { layer.remove(); }
 }
-export function setFesta(on) {
-  try { localStorage.setItem(FESTA_KEY, on ? "1" : "0"); } catch {}
-  applyFesta(on);
+export function setFesta(mode) {
+  const m = (mode === "on" || mode === "off" || mode === "auto") ? mode : (mode ? "on" : "off");
+  try { localStorage.setItem(FESTA_KEY, m); } catch {}
+  applyFesta();
 }

@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.68",
+    d: "2026-06-20",
+    items: [
+      "Tema festa automatico: in modalità \"Automatico\" (Opzioni → Aspetto) si accende da solo nei giorni di festa (Natale, Capodanno, Epifania, Pasqua e Pasquetta, Ferragosto, Halloween) e nel giorno di un Menù delle feste che hai in programma. Puoi sempre scegliere Spento o Sempre acceso."
+    ]
+  },
+  {
     v: "7.67",
     d: "2026-06-20",
     items: [

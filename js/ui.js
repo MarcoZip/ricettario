@@ -20,7 +20,7 @@ import { getNickname, setNickname } from "./profile.js";
 import { isImportConfigured, APP_VERSION, PUSH_WORKER_URL, SPOONACULAR_ENABLED, EDAMAM_ENABLED, WORKER_URL } from "./config.js";
 import { CHANGELOG } from "./changelog.js";
 import { fileToDataUrl } from "./image.js";
-import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS, getTextScale, setTextScale, getContrast, setContrast, getFesta, setFesta } from "./theme.js";
+import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS, getTextScale, setTextScale, getContrast, setContrast, getFestaMode, setFesta, setFestaEventToday } from "./theme.js";
 
 // Tag suggeriti nel form ricetta.
 const TAG_SUGGESTIONS = ["Primi", "Secondi", "Contorni", "Antipasti", "Dolci", "Colazione", "Merenda", "Zuppe", "Insalate", "Lievitati", "Veloce", "Vegetariano", "Vegano", "Pesce", "Carne", "Senza glutine", "Per ospiti", "Bambini"];
@@ -1107,8 +1107,18 @@ async function acquireDetailWake() {
 }
 function releaseDetailWake() { try { if (detailWake) { detailWake.release(); detailWake = null; } } catch (e) {} }
 
+// Tema festa "automatico": segnala a theme.js se oggi cade un Menù delle feste salvato.
+function refreshFestaEvent() {
+  try {
+    const today = todayStr();
+    const on = store.getEvents().some((e) => e.servingAt && e.servingAt.slice(0, 10) === today);
+    setFestaEventToday(on);
+  } catch (e) { /* eventi non disponibili */ }
+}
+
 export function render() {
   if (!root) return;
+  refreshFestaEvent();
   // Schermata di login (gestita da app.js tramite renderLogin)
   if (loginMode) return; // login viene renderizzato a parte
   if (!(currentRoute === "strumenti" && currentRecipeId)) releaseDetailWake();
@@ -6420,13 +6430,17 @@ function renderImpostazioni() {
         </div>
         <input type="checkbox" id="contrastChk" class="mini-check" ${getContrast() ? "checked" : ""} />
       </label>
-      <label class="setting-row" style="cursor:pointer">
+      <div class="setting-row">
         <div>
           <div class="setting-row__label">🎉 Tema festa</div>
-          <div class="setting-row__desc">Coriandoli e palloncini animati di sottofondo, per le occasioni speciali.</div>
+          <div class="setting-row__desc">Coriandoli e palloncini animati. In "Automatico" si accende da solo nei giorni di festa e quando hai un Menù delle feste in programma.</div>
         </div>
-        <input type="checkbox" id="festaChk" class="mini-check" ${getFesta() ? "checked" : ""} />
-      </label>
+        <select id="festaSel" class="mini-select">
+          <option value="off">Spento</option>
+          <option value="auto">Automatico</option>
+          <option value="on">Sempre acceso</option>
+        </select>
+      </div>
     </div>
 
     <h2 class="setting-section"><span class="setting-section__ic">🍽️</span> Preferenze di cucina</h2>
@@ -6599,8 +6613,8 @@ function renderImpostazioni() {
   if (textSizeSel) { textSizeSel.value = String(getTextScale()); textSizeSel.addEventListener("change", () => setTextScale(parseInt(textSizeSel.value, 10))); }
   const contrastChk = root.querySelector("#contrastChk");
   if (contrastChk) contrastChk.addEventListener("change", () => setContrast(contrastChk.checked));
-  const festaChk = root.querySelector("#festaChk");
-  if (festaChk) festaChk.addEventListener("change", () => setFesta(festaChk.checked));
+  const festaSel = root.querySelector("#festaSel");
+  if (festaSel) { festaSel.value = getFestaMode(); festaSel.addEventListener("change", () => setFesta(festaSel.value)); }
   const defServSel = root.querySelector("#defServSel");
   if (defServSel) { defServSel.value = String(prefNum("defServings", 0)); defServSel.addEventListener("change", () => setPrefNum("defServings", parseInt(defServSel.value, 10))); }
   root.querySelectorAll("[data-pref]").forEach((cb) => cb.addEventListener("change", () => setPrefBool(cb.dataset.pref, cb.checked)));
