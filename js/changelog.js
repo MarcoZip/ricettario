@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.47",
+    d: "2026-06-20",
+    items: [
+      "Controllo \"sicuro per tutti\" più preciso: oltre alle parole chiave, ora usa anche il reparto degli ingredienti (riconosce carne/pesce/latticini anche con nomi insoliti, es. macinato, würstel).",
+      "Nuovo: \"Migliora il riconoscimento\" (in Invitati e diete) — se un ingrediente non viene riconosciuto puoi aggiungerlo tu alla categoria giusta (carne, pesce, latticini, glutine…) e l'app lo userà nei controlli."
+    ]
+  },
+  {
     v: "7.46",
     d: "2026-06-20",
     items: [

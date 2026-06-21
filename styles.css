@@ -1159,6 +1159,7 @@ a { color: var(--primary-2); }
 .diet-chips { display: flex; flex-wrap: wrap; gap: 7px; }
 .diet-chip { border: 1px solid var(--surface-3); background: var(--surface-2); color: var(--text); border-radius: 999px; padding: 7px 13px; font-size: 0.86rem; font-weight: 600; }
 .diet-chip.is-on { background: var(--primary); border-color: var(--primary); color: #1a1206; }
+.dt-rm { border: none; background: none; color: var(--text-soft); font-size: 0.8rem; padding: 0 0 0 4px; cursor: pointer; }
 .ev-phase { margin: 16px 0; padding: 12px 14px; background: var(--card-grad); border: 1px solid var(--surface-3); border-radius: var(--radius); }
 .ev-phase__t { font-weight: 800; margin-bottom: 8px; }
 .ev-phase__d { color: var(--text-soft); font-weight: 600; font-size: 0.85rem; }

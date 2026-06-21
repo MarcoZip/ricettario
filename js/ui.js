@@ -12,7 +12,7 @@ import { HELP_TOPICS, findHelpTopics } from "./app-help.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage, shareMenuImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
-import { GUEST_ALLERGENS, GUEST_DIETS, checkRecipeForGuests, guestsSummary } from "./diets.js";
+import { GUEST_ALLERGENS, GUEST_DIETS, checkRecipeForGuests, guestsSummary, CUSTOM_CATS, getCustomTerms, addCustomTerm, removeCustomTerm } from "./diets.js";
 import { estimateCost } from "./cost.js";
 import { seasonalProduce, recipeSeasonalMatches, monthName, currentMonth } from "./seasonal.js";
 import { convertMeasures } from "./measures.js";
@@ -5672,11 +5672,49 @@ function openEventGuests(eventId) {
     ${guests.length ? `<p class="hint" style="margin-top:-6px">${escapeHtml(guestsSummary(guests) || "nessun vincolo")}</p>` : ""}
     <div id="evgList">${rows}</div>
     <button class="btn btn--primary btn--block" id="evgAdd" style="margin-top:10px">${iconHtml("plus")} Aggiungi un invitato</button>
+    <button class="btn btn--ghost btn--block" id="evgTerms" style="margin-top:8px">🔧 Migliora il riconoscimento ingredienti</button>
     <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Fatto</button></div>
   `);
   m.el.querySelector('[data-act="ok"]').onclick = () => { m.close(); openEventSheet(eventId); };
   m.el.querySelectorAll("[data-gi]").forEach((b) => b.addEventListener("click", () => { m.close(); openEventGuestEditor(eventId, parseInt(b.dataset.gi, 10)); }));
   m.el.querySelector("#evgAdd").addEventListener("click", () => { m.close(); openEventGuestEditor(eventId, -1); });
+  m.el.querySelector("#evgTerms").addEventListener("click", () => { m.close(); openDietTerms(() => openEventGuests(eventId)); });
+}
+
+// Schermata "Migliora il riconoscimento": l'utente aggiunge parole (es. chorizo,
+// seitan, kamut) alle categorie, usate nei controlli "sicuro per tutti".
+function openDietTerms(onClose) {
+  const catOpts = CUSTOM_CATS.map(([k, label]) => `<option value="${k}">${escapeHtml(label)}</option>`).join("");
+  const m = openModal(`
+    <h3 class="modal__title">🔧 Migliora il riconoscimento</h3>
+    <p class="hint" style="margin-top:-6px">Se un ingrediente (carne, pesce, latticino, glutine…) non viene riconosciuto nei controlli "sicuro per tutti", aggiungilo qui. Vale per tutti i menù.</p>
+    <div class="ev-field"><span>Categoria</span><select id="dtCat">${catOpts}</select></div>
+    <div class="search-bar"><input type="text" id="dtTerm" placeholder="Es. chorizo, seitan, kamut..." /><button class="btn btn--primary" id="dtAdd">${iconHtml("plus")}</button></div>
+    <div id="dtList" style="margin-top:12px"></div>
+    <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Fatto</button></div>
+  `);
+  const labelOf = (k) => (CUSTOM_CATS.find(([key]) => key === k) || [k, k])[1];
+  function drawList() {
+    const c = getCustomTerms();
+    const cats = CUSTOM_CATS.filter(([k]) => (c[k] || []).length);
+    m.el.querySelector("#dtList").innerHTML = cats.length
+      ? cats.map(([k]) => `<div class="ev-course"><div class="ev-course__t">${escapeHtml(labelOf(k))}</div><div class="ev-dish__chips">${(c[k] || []).map((t) => `<span class="ev-chip">${escapeHtml(t)} <button class="dt-rm" data-cat="${k}" data-term="${escapeHtml(t)}" title="Togli">✕</button></span>`).join("")}</div></div>`).join("")
+      : `<div class="hint">Nessuna parola aggiunta. Le liste di base coprono già i casi più comuni.</div>`;
+    m.el.querySelectorAll(".dt-rm").forEach((b) => b.addEventListener("click", () => { removeCustomTerm(b.dataset.cat, b.dataset.term); drawList(); }));
+  }
+  const add = () => {
+    const cat = m.el.querySelector("#dtCat").value;
+    const term = m.el.querySelector("#dtTerm").value;
+    if (!term.trim()) return;
+    addCustomTerm(cat, term);
+    m.el.querySelector("#dtTerm").value = "";
+    drawList();
+    toast("Aggiunto", "success");
+  };
+  m.el.querySelector("#dtAdd").addEventListener("click", add);
+  m.el.querySelector("#dtTerm").addEventListener("keydown", (e) => { if (e.key === "Enter") add(); });
+  m.el.querySelector('[data-act="ok"]').onclick = () => { m.close(); if (onClose) onClose(); };
+  drawList();
 }
 
 function openEventGuestEditor(eventId, index) {
