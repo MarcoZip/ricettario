@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.62",
+    d: "2026-06-20",
+    minor: true,
+    items: [
+      "Caricamenti più eleganti: al posto delle rotelline, scheletri animati che \"brillano\" (shimmer) mentre l'app prepara i risultati e le funzioni AI."
+    ]
+  },
+  {
     v: "7.61",
     d: "2026-06-20",
     minor: true,

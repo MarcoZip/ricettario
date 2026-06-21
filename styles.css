@@ -705,7 +705,8 @@ a { color: var(--primary-2); }
 
 /* ---------- Skeleton caricamento ---------- */
 .meal-card--skeleton { pointer-events: none; }
-.sk { background: linear-gradient(90deg, #1f2027 25%, #2a2b34 37%, #1f2027 63%); background-size: 400% 100%; border-radius: 8px; }
+.sk { background: linear-gradient(90deg, #1f2027 20%, #34353f 40%, #1f2027 60%); background-size: 400% 100%; border-radius: 8px; }
+.ai-load { max-width: 280px; margin: 0 auto; }
 .sk--img { width: 94px; height: 94px; border-radius: 0; flex-shrink: 0; }
 .sk--line { height: 14px; margin: 7px 0; }
 .sk--short { width: 50%; }

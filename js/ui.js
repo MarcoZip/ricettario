@@ -2263,7 +2263,7 @@ async function openDishCheck(file, title) {
   const m = openModal(`
     <h3 class="modal__title">📷 Com'è venuto?</h3>
     <img src="${escapeHtml(dataUrl)}" alt="" style="width:100%;max-height:240px;object-fit:cover;border-radius:14px;display:block;margin-bottom:12px" />
-    <div id="dishCheckBody"><div style="text-align:center;padding:6px 0"><div class="spinner"></div><div class="hint">Sto guardando il piatto…</div></div></div>
+    <div id="dishCheckBody"><div style="text-align:center;padding:6px 0"><div class="ai-load"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div><div class="sk sk--line"></div></div><div class="hint">Sto guardando il piatto…</div></div></div>
     <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
   `);
   m.el.querySelector('[data-act="ok"]').onclick = m.close;
@@ -2342,7 +2342,7 @@ function openVideoImport(prefillUrl, onRecipe) {
   const doSearchOnline = async (url) => {
     if (!url) { toast("Incolla prima il link del video", "error"); return; }
     const body = m.el.querySelector("#viBody");
-    body.innerHTML = `<div style="text-align:center;padding:6px 0"><div class="spinner"></div><div class="hint">Riconosco il video…</div></div>`;
+    body.innerHTML = `<div style="text-align:center;padding:6px 0"><div class="ai-load"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div><div class="sk sk--line"></div></div><div class="hint">Riconosco il video…</div></div>`;
     const meta = await videoMeta(url);
     const q = meta && meta.title ? dishQueryFromTitle(meta.title, meta.author) : "";
     if (!q) { body.innerHTML = `<div class="hint" style="color:var(--danger)">Non riconosco questo video. Funziona con i link di YouTube o TikTok.</div>`; return; }
@@ -2359,7 +2359,7 @@ function openVideoImport(prefillUrl, onRecipe) {
     const text = m.el.querySelector("#viText").value.trim();
     if (!url && !text) { toast("Inserisci un link o incolla la descrizione", "error"); return; }
     const body = m.el.querySelector("#viBody");
-    body.innerHTML = `<div style="text-align:center;padding:6px 0"><div class="spinner"></div><div class="hint">Leggo la ricetta…</div></div>`;
+    body.innerHTML = `<div style="text-align:center;padding:6px 0"><div class="ai-load"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div><div class="sk sk--line"></div></div><div class="hint">Leggo la ricetta…</div></div>`;
     okBtn.disabled = true;
     try {
       const data = await importFromVideo(url, text);
@@ -2402,7 +2402,7 @@ function openGenerateRecipe(prefill, onRecipe) {
     if (!ing) { toast("Scrivi qualche ingrediente", "error"); return; }
     const note = m.el.querySelector("#grNote").value.trim();
     const body = m.el.querySelector("#grBody");
-    body.innerHTML = `<div style="text-align:center;padding:6px 0"><div class="spinner"></div><div class="hint">Sto inventando…</div></div>`;
+    body.innerHTML = `<div style="text-align:center;padding:6px 0"><div class="ai-load"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div><div class="sk sk--line"></div></div><div class="hint">Sto inventando…</div></div>`;
     okBtn.disabled = true;
     try {
       const data = await generateRecipe(ing, note);
@@ -2588,7 +2588,7 @@ async function openFridgePhoto(file) {
   try { dataUrl = await fileToDataUrl(file, 800, 0.6); } catch (e) { toast("Foto non valida", "error"); return; }
   const m = openModal(`
     <h3 class="modal__title">🧊 Cosa c'è nel frigo</h3>
-    <div id="frBody"><div style="text-align:center;padding:8px 0"><div class="spinner"></div><div class="hint">Guardo cosa c'è…</div></div></div>
+    <div id="frBody"><div style="text-align:center;padding:8px 0"><div class="ai-load"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div><div class="sk sk--line"></div></div><div class="hint">Guardo cosa c'è…</div></div></div>
     <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
   `);
   m.el.querySelector('[data-act="ok"]').onclick = m.close;
@@ -2634,7 +2634,7 @@ function openWeekPlanner(days) {
   };
   const m = openModal(`<h3 class="modal__title">✨ Menù della settimana (AI)</h3><div id="wpBody"></div>`);
   const body = m.el.querySelector("#wpBody");
-  const spinner = () => { body.innerHTML = `<div style="text-align:center;padding:10px 0"><div class="spinner"></div><div class="hint">Compongo la settimana…</div></div>`; };
+  const spinner = () => { body.innerHTML = `<div style="text-align:center;padding:10px 0"><div class="ai-load"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div><div class="sk sk--line"></div></div><div class="hint">Compongo la settimana…</div></div>`; };
   const draw = (daysData) => {
     body.innerHTML = `<div class="hint" style="margin-bottom:8px">Proposta per le cene. Rigenera o applica (riempie solo i giorni senza cena).</div>
       <div class="wp-list">${days.map((d, i) => { const rec = matchTitle((daysData[i] || {}).cena); return `<div class="wp-day"><span class="wp-day__d">${WEEKDAYS_IT[i]} ${d.getDate()}</span><span class="wp-day__r">${rec ? escapeHtml(rec.title) : '<span style="color:var(--text-soft)">—</span>'}</span></div>`; }).join("")}</div>
@@ -2667,7 +2667,7 @@ function openConvertRecipe(r) {
   const run = async (diet, label) => {
     const m = openModal(`
       <h3 class="modal__title">🥗 Adatta: ${escapeHtml(label)}</h3>
-      <div id="cvBody"><div style="text-align:center;padding:8px 0"><div class="spinner"></div><div class="hint">Adatto la ricetta…</div></div></div>
+      <div id="cvBody"><div style="text-align:center;padding:8px 0"><div class="ai-load"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div><div class="sk sk--line"></div></div><div class="hint">Adatto la ricetta…</div></div></div>
       <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
     `);
     m.el.querySelector('[data-act="ok"]').onclick = m.close;
@@ -2697,7 +2697,7 @@ function openRobotMode(r) {
     const label = device === "bimby" ? "Bimby" : "Companion";
     const m = openModal(`
       <h3 class="modal__title">🤖 Modalità ${escapeHtml(label)}</h3>
-      <div id="robotBody"><div style="text-align:center;padding:8px 0"><div class="spinner"></div><div class="hint">Converto la ricetta per il ${escapeHtml(label)}…</div></div></div>
+      <div id="robotBody"><div style="text-align:center;padding:8px 0"><div class="ai-load"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div><div class="sk sk--line"></div></div><div class="hint">Converto la ricetta per il ${escapeHtml(label)}…</div></div></div>
       <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
     `);
     m.el.querySelector('[data-act="ok"]').onclick = m.close;
@@ -4062,7 +4062,7 @@ async function recognizeDishPhoto(file) {
   try { dataUrl = await fileToDataUrl(file, 672, 0.6); } catch (e) { toast("Foto non valida", "error"); return; }
   const m = openModal(`
     <h3 class="modal__title">📸 Che piatto è?</h3>
-    <div id="dpBody" style="text-align:center;padding:8px 0"><div class="spinner"></div><div class="hint">Guardo la foto…</div></div>
+    <div id="dpBody" style="text-align:center;padding:8px 0"><div class="ai-load"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div><div class="sk sk--line"></div></div><div class="hint">Guardo la foto…</div></div>
     <div class="modal__actions"><button class="btn" data-act="c">Chiudi</button></div>
   `);
   m.el.querySelector('[data-act="c"]').onclick = m.close;
@@ -4145,7 +4145,7 @@ function renderOnlineTab() {
   }
   let resultsHtml = "";
   if (mealLoading) {
-    resultsHtml = Array.from({ length: 4 }, () =>
+    resultsHtml = Array.from({ length: 6 }, () =>
       `<div class="meal-card meal-card--skeleton"><div class="sk sk--img"></div><div class="meal-card__body"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div></div></div>`
     ).join("");
   } else if (mealError) {
@@ -4447,7 +4447,7 @@ function openHelpAssistant() {
   const ask = async (q) => {
     q = (q || "").trim(); if (!q) return;
     input.value = q;
-    body.innerHTML = `<div style="text-align:center;padding:8px 0"><div class="spinner"></div><div class="hint">Cerco…</div></div>`;
+    body.innerHTML = `<div style="text-align:center;padding:8px 0"><div class="ai-load"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div><div class="sk sk--line"></div></div><div class="hint">Cerco…</div></div>`;
     const cands = findHelpTopics(q, 5);
     if (isImportConfigured() && cands.length) {
       try {
