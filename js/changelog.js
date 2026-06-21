@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.64",
+    d: "2026-06-20",
+    minor: true,
+    items: [
+      "Tocco grafico: sfondo \"vivo\" più ricco (sfumature soffuse che si muovono lentamente) e passaggi tra le schermate più morbidi (lieve dissolvenza con risalita)."
+    ]
+  },
+  {
     v: "7.63",
     d: "2026-06-20",
     minor: true,

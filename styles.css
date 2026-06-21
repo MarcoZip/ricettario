@@ -696,8 +696,11 @@ a { color: var(--primary-2); }
 /* ---------- Animazioni ---------- */
 @media (prefers-reduced-motion: no-preference) {
   .stagger { animation: cardIn 0.42s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 45ms); }
-  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.3s; }
+  ::view-transition-old(root) { animation: vtOut 0.22s ease both; }
+  ::view-transition-new(root) { animation: vtIn 0.34s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 }
+@keyframes vtIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes vtOut { to { opacity: 0; } }
 @keyframes cardIn { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
 .tool-card { transition: transform 0.14s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.2s; }
 .tool-card:active { transform: perspective(700px) rotateX(8deg) scale(0.96); box-shadow: 0 10px 22px -12px rgba(0, 0, 0, 0.6); }
@@ -746,7 +749,10 @@ a { color: var(--primary-2); }
 
 /* Sfondo aurora animato */
 #aurora { position: fixed; inset: -25%; z-index: -1; pointer-events: none; background: radial-gradient(40% 40% at 20% 16%, rgba(var(--primary-rgb, 255,140,60), 0.16), transparent 70%), radial-gradient(44% 44% at 82% 64%, rgba(var(--primary-rgb, 255,140,60), 0.10), transparent 70%), radial-gradient(36% 36% at 60% 96%, rgba(var(--primary-rgb, 255,140,60), 0.07), transparent 70%); }
-@media (prefers-reduced-motion: no-preference) { #aurora { animation: aurora 22s ease-in-out infinite alternate; } }
+/* Secondo strato soffuso (toni freddi) per un effetto "mesh" con più profondità. */
+#aurora::after { content: ""; position: absolute; inset: 0; background: radial-gradient(34% 34% at 78% 18%, rgba(120, 170, 255, 0.07), transparent 70%), radial-gradient(40% 40% at 22% 82%, rgba(199, 125, 255, 0.06), transparent 70%); }
+@media (prefers-reduced-motion: no-preference) { #aurora { animation: aurora 22s ease-in-out infinite alternate; } #aurora::after { animation: aurora2 30s ease-in-out infinite alternate; } }
+@keyframes aurora2 { 0% { transform: translate(0, 0) scale(1.08); } 100% { transform: translate(-5%, -3%) scale(1); } }
 #seasonDecor { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
 #seasonDecor span { position: absolute; top: -32px; opacity: 0.45; will-change: transform; animation: seasonFall linear infinite; }
 @keyframes seasonFall { 0% { transform: translateY(-32px) rotate(0deg); } 100% { transform: translateY(104vh) rotate(320deg); } }
