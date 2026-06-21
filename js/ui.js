@@ -2306,10 +2306,23 @@ function openVideoImport(prefillUrl, onRecipe) {
     <p class="hint" style="margin-top:-8px;margin-bottom:12px">Incolla il link di un video (TikTok, Instagram, YouTube): l'AI prova a ricavarne la ricetta. Funziona meglio se la ricetta è scritta nella descrizione del video.</p>
     <div class="field"><input type="url" id="viUrl" inputmode="url" placeholder="https://..." value="${escapeHtml(prefillUrl || "")}" /></div>
     <div class="field"><label>Oppure incolla qui la descrizione del video (facoltativo)</label><textarea id="viText" rows="4" placeholder="Incolla il testo della ricetta se il link non basta"></textarea></div>
+    <button class="btn btn--ghost btn--block" id="viSearchNow" style="margin-bottom:6px">${iconHtml("magnifying-glass")} Cerca questa ricetta nel Ricettario online</button>
     <div id="viBody"></div>
     <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button><button class="btn btn--primary" data-act="ok">Importa</button></div>
   `);
   m.el.querySelector('[data-act="cancel"]').onclick = m.close;
+  // Sempre disponibile: riconosce il video e cerca quel piatto nel Ricettario online.
+  const doSearchOnline = async (url) => {
+    if (!url) { toast("Incolla prima il link del video", "error"); return; }
+    const body = m.el.querySelector("#viBody");
+    body.innerHTML = `<div style="text-align:center;padding:6px 0"><div class="spinner"></div><div class="hint">Riconosco il video…</div></div>`;
+    const meta = await videoMeta(url);
+    const q = meta && meta.title ? dishQueryFromTitle(meta.title, meta.author) : "";
+    if (!q) { body.innerHTML = `<div class="hint" style="color:var(--danger)">Non riconosco questo video. Funziona con i link di YouTube o TikTok.</div>`; return; }
+    m.close();
+    searchOnline(q);
+  };
+  m.el.querySelector("#viSearchNow").onclick = () => doSearchOnline(m.el.querySelector("#viUrl").value.trim());
   const okBtn = m.el.querySelector('[data-act="ok"]');
   okBtn.onclick = async () => {
     const url = m.el.querySelector("#viUrl").value.trim();

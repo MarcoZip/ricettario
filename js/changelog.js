@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.51",
+    d: "2026-06-20",
+    items: [
+      "Importa da video: ora il tasto \"Cerca questa ricetta nel Ricettario online\" è sempre disponibile — incolli il link del video e cerchi subito quel piatto online, senza dover prima tentare l'estrazione."
+    ]
+  },
+  {
     v: "7.50",
     d: "2026-06-20",
     items: [
