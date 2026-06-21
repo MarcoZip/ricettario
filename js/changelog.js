@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.65",
+    d: "2026-06-20",
+    minor: true,
+    items: [
+      "Quando salvi una nuova ricetta parte una piccola festa: coriandoli e un \"Ricetta salvata!\" che entra a molla."
+    ]
+  },
+  {
     v: "7.64",
     d: "2026-06-20",
     minor: true,

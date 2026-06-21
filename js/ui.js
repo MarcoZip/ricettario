@@ -67,6 +67,23 @@ function fxBurstFrom(el, opts) {
   fxBurst(r.left + r.width / 2, r.top + r.height / 2, opts);
 }
 
+// Celebrazione scenica quando si salva una nuova ricetta: coriandoli a pioggia
+// dall'alto + un cartellino "Ricetta salvata!" che entra a molla e svanisce.
+function celebrateSave(title) {
+  haptic(30);
+  const el = document.createElement("div");
+  el.className = "save-cele";
+  el.innerHTML = `<div class="save-cele__card"><div class="save-cele__emoji">🎉</div><div class="save-cele__t">Ricetta salvata!</div>${title ? `<div class="save-cele__sub">${escapeHtml(String(title).slice(0, 50))}</div>` : ""}</div>`;
+  document.body.appendChild(el);
+  try { navigator.vibrate && navigator.vibrate([30, 50, 30]); } catch (e) {}
+  if (!reduceMotion) {
+    const W = window.innerWidth;
+    for (let i = 0; i < 5; i++) setTimeout(() => fxBurst(W * (0.12 + i * 0.19), 70, { count: 16 }), i * 90);
+    setTimeout(() => fxBurstFrom(el.querySelector(".save-cele__card"), { emojis: ["🎉", "✨", "🍴", "❤️"], count: 14 }), 120);
+  }
+  setTimeout(() => el.remove(), reduceMotion ? 900 : 1800);
+}
+
 // Leggero feedback aptico (vibrazione) sui dispositivi che lo supportano.
 function haptic(ms = 15) {
   try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* ignora */ }
@@ -3733,7 +3750,8 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       if (editing) await store.updateRecipe(recipe.id, data);
       else await store.addRecipe(data);
       m.close();
-      toast(editing ? "Ricetta aggiornata" : "Ricetta salvata", "success");
+      if (editing) toast("Ricetta aggiornata", "success");
+      else celebrateSave(data.title);
       render();
     } catch (e) {
       toast("Errore nel salvataggio", "error");
