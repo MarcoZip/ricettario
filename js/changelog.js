@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.53",
+    d: "2026-06-20",
+    minor: true,
+    items: [
+      "Importa da video: la ricerca online ricava meglio il nome del piatto dal titolo del video (toglie sottotitoli ed emoji), così trova risultati più pertinenti."
+    ]
+  },
+  {
     v: "7.52",
     d: "2026-06-20",
     items: [

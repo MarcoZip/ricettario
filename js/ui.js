@@ -2293,9 +2293,12 @@ async function videoMeta(url) {
 function dishQueryFromTitle(title, author) {
   let t = " " + (title || "") + " ";
   if (author) t = t.replace(new RegExp(author.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "ig"), " ");
+  t = t.split(/[:|｜]/)[0]; // il nome del piatto sta quasi sempre prima dei due punti
   t = t.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}]/gu, " ")
-    .replace(/[“”"'|•·–—_\-]+/g, " ")
+    .replace(/[“”"'|•·–—_\-!?,;]+/g, " ")
     .replace(/\b(ricetta|ricette|la mia|le mie|il mio|i miei|come si fa|come fare|tutorial|video ?ricetta|originale|facile|veloce|perfett[ao]|cremos[ao]|buonissim[ao]|anni\s*\d0)\b/ig, " ")
+    // toglie gli accenti (la ricerca di alcune fonti non li gestisce: "crêpes" -> "crepes")
+    .replace(/[àáâ]/gi, "a").replace(/[èéê]/gi, "e").replace(/[ìíî]/gi, "i").replace(/[òóô]/gi, "o").replace(/[ùúû]/gi, "u")
     .replace(/\s+/g, " ").trim().toLowerCase();
   return t;
 }
