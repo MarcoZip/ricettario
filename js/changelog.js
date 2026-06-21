@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.63",
+    d: "2026-06-20",
+    minor: true,
+    items: [
+      "Tocco grafico: gli anelli nutrizionali si riempiono con un'animazione e i numeri (calorie, macro, \"Trovate N ricette\") salgono da zero."
+    ]
+  },
+  {
     v: "7.62",
     d: "2026-06-20",
     minor: true,

@@ -87,6 +87,26 @@ function countUp(el, to) {
   requestAnimationFrame(step);
 }
 
+// Anima tutti i numeri con [data-countup] (con suffisso) e riempie gli anelli
+// nutrizionali (.nring__fg[data-off]) la prima volta che compaiono.
+function animateCountUps(scope) {
+  const s = scope || document;
+  s.querySelectorAll("[data-countup]").forEach((el) => {
+    if (el.dataset.counted) return; el.dataset.counted = "1";
+    const to = parseFloat(el.dataset.countup) || 0;
+    const suffix = el.dataset.suffix || "";
+    if (reduceMotion || to <= 0) { el.textContent = to + suffix; return; }
+    const dur = 700, start = performance.now();
+    const step = (now) => { const p = Math.min(1, (now - start) / dur); const e = 1 - Math.pow(1 - p, 3); el.textContent = Math.round(e * to) + suffix; if (p < 1) requestAnimationFrame(step); else el.textContent = to + suffix; };
+    requestAnimationFrame(step);
+  });
+  s.querySelectorAll(".nring__fg[data-off]").forEach((c) => {
+    if (c.dataset.animated) return; c.dataset.animated = "1";
+    if (reduceMotion) { c.style.strokeDashoffset = c.dataset.off; return; }
+    requestAnimationFrame(() => { c.style.strokeDashoffset = c.dataset.off; });
+  });
+}
+
 let root = null;
 let currentRoute = "strumenti";
 let currentToolId = null;
@@ -2007,6 +2027,7 @@ function renderRecipeDetail() {
 
   wireNutrition(r, base, detailServings);
   wireVoiceNote(r);
+  animateCountUps(root); // anima anelli nutrizionali e numeri della ricetta
 
   // Tinta dell'hero dal colore dominante della foto (ravvivato e scurito per
   // tenere leggibile il titolo bianco).
@@ -2131,9 +2152,9 @@ function nutriRing(label, value, unit, ref, color) {
   return `<div class="nring">
     <svg viewBox="0 0 50 50" width="58" height="58" aria-hidden="true">
       <circle cx="25" cy="25" r="${R}" fill="none" stroke="var(--surface-3)" stroke-width="5"/>
-      <circle cx="25" cy="25" r="${R}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${CIRC.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 25 25)"/>
+      <circle class="nring__fg" cx="25" cy="25" r="${R}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${CIRC.toFixed(1)}" stroke-dashoffset="${CIRC.toFixed(1)}" data-off="${off.toFixed(1)}" transform="rotate(-90 25 25)"/>
     </svg>
-    <div class="nring__v">${value || 0}${unit}</div>
+    <div class="nring__v" data-countup="${Math.round(value || 0)}" data-suffix="${unit}">0${unit}</div>
     <div class="nring__l">${label}</div>
   </div>`;
 }
@@ -4159,9 +4180,9 @@ function renderOnlineTab() {
     const pageItems = serverPaged ? mealResults : mealResults.slice(mealPage * MEAL_PAGE_SIZE, mealPage * MEAL_PAGE_SIZE + MEAL_PAGE_SIZE);
     const timeStr = mealElapsedMs > 0 ? ` · ${(mealElapsedMs / 1000).toFixed(1)} s` : "";
     const countLine = mealSource === "all"
-      ? `<div class="result-count">${iconHtml("magnifying-glass")} Trovate <b>${totalItems}</b> ricette da ${mealSourceCounts.length} ${mealSourceCounts.length === 1 ? "fonte" : "fonti"}${totalPages > 1 ? ` · pagina ${mealPage + 1} di ${totalPages}` : ""}${timeStr}</div>`
+      ? `<div class="result-count">${iconHtml("magnifying-glass")} Trovate <b data-countup="${totalItems}">${totalItems}</b> ricette da ${mealSourceCounts.length} ${mealSourceCounts.length === 1 ? "fonte" : "fonti"}${totalPages > 1 ? ` · pagina ${mealPage + 1} di ${totalPages}` : ""}${timeStr}</div>`
         + (mealSourceCounts.length ? `<div class="src-summary">${mealSourceCounts.map((s) => `<span class="src-chip">${escapeHtml(s.label)} <b>${s.count}</b></span>`).join("")}</div>` : "")
-      : `<div class="result-count">${iconHtml("magnifying-glass")} Trovate <b>${totalItems}</b> ${totalItems === 1 ? "ricetta" : "ricette"}${totalPages > 1 ? ` · pagina ${mealPage + 1} di ${totalPages}` : ""}${timeStr}</div>`;
+      : `<div class="result-count">${iconHtml("magnifying-glass")} Trovate <b data-countup="${totalItems}">${totalItems}</b> ${totalItems === 1 ? "ricetta" : "ricette"}${totalPages > 1 ? ` · pagina ${mealPage + 1} di ${totalPages}` : ""}${timeStr}</div>`;
     const pager = totalPages > 1 ? `<div class="pager">
         <button class="btn btn--ghost" id="pagePrev" ${mealPage === 0 ? "disabled" : ""}>${iconHtml("caret-left")} Prec.</button>
         <span class="pager__info">${mealPage + 1} / ${totalPages}</span>
@@ -4258,6 +4279,7 @@ function renderOnlineTab() {
   // Tira-per-aggiornare: trascina in basso (in cima alla pagina) per rilanciare
   // l'ultima ricerca, o pescare nuove ricette casuali su TheMealDB.
   setupPullToRefresh(body);
+  animateCountUps(body); // conteggio "Trovate N ricette" che sale da zero
 
   body.querySelectorAll(".meal-card[data-meal]").forEach((card) => {
     let data;

@@ -578,6 +578,7 @@ a { color: var(--primary-2); }
 .nrings { display: flex; justify-content: space-around; gap: 6px; margin: 6px 0 2px; }
 .nring { display: flex; flex-direction: column; align-items: center; position: relative; }
 .nring svg { display: block; }
+@media (prefers-reduced-motion: no-preference) { .nring__fg { transition: stroke-dashoffset 0.9s cubic-bezier(0.34, 1.1, 0.4, 1); } }
 .nring__v { position: absolute; top: 20px; font-size: 0.72rem; font-weight: 800; }
 .nring__l { font-size: 0.72rem; color: var(--text-soft); margin-top: 2px; }
 .bar-chart { display: flex; align-items: flex-end; justify-content: space-between; gap: 6px; padding: 8px 2px 0; height: 110px; }
