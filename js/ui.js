@@ -4580,6 +4580,52 @@ function editShoppingQty(it) {
   };
 }
 
+// "Modalità supermercato": vista a tutto schermo della spesa, ordinata per
+// reparto come giri tra le corsie, con articoli grandi e barra di avanzamento.
+function openSupermarketMode() {
+  const host = document.getElementById("modalRoot");
+  const el = document.createElement("div");
+  el.className = "super";
+  host.appendChild(el);
+  let wake = null, unsub = null;
+  (async () => { try { if (navigator.wakeLock) wake = await navigator.wakeLock.request("screen"); } catch (e) {} })();
+  const close = () => { try { if (wake) wake.release(); } catch (e) {} wake = null; if (unsub) { try { unsub(); } catch (e) {} unsub = null; } el.remove(); };
+  const superRow = (it) => {
+    const qty = it.qty != null ? formatQty(it.qty) : "";
+    const amount = [qty, it.unit && it.unit !== "q.b." ? it.unit : (it.unit === "q.b." ? "q.b." : "")].filter(Boolean).join(" ");
+    return `<button class="super__item ${it.checked ? "is-checked" : ""}" data-id="${it.id}"><span class="super__check">${it.checked ? "✓" : ""}</span><span class="super__name">${escapeHtml(it.name)}</span>${amount ? `<span class="super__amt">${escapeHtml(amount)}</span>` : ""}</button>`;
+  };
+  function paint() {
+    const items = store.getShopping();
+    const total = items.length, checked = items.filter((i) => i.checked).length;
+    const active = items.filter((i) => !i.checked), done = items.filter((i) => i.checked);
+    const groups = {};
+    active.forEach((it) => { const c = it.category || "Altro"; (groups[c] = groups[c] || []).push(it); });
+    const orderedCats = getAisleOrder().filter((c) => groups[c]);
+    const groupHtml = orderedCats.map((cat) => `<div class="super__group"><div class="super__cat">${escapeHtml(cat)}</div>${groups[cat].map(superRow).join("")}</div>`).join("");
+    const doneHtml = done.length ? `<div class="super__group super__group--done"><div class="super__cat">Presi (${done.length})</div>${done.map(superRow).join("")}</div>` : "";
+    const pct = total ? Math.round(checked / total * 100) : 0;
+    el.innerHTML = `
+      <div class="super__bar">
+        <button class="super__close" id="suClose">${iconHtml("x")}</button>
+        <div class="super__title">🛒 Spesa · ${checked}/${total}</div>
+      </div>
+      <div class="super__track"><div class="super__fill" style="width:${pct}%"></div></div>
+      <div class="super__body">${total ? (groupHtml || `<div class="super__alldone">🎉 Tutto preso!</div>`) + doneHtml : `<div class="super__alldone">La lista è vuota.</div>`}</div>`;
+    el.querySelector("#suClose").onclick = close;
+    el.querySelectorAll(".super__item").forEach((row) => {
+      row.onclick = () => {
+        const it = store.getShopping().find((s) => s.id === row.dataset.id);
+        if (!it) return;
+        const willCheck = !it.checked;
+        if (willCheck) haptic(12);
+        store.toggleShoppingItem(it.id, willCheck); // il repaint avviene via subscribe (gestisce anche il cloud)
+      };
+    });
+  }
+  unsub = store.subscribe(() => paint()); // ridisegna quando i dati cambiano (anche da altri dispositivi)
+}
+
 function renderShopping() {
   root.innerHTML = `
     <h1 class="page-title">Spesa</h1>
@@ -4704,6 +4750,7 @@ function renderShoppingList() {
       <button class="btn btn--primary" id="shopAddBtn">${iconHtml("plus")}</button>
     </div>
     ${shopManual ? `<div class="hint" style="margin-bottom:8px">Usa le frecce per ordinare. Tocca "Fine" per tornare alla lista.</div>` : ""}
+    ${active.length && !shopManual ? `<button class="btn btn--primary btn--block" id="superMode" style="margin:10px 0">🛒 Modalità supermercato</button>` : ""}
     <div id="shopBody">${body}</div>
     ${(() => { const c = estimateCost(active); return c.counted ? `<div class="shop-cost">${iconHtml("basket")} Costo stimato del carrello: <b>€ ${c.total.toFixed(2)}</b><span class="shop-cost__note"> · stima su ${c.counted} articoli</span></div>` : ""; })()}
     ${budgetLineHtml()}
@@ -4757,6 +4804,8 @@ function renderShoppingList() {
   wrap.querySelectorAll("[data-down]").forEach((b) => b.addEventListener("click", () => store.moveShoppingItem(b.dataset.down, 1)));
   const rb = wrap.querySelector("#reorderBtn");
   if (rb) rb.addEventListener("click", () => { shopManual = !shopManual; renderShoppingList(); });
+  const sm = wrap.querySelector("#superMode");
+  if (sm) sm.addEventListener("click", () => openSupermarketMode());
   const pasteBtn = wrap.querySelector("#shopPasteBtn");
   if (pasteBtn) pasteBtn.addEventListener("click", openPasteShopping);
   const houseBanner = wrap.querySelector("#houseBanner");

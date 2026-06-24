@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.71",
+    d: "2026-06-24",
+    items: [
+      "Nuovo: \"Modalità supermercato\" nella Spesa — lista a tutto schermo, articoli grandi ordinati per reparto come giri tra le corsie, spunti col dito e una barra mostra quanto manca. Tieni lo schermo acceso mentre fai la spesa."
+    ]
+  },
+  {
     v: "7.70",
     d: "2026-06-20",
     items: [
