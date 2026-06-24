@@ -468,7 +468,6 @@ export function mount(rootEl) {
   setupBackHandler();
   setupRipple();
   setupAurora();
-  setupSeasonalDecor();
   checkPrepReminders();
   setInterval(checkPrepReminders, 60000);
   document.addEventListener("visibilitychange", () => {
@@ -502,31 +501,8 @@ function setupAurora() {
   document.body.insertBefore(a, document.body.firstChild);
 }
 
-// Decorazioni stagionali discrete sullo sfondo (neve d'inverno, petali in primavera,
-// foglie in autunno). Gated reduce-motion; d'estate niente.
-function setupSeasonalDecor() {
-  if (reduceMotion) return;
-  const old = document.getElementById("seasonDecor");
-  if (old) old.remove();
-  const m = new Date().getMonth() + 1;
-  let emoji = null;
-  if (m === 12 || m === 1 || m === 2) emoji = "❄️";
-  else if (m >= 3 && m <= 5) emoji = "🌸";
-  else if (m >= 9 && m <= 11) emoji = "🍂";
-  if (!emoji) return;
-  const layer = document.createElement("div");
-  layer.id = "seasonDecor";
-  for (let i = 0; i < 9; i++) {
-    const s = document.createElement("span");
-    s.textContent = emoji;
-    s.style.left = (Math.random() * 100).toFixed(1) + "%";
-    s.style.animationDuration = (9 + Math.random() * 9).toFixed(1) + "s";
-    s.style.animationDelay = (-Math.random() * 12).toFixed(1) + "s";
-    s.style.fontSize = (12 + Math.random() * 14).toFixed(0) + "px";
-    layer.appendChild(s);
-  }
-  document.body.appendChild(layer);
-}
+// (L'atmosfera stagionale sullo sfondo è ora gestita da applySeason() in theme.js,
+//  con anche l'estate e un interruttore in Opzioni.)
 
 // Tasto Indietro del telefono: torna alla schermata precedente DENTRO l'app
 // invece di chiuderla. Teniamo sempre uno "stato in più" nella cronologia: a

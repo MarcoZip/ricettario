@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.80",
+    d: "2026-06-24",
+    items: [
+      "Effetto wow: lo sfondo segue l'ora del giorno — tenui rosa all'alba, luce di giorno, arancio al tramonto, blu profondo di notte. L'app \"respira\" con la giornata.",
+      "Ritocco: unificata l'atmosfera stagionale (prima due effetti si sovrapponevano)."
+    ]
+  },
+  {
     v: "7.79",
     d: "2026-06-24",
     items: [

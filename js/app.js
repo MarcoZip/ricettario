@@ -3,7 +3,7 @@
 import * as store from "./store.js";
 import * as ui from "./ui.js";
 import { isCloudConfigured } from "./config.js";
-import { applyTheme, applyAccent, applyTextScale, applyContrast, applyFesta, applySeason } from "./theme.js";
+import { applyTheme, applyAccent, applyTextScale, applyContrast, applyFesta, applySeason, applyDaylight } from "./theme.js";
 import { runDailyReminders } from "./notify.js";
 import { isPushSubscribed, refreshReminders } from "./push.js";
 import { getNickname, setNickname } from "./profile.js";
@@ -38,6 +38,8 @@ applyTextScale();
 applyContrast();
 applyFesta();
 applySeason();
+applyDaylight();
+setInterval(applyDaylight, 10 * 60 * 1000); // aggiorna la tinta col passare delle ore
 
 const root = document.getElementById("view");
 let mounted = false;

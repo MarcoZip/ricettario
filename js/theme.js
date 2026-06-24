@@ -202,3 +202,24 @@ export function setSeason(mode) {
   try { localStorage.setItem(SEASON_KEY, mode === "off" ? "off" : "on"); } catch {}
   applySeason();
 }
+
+// ---- Sfondo che segue l'ora del giorno ----
+// Una tinta soffusa sullo sfondo che vira con l'orario reale: rosa all'alba,
+// luce di giorno, arancio al tramonto, blu profondo di notte.
+export function dayPhase(d) {
+  const h = (d || new Date()).getHours();
+  if (h >= 5 && h < 8) return "alba";
+  if (h >= 8 && h < 17) return "giorno";
+  if (h >= 17 && h < 20) return "tramonto";
+  return "notte";
+}
+export function applyDaylight() {
+  document.documentElement.setAttribute("data-daylight", dayPhase());
+  let layer = document.getElementById("daysky");
+  if (!layer) {
+    layer = document.createElement("div");
+    layer.id = "daysky";
+    layer.setAttribute("aria-hidden", "true");
+    document.body.insertBefore(layer, document.body.firstChild);
+  }
+}
