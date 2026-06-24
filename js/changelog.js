@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.83",
+    d: "2026-06-24",
+    items: [
+      "Novità: micro-suoni soft opzionali — un \"tin\" cristallino del timer, un fruscio quando sfogli i passi in cucina, uno sparkle quando salvi o completi un piatto. Sono spenti di default: li accendi (con tasto \"Prova\") da Opzioni › Aspetto. Generati al volo, nessun file da scaricare."
+    ]
+  },
+  {
     v: "7.82",
     d: "2026-06-24",
     items: [

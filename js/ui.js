@@ -21,6 +21,7 @@ import { isImportConfigured, APP_VERSION, PUSH_WORKER_URL, SPOONACULAR_ENABLED, 
 import { CHANGELOG } from "./changelog.js";
 import { fileToDataUrl } from "./image.js";
 import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS, getTextScale, setTextScale, getContrast, setContrast, getFestaMode, setFesta, setFestaEventToday, getSeasonMode, setSeason, currentSeason } from "./theme.js";
+import { getSoundOn, setSoundOn, playPling, playChime, playFlip, playSample } from "./sound.js";
 
 // Tag suggeriti nel form ricetta.
 const TAG_SUGGESTIONS = ["Primi", "Secondi", "Contorni", "Antipasti", "Dolci", "Colazione", "Merenda", "Zuppe", "Insalate", "Lievitati", "Veloce", "Vegetariano", "Vegano", "Pesce", "Carne", "Senza glutine", "Per ospiti", "Bambini"];
@@ -74,6 +75,7 @@ function fxBurstFrom(el, opts) {
 // dall'alto + un cartellino "Ricetta salvata!" che entra a molla e svanisce.
 function celebrateSave(title) {
   haptic(30);
+  playPling();
   const el = document.createElement("div");
   el.className = "save-cele";
   el.innerHTML = `<div class="save-cele__card"><div class="save-cele__emoji">🎉</div><div class="save-cele__t">Ricetta salvata!</div>${title ? `<div class="save-cele__sub">${escapeHtml(String(title).slice(0, 50))}</div>` : ""}</div>`;
@@ -2603,6 +2605,7 @@ let gTimers = []; // { id, label, remaining, running, alarming }
 let gTicker = null, gAlarm = null, gSeq = 0;
 let timersPanelEl = null; // modale Timer aperta (per ridisegnarla a ogni tick)
 function playBeep() {
+  if (getSoundOn()) { playChime(); return; } // "tin" gentile se i micro-suoni sono accesi
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const o = ctx.createOscillator(); const g = ctx.createGain();
@@ -3303,10 +3306,10 @@ function openCookingMode(recipe) {
   }
 
   function goNext() {
-    if (idx < steps.length - 1) { idx++; haptic(6); draw(); speakStep(); }
+    if (idx < steps.length - 1) { idx++; haptic(6); playFlip(); draw(); speakStep(); }
     else finishCooking();
   }
-  function goPrev() { if (idx > 0) { idx--; haptic(6); draw(); speakStep(); } }
+  function goPrev() { if (idx > 0) { idx--; haptic(6); playFlip(); draw(); speakStep(); } }
 
   // Schermata celebrativa di fine ricetta: coriandoli + scorciatoia al voto/foto.
   function finishCooking() {
@@ -3314,7 +3317,7 @@ function openCookingMode(recipe) {
     if (ticker) { clearInterval(ticker); ticker = null; }
     if (alarmTicker) { clearInterval(alarmTicker); alarmTicker = null; }
     stopSpeak(); stopVoice();
-    haptic(30);
+    haptic(30); playPling();
     el.classList.add("cook--done");
     el.innerHTML = `
       <div class="cook__done">
@@ -3438,7 +3441,7 @@ function openCookingMode(recipe) {
     for (const t of timers) {
       if (!t.running) continue;
       t.remaining--;
-      if (t.remaining <= 0) { t.remaining = 0; t.running = false; t.alarming = true; beep(); try { navigator.vibrate && navigator.vibrate([300, 120, 300]); } catch (e) {} toast(`⏰ ${t.label} finito!`, "success"); }
+      if (t.remaining <= 0) { t.remaining = 0; t.running = false; t.alarming = true; if (getSoundOn()) playChime(); else beep(); try { navigator.vibrate && navigator.vibrate([300, 120, 300]); } catch (e) {} toast(`⏰ ${t.label} finito!`, "success"); }
     }
     ensureTicker();
     ensureAlarm();
@@ -3467,7 +3470,7 @@ function openCookingMode(recipe) {
   // Allarme ripetuto (suono + vibrazione) finché non lo si ferma toccando il timer.
   function ensureAlarm() {
     const any = timers.some((t) => t.alarming);
-    if (any && !alarmTicker) alarmTicker = setInterval(() => { beep(); try { navigator.vibrate && navigator.vibrate([300, 120, 300]); } catch (e) {} }, 1700);
+    if (any && !alarmTicker) alarmTicker = setInterval(() => { if (getSoundOn()) playChime(); else beep(); try { navigator.vibrate && navigator.vibrate([300, 120, 300]); } catch (e) {} }, 1700);
     else if (!any && alarmTicker) { clearInterval(alarmTicker); alarmTicker = null; }
   }
   function addTimer(mins, label) {
@@ -6702,6 +6705,13 @@ function renderImpostazioni() {
         </div>
         <input type="checkbox" id="seasonChk" class="mini-check" ${getSeasonMode() !== "off" ? "checked" : ""} />
       </label>
+      <label class="setting-row" style="cursor:pointer">
+        <div>
+          <div class="setting-row__label">🔊 Micro-suoni soft</div>
+          <div class="setting-row__desc">Suoni gentili e discreti: il "tin" del timer, un fruscio sfogliando i passi, uno sparkle quando salvi o completi un piatto. <a href="#" id="soundTest">Prova</a></div>
+        </div>
+        <input type="checkbox" id="soundChk" class="mini-check" ${getSoundOn() ? "checked" : ""} />
+      </label>
     </div>
 
     <h2 class="setting-section"><span class="setting-section__ic">🍽️</span> Preferenze di cucina</h2>
@@ -6878,6 +6888,10 @@ function renderImpostazioni() {
   if (festaSel) { festaSel.value = getFestaMode(); festaSel.addEventListener("change", () => setFesta(festaSel.value)); }
   const seasonChk = root.querySelector("#seasonChk");
   if (seasonChk) seasonChk.addEventListener("change", () => setSeason(seasonChk.checked ? "on" : "off"));
+  const soundChk = root.querySelector("#soundChk");
+  if (soundChk) soundChk.addEventListener("change", () => { setSoundOn(soundChk.checked); if (soundChk.checked) playSample(); });
+  const soundTest = root.querySelector("#soundTest");
+  if (soundTest) soundTest.addEventListener("click", (e) => { e.preventDefault(); playSample(); });
   const defServSel = root.querySelector("#defServSel");
   if (defServSel) { defServSel.value = String(prefNum("defServings", 0)); defServSel.addEventListener("change", () => setPrefNum("defServings", parseInt(defServSel.value, 10))); }
   root.querySelectorAll("[data-pref]").forEach((cb) => cb.addEventListener("change", () => setPrefBool(cb.dataset.pref, cb.checked)));
