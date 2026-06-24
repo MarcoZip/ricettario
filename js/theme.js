@@ -152,3 +152,53 @@ export function setFesta(mode) {
   try { localStorage.setItem(FESTA_KEY, m); } catch {}
   applyFesta();
 }
+
+// ---- Atmosfera stagionale (petali, pulviscolo dorato, foglie, neve) ----
+// Elementi leggeri che fluttuano sullo sfondo a seconda della stagione in corso.
+// Acceso di default; "off" lo disattiva. Rispetta sempre "riduci movimento".
+const SEASON_KEY = "ricettario.season";
+export function getSeasonMode() {
+  try { return localStorage.getItem(SEASON_KEY) === "off" ? "off" : "on"; } catch { return "on"; }
+}
+export function currentSeason() {
+  const m = new Date().getMonth() + 1;
+  if (m >= 3 && m <= 5) return "primavera";
+  if (m >= 6 && m <= 8) return "estate";
+  if (m >= 9 && m <= 11) return "autunno";
+  return "inverno";
+}
+const SEASON_BITS = {
+  primavera: { emojis: ["🌸", "🌸", "🌷", "🌼"], rise: false },
+  estate: { emojis: ["✨", "✨", "🌟", "✨"], rise: true },
+  autunno: { emojis: ["🍂", "🍁", "🍂", "🍃"], rise: false },
+  inverno: { emojis: ["❄️", "❄️", "❄️", "🌨️"], rise: false }
+};
+export function applySeason() {
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const season = currentSeason();
+  let layer = document.getElementById("season");
+  if (getSeasonMode() !== "off" && !reduce) {
+    if (layer && layer.dataset.season === season) return; // già impostato sulla stagione giusta
+    if (layer) layer.remove();
+    layer = document.createElement("div");
+    layer.id = "season";
+    layer.dataset.season = season;
+    layer.setAttribute("aria-hidden", "true");
+    const cfg = SEASON_BITS[season];
+    let html = "";
+    for (let i = 0; i < 12; i++) {
+      const left = Math.round((i / 12) * 94 + (i % 4) * 1.5);
+      const dur = 9 + (i % 6);
+      const delay = -(i * 1.3).toFixed(1);
+      const size = (0.85 + (i % 4) * 0.28).toFixed(2);
+      const cls = cfg.rise ? "season__bit season__bit--rise" : "season__bit";
+      html += `<span class="${cls}" style="left:${left}%;font-size:${size}rem;animation-duration:${dur}s;animation-delay:${delay}s">${cfg.emojis[i % cfg.emojis.length]}</span>`;
+    }
+    layer.innerHTML = html;
+    document.body.appendChild(layer);
+  } else if (layer) { layer.remove(); }
+}
+export function setSeason(mode) {
+  try { localStorage.setItem(SEASON_KEY, mode === "off" ? "off" : "on"); } catch {}
+  applySeason();
+}

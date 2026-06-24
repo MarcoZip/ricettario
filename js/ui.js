@@ -20,7 +20,7 @@ import { getNickname, setNickname } from "./profile.js";
 import { isImportConfigured, APP_VERSION, PUSH_WORKER_URL, SPOONACULAR_ENABLED, EDAMAM_ENABLED, WORKER_URL } from "./config.js";
 import { CHANGELOG } from "./changelog.js";
 import { fileToDataUrl } from "./image.js";
-import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS, getTextScale, setTextScale, getContrast, setContrast, getFestaMode, setFesta, setFestaEventToday } from "./theme.js";
+import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS, getTextScale, setTextScale, getContrast, setContrast, getFestaMode, setFesta, setFestaEventToday, getSeasonMode, setSeason, currentSeason } from "./theme.js";
 
 // Tag suggeriti nel form ricetta.
 const TAG_SUGGESTIONS = ["Primi", "Secondi", "Contorni", "Antipasti", "Dolci", "Colazione", "Merenda", "Zuppe", "Insalate", "Lievitati", "Veloce", "Vegetariano", "Vegano", "Pesce", "Carne", "Senza glutine", "Per ospiti", "Bambini"];
@@ -6622,6 +6622,13 @@ function renderImpostazioni() {
           <option value="on">Sempre acceso</option>
         </select>
       </div>
+      <label class="setting-row" style="cursor:pointer">
+        <div>
+          <div class="setting-row__label">${{ primavera: "🌸", estate: "✨", autunno: "🍂", inverno: "❄️" }[currentSeason()]} Atmosfera stagionale</div>
+          <div class="setting-row__desc">Petali, foglie, neve o pulviscolo dorato che fluttuano leggeri sullo sfondo, a seconda della stagione.</div>
+        </div>
+        <input type="checkbox" id="seasonChk" class="mini-check" ${getSeasonMode() !== "off" ? "checked" : ""} />
+      </label>
     </div>
 
     <h2 class="setting-section"><span class="setting-section__ic">🍽️</span> Preferenze di cucina</h2>
@@ -6796,6 +6803,8 @@ function renderImpostazioni() {
   if (contrastChk) contrastChk.addEventListener("change", () => setContrast(contrastChk.checked));
   const festaSel = root.querySelector("#festaSel");
   if (festaSel) { festaSel.value = getFestaMode(); festaSel.addEventListener("change", () => setFesta(festaSel.value)); }
+  const seasonChk = root.querySelector("#seasonChk");
+  if (seasonChk) seasonChk.addEventListener("change", () => setSeason(seasonChk.checked ? "on" : "off"));
   const defServSel = root.querySelector("#defServSel");
   if (defServSel) { defServSel.value = String(prefNum("defServings", 0)); defServSel.addEventListener("change", () => setPrefNum("defServings", parseInt(defServSel.value, 10))); }
   root.querySelectorAll("[data-pref]").forEach((cb) => cb.addEventListener("change", () => setPrefBool(cb.dataset.pref, cb.checked)));

@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.78",
+    d: "2026-06-24",
+    items: [
+      "Effetto wow: atmosfera stagionale sullo sfondo — petali a primavera, pulviscolo dorato d'estate, foglie in autunno, neve d'inverno. Cambia da solo con la stagione; si può spegnere in Opzioni › Aspetto. (Rispetta \"riduci movimento\".)"
+    ]
+  },
+  {
     v: "7.77",
     d: "2026-06-24",
     items: [
