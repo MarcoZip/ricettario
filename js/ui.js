@@ -26,6 +26,9 @@ import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS, getTextScale,
 const TAG_SUGGESTIONS = ["Primi", "Secondi", "Contorni", "Antipasti", "Dolci", "Colazione", "Merenda", "Zuppe", "Insalate", "Lievitati", "Veloce", "Vegetariano", "Vegano", "Pesce", "Carne", "Senza glutine", "Per ospiti", "Bambini"];
 const ALLERGENS = ["Glutine", "Lattosio", "Uova", "Frutta a guscio", "Arachidi", "Pesce", "Crostacei", "Soia", "Sedano"];
 
+// Vapore animato (CSS) sovrapposto alle foto dei piatti: caldo e appetitoso.
+const STEAM_HTML = '<div class="steam" aria-hidden="true"><span class="steam__w"></span><span class="steam__w"></span><span class="steam__w"></span></div>';
+
 // Animazioni: rispetta la preferenza di sistema "riduci animazioni".
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -1389,6 +1392,7 @@ function renderStrumenti() {
     rotdCard = `<button class="rotd" data-recipe="${rotd.id}">
         ${rotd.photo ? `<img class="rotd__img" src="${escapeHtml(proxiedImg(rotd.photo))}" alt="" referrerpolicy="no-referrer" />` : `<span class="rotd__ph">${iconHtml("fork-knife")}</span>`}
         <span class="rotd__grad"></span>
+        ${rotd.photo ? STEAM_HTML : ""}
         <span class="rotd__glare"></span>
         <span class="rotd__body"><span class="rotd__lbl">${iconHtml("sparkle")} Ricetta del giorno</span><span class="rotd__title">${escapeHtml(rotd.title)}</span></span>
       </button>`;
@@ -1842,7 +1846,7 @@ function renderRecipeDetail() {
       <div class="toolbar__title" style="flex:1">${r.photo ? "" : escapeHtml(r.title)}</div>
       <button class="back-btn fav-btn ${r.favorite ? "is-fav" : ""}" id="favBtn" title="Preferito">${iconHtml("heart")}</button>
     </div>
-    ${r.photo ? `<div class="recipe-hero"><img src="${escapeHtml(proxiedImg(r.photo))}" alt="" referrerpolicy="no-referrer" style="view-transition-name:vt-hero" /><div class="recipe-hero__grad"></div><h2 class="recipe-hero__title">${escapeHtml(r.title)}</h2></div>` : ""}
+    ${r.photo ? `<div class="recipe-hero"><img src="${escapeHtml(proxiedImg(r.photo))}" alt="" referrerpolicy="no-referrer" style="view-transition-name:vt-hero" /><div class="recipe-hero__grad"></div>${STEAM_HTML}<h2 class="recipe-hero__title">${escapeHtml(r.title)}</h2></div>` : ""}
     <div class="detail-top">
       ${tool ? `<span class="recipe-tool-chip" style="margin:0">${iconHtml(tool.icon)} ${escapeHtml(tool.name)}</span>` : "<span></span>"}
       ${ratingRow}

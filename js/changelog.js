@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.76",
+    d: "2026-06-24",
+    items: [
+      "Effetto wow: un filo di vapore sale dalle foto dei piatti (Ricetta del giorno e dettaglio ricetta) — caldo e appetitoso. (Rispetta \"riduci movimento\".)"
+    ]
+  },
+  {
     v: "7.75",
     d: "2026-06-24",
     items: [
