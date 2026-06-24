@@ -170,6 +170,21 @@ function initGyroCard() {
   }, { passive: true });
 }
 
+// Comparsa "a cascata": le sezioni della ricetta appaiono con dissolvenza e
+// leggera salita mentre entrano nello schermo. Niente classe = nessun rischio
+// di contenuto nascosto su browser senza IntersectionObserver o con riduci-movimento.
+function wireScrollReveal() {
+  if (reduceMotion || !("IntersectionObserver" in window)) return;
+  const cards = root ? root.querySelectorAll(".section-card") : [];
+  if (!cards.length) return;
+  cards.forEach((c, i) => { c.classList.add("reveal"); c.style.setProperty("--reveal-d", (Math.min(i, 6) * 55) + "ms"); });
+  const io = new IntersectionObserver((entries, obs) => {
+    entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("reveal-in"); obs.unobserve(e.target); } });
+  }, { rootMargin: "0px 0px -7% 0px", threshold: 0.08 });
+  cards.forEach((c) => io.observe(c));
+  setTimeout(() => cards.forEach((c) => c.classList.add("reveal-in")), 1600); // sicurezza: rivela comunque tutto
+}
+
 let root = null;
 let currentRoute = "strumenti";
 let currentToolId = null;
@@ -1934,6 +1949,8 @@ function renderRecipeDetail() {
     };
     window.addEventListener("scroll", onHeroScroll, { passive: true });
   }
+  wireScrollReveal(); // sezioni che appaiono a cascata mentre si scorre
+
   const pMinus = root.querySelector("#pMinus");
   const pPlus = root.querySelector("#pPlus");
   if (pMinus) pMinus.addEventListener("click", () => { detailServings = Math.max(1, (detailServings || base || 1) - 1); render(); });

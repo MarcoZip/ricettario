@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.77",
+    d: "2026-06-24",
+    items: [
+      "Effetto wow: scorrendo una ricetta, le sezioni (ingredienti, passi, note…) appaiono con una morbida dissolvenza in salita mano a mano che entrano nello schermo. (Rispetta \"riduci movimento\".)"
+    ]
+  },
+  {
     v: "7.76",
     d: "2026-06-24",
     items: [
