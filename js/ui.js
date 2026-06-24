@@ -142,6 +142,31 @@ function switchThemeReveal(newTheme, originEl) {
   vt.finished.finally(() => document.documentElement.classList.remove("theme-switching"));
 }
 
+// Carta "Ricetta del giorno" 3D: si inclina seguendo il giroscopio del telefono,
+// con un riflesso di luce che scorre. Su desktop/senza giroscopio resta ferma.
+let gyroCardInited = false;
+function initGyroCard() {
+  if (gyroCardInited || reduceMotion) return;
+  if (typeof window.DeviceOrientationEvent === "undefined") return;
+  gyroCardInited = true;
+  let last = 0, b0 = null;
+  window.addEventListener("deviceorientation", (e) => {
+    if (e.beta == null && e.gamma == null) return;
+    const now = performance.now();
+    if (now - last < 33) return; // ~30 fps, evita aggiornamenti troppo frequenti
+    last = now;
+    const card = document.querySelector(".rotd");
+    if (!card) return;
+    if (b0 == null) b0 = e.beta || 0; // calibra sulla posizione iniziale di tenuta
+    const ry = Math.max(-9, Math.min(9, (e.gamma || 0) * 0.55));   // sinistra/destra
+    const rx = Math.max(-7, Math.min(7, ((e.beta || 0) - b0) * 0.4)); // avanti/indietro
+    card.classList.add("is-tilting");
+    card.style.transform = `perspective(800px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg)`;
+    const glare = card.querySelector(".rotd__glare");
+    if (glare) glare.style.background = `radial-gradient(circle at ${(50 + ry * 4).toFixed(0)}% ${(50 - rx * 4).toFixed(0)}%, rgba(255,255,255,0.28), transparent 55%)`;
+  }, { passive: true });
+}
+
 let root = null;
 let currentRoute = "strumenti";
 let currentToolId = null;
@@ -1364,6 +1389,7 @@ function renderStrumenti() {
     rotdCard = `<button class="rotd" data-recipe="${rotd.id}">
         ${rotd.photo ? `<img class="rotd__img" src="${escapeHtml(proxiedImg(rotd.photo))}" alt="" referrerpolicy="no-referrer" />` : `<span class="rotd__ph">${iconHtml("fork-knife")}</span>`}
         <span class="rotd__grad"></span>
+        <span class="rotd__glare"></span>
         <span class="rotd__body"><span class="rotd__lbl">${iconHtml("sparkle")} Ricetta del giorno</span><span class="rotd__title">${escapeHtml(rotd.title)}</span></span>
       </button>`;
   }
@@ -1502,6 +1528,7 @@ function renderStrumenti() {
 
   const moodBtn = root.querySelector("#moodBtn");
   if (moodBtn) moodBtn.addEventListener("click", () => openMoodPicker());
+  initGyroCard(); // carta del giorno reattiva al giroscopio (solo su dispositivi che lo supportano)
   const surprise = root.querySelector("#surpriseBtn");
   if (surprise) surprise.addEventListener("click", () => {
     const all = store.getAllRecipes();

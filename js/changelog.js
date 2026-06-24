@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.75",
+    d: "2026-06-24",
+    items: [
+      "Effetto wow: la \"Ricetta del giorno\" si inclina seguendo i movimenti del telefono (giroscopio), con un riflesso di luce che scorre — sembra una carta 3D in mano. (Solo su telefono; rispetta \"riduci movimento\".)"
+    ]
+  },
+  {
     v: "7.74",
     d: "2026-06-24",
     items: [
