@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.84",
+    d: "2026-06-24",
+    items: [
+      "Effetto wow: nuovo look \"Vetro liquido\" — card e pannelli in vetro smerigliato con un riflesso di luce che scorre mentre navighi. Attivo di default, si può togliere da Opzioni › Aspetto."
+    ]
+  },
+  {
     v: "7.83",
     d: "2026-06-24",
     items: [

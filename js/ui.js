@@ -20,7 +20,7 @@ import { getNickname, setNickname } from "./profile.js";
 import { isImportConfigured, APP_VERSION, PUSH_WORKER_URL, SPOONACULAR_ENABLED, EDAMAM_ENABLED, WORKER_URL } from "./config.js";
 import { CHANGELOG } from "./changelog.js";
 import { fileToDataUrl } from "./image.js";
-import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS, getTextScale, setTextScale, getContrast, setContrast, getFestaMode, setFesta, setFestaEventToday, getSeasonMode, setSeason, currentSeason } from "./theme.js";
+import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS, getTextScale, setTextScale, getContrast, setContrast, getFestaMode, setFesta, setFestaEventToday, getSeasonMode, setSeason, currentSeason, getGlassOn, setGlass } from "./theme.js";
 import { getSoundOn, setSoundOn, playPling, playChime, playFlip, playSample } from "./sound.js";
 
 // Tag suggeriti nel form ricetta.
@@ -497,6 +497,7 @@ export function mount(rootEl) {
   setupRipple();
   setupAurora();
   window.addEventListener("resize", moveNavBlob);
+  setupGlassSheen();
   checkPrepReminders();
   setInterval(checkPrepReminders, 60000);
   document.addEventListener("visibilitychange", () => {
@@ -520,6 +521,21 @@ function setupRipple() {
     btn.appendChild(r);
     setTimeout(() => r.remove(), 600);
   });
+}
+
+// "Vetro liquido": aggiorna la variabile --sheen con lo scroll, così il riflesso
+// di luce sulle superfici di vetro scorre mentre si naviga. Throttle con rAF.
+function setupGlassSheen() {
+  let pending = false;
+  const upd = () => {
+    pending = false;
+    const y = window.scrollY || window.pageYOffset || 0;
+    document.documentElement.style.setProperty("--sheen", String(Math.round(y)));
+  };
+  window.addEventListener("scroll", () => {
+    if (pending) return; pending = true; requestAnimationFrame(upd);
+  }, { passive: true });
+  upd();
 }
 
 // Sfondo "aurora" animato dietro i contenuti (soft, gated reduce-motion).
@@ -6712,6 +6728,13 @@ function renderImpostazioni() {
         </div>
         <input type="checkbox" id="soundChk" class="mini-check" ${getSoundOn() ? "checked" : ""} />
       </label>
+      <label class="setting-row" style="cursor:pointer">
+        <div>
+          <div class="setting-row__label">🪟 Vetro liquido</div>
+          <div class="setting-row__desc">Card e pannelli in "vetro smerigliato" con un riflesso di luce che scorre mentre navighi. Look premium e arioso.</div>
+        </div>
+        <input type="checkbox" id="glassChk" class="mini-check" ${getGlassOn() ? "checked" : ""} />
+      </label>
     </div>
 
     <h2 class="setting-section"><span class="setting-section__ic">🍽️</span> Preferenze di cucina</h2>
@@ -6892,6 +6915,8 @@ function renderImpostazioni() {
   if (soundChk) soundChk.addEventListener("change", () => { setSoundOn(soundChk.checked); if (soundChk.checked) playSample(); });
   const soundTest = root.querySelector("#soundTest");
   if (soundTest) soundTest.addEventListener("click", (e) => { e.preventDefault(); playSample(); });
+  const glassChk = root.querySelector("#glassChk");
+  if (glassChk) glassChk.addEventListener("change", () => setGlass(glassChk.checked));
   const defServSel = root.querySelector("#defServSel");
   if (defServSel) { defServSel.value = String(prefNum("defServings", 0)); defServSel.addEventListener("change", () => setPrefNum("defServings", parseInt(defServSel.value, 10))); }
   root.querySelectorAll("[data-pref]").forEach((cb) => cb.addEventListener("change", () => setPrefBool(cb.dataset.pref, cb.checked)));

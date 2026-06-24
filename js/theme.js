@@ -153,6 +153,20 @@ export function setFesta(mode) {
   applyFesta();
 }
 
+// ---- Vetro liquido (glassmorphism): superfici smerigliate con riflesso ----
+const GLASS_KEY = "ricettario.glass";
+export function getGlassOn() {
+  try { const v = localStorage.getItem(GLASS_KEY); return v === null ? true : v === "1"; } catch { return true; }
+}
+export function applyGlass(on) {
+  const v = on == null ? getGlassOn() : on;
+  document.documentElement.classList.toggle("glass", !!v);
+}
+export function setGlass(on) {
+  try { localStorage.setItem(GLASS_KEY, on ? "1" : "0"); } catch {}
+  applyGlass(on);
+}
+
 // ---- Atmosfera stagionale (petali, pulviscolo dorato, foglie, neve) ----
 // Elementi leggeri che fluttuano sullo sfondo a seconda della stagione in corso.
 // Acceso di default; "off" lo disattiva. Rispetta sempre "riduci movimento".
