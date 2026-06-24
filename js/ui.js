@@ -129,6 +129,103 @@ function animateCountUps(scope) {
   });
 }
 
+// ---- "I tuoi numeri": dashboard animata che celebra l'uso dell'app ----
+const STAT_RANKS = [
+  { min: 100, emoji: "🏆", title: "Leggenda della cucina" },
+  { min: 50, emoji: "⭐", title: "Maestra dei fornelli" },
+  { min: 20, emoji: "🧑‍🍳", title: "Chef di famiglia" },
+  { min: 5, emoji: "👩‍🍳", title: "Cuoca di casa" },
+  { min: 0, emoji: "🍳", title: "Apprendista ai fornelli" }
+];
+const STAT_MILESTONES = [5, 20, 50, 100, 200, 365];
+function statRankOf(cooked) { return STAT_RANKS.find((r) => cooked >= r.min) || STAT_RANKS[STAT_RANKS.length - 1]; }
+function computeAppStats() {
+  const recipes = (store.getAllRecipes && store.getAllRecipes()) || [];
+  const tools = (store.getTools && store.getTools()) || [];
+  const favorites = recipes.filter((r) => r.favorite).length;
+  const cooked = recipes.reduce((s, r) => s + (r.cookCount || 0), 0);
+  const withPhoto = recipes.filter((r) => r.photo).length;
+  const tagCount = {};
+  recipes.forEach((r) => (r.tags || []).forEach((t) => { const k = String(t).trim(); if (k) tagCount[k] = (tagCount[k] || 0) + 1; }));
+  const topTags = Object.entries(tagCount).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const ingCount = {};
+  recipes.forEach((r) => (r.ingredients || []).forEach((it) => {
+    const name = (it && it.name ? String(it.name) : "").toLowerCase().trim();
+    if (name && name.length > 1) ingCount[name] = (ingCount[name] || 0) + 1;
+  }));
+  const topIng = Object.entries(ingCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const mostCooked = recipes.filter((r) => r.cookCount).sort((a, b) => (b.cookCount || 0) - (a.cookCount || 0))[0] || null;
+  return { total: recipes.length, favorites, cooked, withPhoto, tools: tools.length, topTags, topIng, mostCooked };
+}
+function openStatsDashboard() {
+  const s = computeAppStats();
+  if (!s.total) {
+    openModal(`<h3 class="modal__title">📊 I tuoi numeri</h3>
+      <p style="text-align:center;padding:18px 6px;color:var(--text-soft)">Qui vedrai le tue statistiche di cucina appena salverai e cucinerai qualche ricetta. 🍳</p>
+      <button class="btn btn--block" id="stClose">Chiudi</button>`);
+    const b = document.querySelector("#modalRoot .modal #stClose"); if (b) b.onclick = closeAllModals;
+    return;
+  }
+  const rank = statRankOf(s.cooked);
+  const next = STAT_MILESTONES.find((m) => m > s.cooked) || null;
+  const prev = [...STAT_MILESTONES].reverse().find((m) => m <= s.cooked) || 0;
+  const ringFrac = next ? Math.max(0.04, (s.cooked - prev) / (next - prev)) : 1;
+  const R = 52, CIRC = 2 * Math.PI * R, off = CIRC * (1 - ringFrac);
+  const maxTag = Math.max(1, ...s.topTags.map((t) => t[1]));
+  const maxIng = Math.max(1, ...s.topIng.map((t) => t[1]));
+  const bars = (arr, max, cls) => arr.map(([label, n]) => `
+    <div class="stbar">
+      <div class="stbar__lbl">${escapeHtml(label)}</div>
+      <div class="stbar__track"><div class="stbar__fill ${cls}" data-w="${Math.round((n / max) * 100)}"></div></div>
+      <div class="stbar__n" data-countup="${n}">0</div>
+    </div>`).join("");
+  const tile = (emoji, value, label) => `
+    <div class="sttile"><div class="sttile__e">${emoji}</div><div class="sttile__v" data-countup="${value}">0</div><div class="sttile__l">${label}</div></div>`;
+  const html = `
+    <h3 class="modal__title">📊 I tuoi numeri</h3>
+    <div class="stats-scroll">
+      <div class="stats-hero">
+        <svg class="stats-ring" viewBox="0 0 120 120" width="132" height="132">
+          <circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--surface-3)" stroke-width="9"/>
+          <circle class="nring__fg stats-ring__fg" cx="60" cy="60" r="${R}" fill="none" stroke="url(#stGrad)" stroke-width="9" stroke-linecap="round"
+            stroke-dasharray="${CIRC.toFixed(1)}" stroke-dashoffset="${CIRC.toFixed(1)}" data-off="${off.toFixed(1)}" transform="rotate(-90 60 60)"/>
+          <defs><linearGradient id="stGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--primary-2)"/><stop offset="1" stop-color="var(--primary)"/></linearGradient></defs>
+          <text x="60" y="55" text-anchor="middle" class="stats-ring__big" data-countup="${s.cooked}">0</text>
+          <text x="60" y="74" text-anchor="middle" class="stats-ring__sub">cotture</text>
+        </svg>
+        <div class="stats-rank">${rank.emoji} ${escapeHtml(rank.title)}</div>
+        <div class="stats-rank__sub">${next ? `Ancora <b>${next - s.cooked}</b> per il prossimo traguardo (${next})` : "Hai raggiunto tutti i traguardi! 🎉"}</div>
+      </div>
+      <div class="stats-tiles">
+        ${tile("📚", s.total, s.total === 1 ? "ricetta" : "ricette")}
+        ${tile("❤️", s.favorites, "preferiti")}
+        ${tile("📷", s.withPhoto, "con foto")}
+        ${tile("🔧", s.tools, s.tools === 1 ? "strumento" : "strumenti")}
+      </div>
+      ${s.topTags.length ? `<div class="stats-sec"><h3 class="stats-sec__t">🍽️ Le tue portate</h3>${bars(s.topTags, maxTag, "is-tag")}</div>` : ""}
+      ${s.topIng.length ? `<div class="stats-sec"><h3 class="stats-sec__t">🥕 Ingredienti del cuore</h3>${bars(s.topIng, maxIng, "is-ing")}</div>` : ""}
+      ${s.mostCooked ? `<div class="stats-sec"><h3 class="stats-sec__t">👑 La più cucinata</h3>
+        <div class="stats-top">${s.mostCooked.photo ? `<img src="${escapeHtml(proxiedImg(s.mostCooked.photo))}" alt="" referrerpolicy="no-referrer"/>` : `<span class="stats-top__ph">🍴</span>`}
+          <div><div class="stats-top__t">${escapeHtml(s.mostCooked.title)}</div><div class="stats-top__n">cucinata ${s.mostCooked.cookCount} ${s.mostCooked.cookCount === 1 ? "volta" : "volte"}</div></div></div></div>` : ""}
+    </div>
+    <button class="btn btn--block" id="stClose">Chiudi</button>`;
+  const { el } = openModal(html);
+  el.classList.add("modal--stats");
+  el.querySelector("#stClose").onclick = closeAllModals;
+  animateCountUps(el);
+  // Barre che crescono
+  requestAnimationFrame(() => { el.querySelectorAll(".stbar__fill").forEach((b) => { b.style.width = (b.dataset.w || 0) + "%"; }); });
+  // Coriandoli quando si supera un nuovo traguardo (una volta sola per traguardo).
+  try {
+    const reached = [...STAT_MILESTONES].reverse().find((m) => s.cooked >= m) || 0;
+    const cheered = parseInt(localStorage.getItem("ricettario.statsCheer") || "0", 10);
+    if (reached > cheered) {
+      localStorage.setItem("ricettario.statsCheer", String(reached));
+      setTimeout(() => { try { fxBurst(window.innerWidth / 2, window.innerHeight / 3, { count: 44 }); } catch (e) {} playPling(); toast(`🎉 Traguardo: ${reached} cotture!`, "success"); }, 350);
+    }
+  } catch (e) {}
+}
+
 // Cambio tema con "onda" circolare: il nuovo tema si espande da dove tocchi
 // (View Transitions API). Fallback al cambio istantaneo se non supportato.
 function switchThemeReveal(newTheme, originEl) {
@@ -6665,6 +6762,17 @@ function renderImpostazioni() {
     <p class="page-sub">Tutto a portata di mano, raggruppato per argomento.</p>
     ${accountGroup}
 
+    <h2 class="setting-section"><span class="setting-section__ic">📊</span> I tuoi numeri</h2>
+    <div class="setting-group">
+      <div class="setting-row">
+        <div>
+          <div class="setting-row__label">Le tue statistiche di cucina</div>
+          <div class="setting-row__desc">Ricette, preferiti, cotture, portate e ingredienti del cuore — con anelli e barre animate.</div>
+        </div>
+        <button class="btn btn--primary" id="statsBtn">Apri</button>
+      </div>
+    </div>
+
     <h2 class="setting-section"><span class="setting-section__ic">🎨</span> Aspetto</h2>
     <div class="setting-group">
       <div class="setting-row">
@@ -6917,6 +7025,8 @@ function renderImpostazioni() {
   if (soundTest) soundTest.addEventListener("click", (e) => { e.preventDefault(); playSample(); });
   const glassChk = root.querySelector("#glassChk");
   if (glassChk) glassChk.addEventListener("change", () => setGlass(glassChk.checked));
+  const statsBtn = root.querySelector("#statsBtn");
+  if (statsBtn) statsBtn.addEventListener("click", () => openStatsDashboard());
   const defServSel = root.querySelector("#defServSel");
   if (defServSel) { defServSel.value = String(prefNum("defServings", 0)); defServSel.addEventListener("change", () => setPrefNum("defServings", parseInt(defServSel.value, 10))); }
   root.querySelectorAll("[data-pref]").forEach((cb) => cb.addEventListener("change", () => setPrefBool(cb.dataset.pref, cb.checked)));

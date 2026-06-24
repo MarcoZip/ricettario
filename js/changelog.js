@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.85",
+    d: "2026-06-24",
+    items: [
+      "Novità: \"I tuoi numeri\" — una schermata che celebra la tua cucina con anelli e barre animate: ricette, preferiti, cotture totali, le tue portate, gli ingredienti del cuore e la ricetta più cucinata. C'è anche un titolo (da Apprendista a Leggenda) e coriandoli quando superi un traguardo! La trovi in Opzioni › I tuoi numeri."
+    ]
+  },
+  {
     v: "7.84",
     d: "2026-06-24",
     items: [
