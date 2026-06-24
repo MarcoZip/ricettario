@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.79",
+    d: "2026-06-24",
+    items: [
+      "Effetto wow: aprendo una ricetta con foto, l'immagine si \"serve\" con un cerchio che si espande (come un piatto al tavolo) e il titolo compare con l'effetto macchina-da-scrivere. (Rispetta \"riduci movimento\".)"
+    ]
+  },
+  {
     v: "7.78",
     d: "2026-06-24",
     items: [

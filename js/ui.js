@@ -1949,6 +1949,26 @@ function renderRecipeDetail() {
     };
     window.addEventListener("scroll", onHeroScroll, { passive: true });
   }
+  // "Impiattamento": la foto si rivela con un cerchio che si espande e il titolo
+  // compare con effetto macchina-da-scrivere.
+  if (heroEl && !reduceMotion) {
+    heroEl.classList.add("is-plating");
+    const titleEl = heroEl.querySelector(".recipe-hero__title");
+    if (titleEl) {
+      const full = titleEl.textContent;
+      titleEl.textContent = "";
+      titleEl.classList.add("is-typing");
+      setTimeout(() => {
+        if (!document.body.contains(titleEl)) return;
+        let i = 0;
+        const iv = setInterval(() => {
+          if (!document.body.contains(titleEl)) { clearInterval(iv); return; }
+          titleEl.textContent = full.slice(0, ++i);
+          if (i >= full.length) { clearInterval(iv); titleEl.classList.remove("is-typing"); }
+        }, 40);
+      }, 340);
+    }
+  }
   wireScrollReveal(); // sezioni che appaiono a cascata mentre si scorre
 
   const pMinus = root.querySelector("#pMinus");
