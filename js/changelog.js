@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.82",
+    d: "2026-06-24",
+    items: [
+      "Effetto wow: la Modalità cucina prende vita! Lo sfondo cambia col modo di cottura del passo — bagliore caldo che pulsa per il forno, bollicine e vapore che salgono per il bollito, scintille dorate per la frittura, fiamma soffusa per la padella. (Rispetta \"riduci movimento\".)"
+    ]
+  },
+  {
     v: "7.81",
     d: "2026-06-24",
     items: [

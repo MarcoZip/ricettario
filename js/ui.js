@@ -3232,6 +3232,34 @@ function stepTimerLabel(text, n) {
   return "Passo " + n;
 }
 
+// Riconosce il metodo di cottura dal testo (per la "Cucina viva"). L'ordine conta:
+// "olio bollente" è frittura, non bollito.
+function detectCookMethod(text) {
+  const t = (text || "").toLowerCase();
+  if (/frigg|frittur|olio bollente|olio caldo|abbondante olio|dorare in olio|immerg/.test(t)) return "frittura";
+  if (/forn|inforn|gratin|180°|190°|200°|220°|grigli|cartoccio/.test(t)) return "forno";
+  if (/bolli|lessa|sbollent|acqua bollente|cuoci la pasta|scola|in pentola|bagnomaria|vapore|brodo/.test(t)) return "bollito";
+  if (/padella|rosola|soffri|saltar|mantec|tegame|sciogliere il burro|filo d'olio/.test(t)) return "padella";
+  return "";
+}
+// Genera le particelle animate dello sfondo "vivo" in base al metodo.
+function buildAmbientBits(method) {
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  let html = "";
+  if (method === "bollito") {
+    for (let i = 0; i < 18; i++) { const s = Math.round(rnd(6, 18)); html += `<span class="cka cka--bubble" style="left:${rnd(4, 94).toFixed(1)}%;width:${s}px;height:${s}px;animation-duration:${rnd(2.8, 6).toFixed(1)}s;animation-delay:${(-rnd(0, 5)).toFixed(1)}s"></span>`; }
+    for (let i = 0; i < 4; i++) html += `<span class="cka cka--steam" style="left:${rnd(20, 80).toFixed(0)}%;animation-duration:${rnd(6, 9).toFixed(1)}s;animation-delay:${(-rnd(0, 6)).toFixed(1)}s"></span>`;
+  } else if (method === "frittura") {
+    for (let i = 0; i < 22; i++) { const s = Math.round(rnd(3, 7)); html += `<span class="cka cka--spark" style="left:${rnd(8, 92).toFixed(1)}%;width:${s}px;height:${s}px;animation-duration:${rnd(0.7, 1.8).toFixed(2)}s;animation-delay:${(-rnd(0, 2)).toFixed(2)}s"></span>`; }
+  } else if (method === "forno") {
+    for (let i = 0; i < 12; i++) html += `<span class="cka cka--ember" style="left:${rnd(10, 90).toFixed(1)}%;animation-duration:${rnd(4, 8).toFixed(1)}s;animation-delay:${(-rnd(0, 6)).toFixed(1)}s"></span>`;
+  } else if (method === "padella") {
+    for (let i = 0; i < 8; i++) html += `<span class="cka cka--ember" style="left:${rnd(20, 80).toFixed(1)}%;animation-duration:${rnd(3, 6).toFixed(1)}s;animation-delay:${(-rnd(0, 5)).toFixed(1)}s"></span>`;
+    for (let i = 0; i < 3; i++) html += `<span class="cka cka--steam" style="left:${rnd(30, 70).toFixed(0)}%;animation-duration:${rnd(6, 9).toFixed(1)}s;animation-delay:${(-rnd(0, 6)).toFixed(1)}s"></span>`;
+  }
+  return html;
+}
+
 function openCookingMode(recipe) {
   const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
   if (!steps.length) return;
@@ -3253,6 +3281,26 @@ function openCookingMode(recipe) {
   const el = document.createElement("div");
   el.className = "cook";
   host.appendChild(el);
+
+  // "Cucina viva": sfondo ambientale legato al metodo di cottura del passo
+  // corrente (bagliore del forno, bollicine, scintille della frittura, fiamma
+  // della padella). Vive sotto la UI, che viene ridisegnata a ogni passo.
+  const ambient = document.createElement("div");
+  ambient.className = "cook__ambient";
+  ambient.setAttribute("aria-hidden", "true");
+  el.appendChild(ambient);
+  const ui = document.createElement("div");
+  ui.className = "cook__ui";
+  el.appendChild(ui);
+  // Metodo "di base" dall'intera ricetta (usato se un passo non è esplicito).
+  const recipeMethod = detectCookMethod([recipe.title, (steps || []).join(" "), (recipe.ingredients || []).map((it) => ingredientText(it)).join(" ")].join(" "));
+  function setAmbient(method) {
+    const m = method || "neutro";
+    if (ambient.dataset.method === m) return;
+    ambient.dataset.method = m;
+    if (reduceMotion) { ambient.innerHTML = ""; return; }
+    ambient.innerHTML = buildAmbientBits(m);
+  }
 
   function goNext() {
     if (idx < steps.length - 1) { idx++; haptic(6); draw(); speakStep(); }
@@ -3465,7 +3513,8 @@ function openCookingMode(recipe) {
   }
 
   function draw() {
-    el.innerHTML = `
+    setAmbient(detectCookMethod(steps[idx]) || recipeMethod);
+    ui.innerHTML = `
       <div class="cook__bar">
         <button class="cook__close" id="ckClose">${iconHtml("x")}</button>
         <div class="cook__progress">Passo ${idx + 1} di ${steps.length}</div>
