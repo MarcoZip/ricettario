@@ -185,6 +185,32 @@ function wireScrollReveal() {
   setTimeout(() => cards.forEach((c) => c.classList.add("reveal-in")), 1600); // sicurezza: rivela comunque tutto
 }
 
+// Indicatore "a goccia" della barra in basso: scivola elastico sotto la voce
+// attiva, con una piccola deformazione liquida durante lo spostamento.
+let navBlobTimer = null;
+function moveNavBlob() {
+  const nav = document.querySelector(".bottom-nav");
+  if (!nav) return;
+  let blob = nav.querySelector(".bottom-nav__blob");
+  if (!blob) {
+    blob = document.createElement("span");
+    blob.className = "bottom-nav__blob";
+    blob.setAttribute("aria-hidden", "true");
+    blob.innerHTML = "<i></i>";
+    nav.insertBefore(blob, nav.firstChild);
+  }
+  const active = nav.querySelector(".bottom-nav__btn.is-active");
+  if (!active) return;
+  const x = active.offsetLeft + active.offsetWidth / 2;
+  blob.style.transform = `translateX(${x}px) translateX(-50%)`;
+  blob.classList.add("is-ready");
+  if (!reduceMotion) {
+    blob.classList.remove("is-moving"); void blob.offsetWidth; blob.classList.add("is-moving");
+    clearTimeout(navBlobTimer);
+    navBlobTimer = setTimeout(() => { if (blob) blob.classList.remove("is-moving"); }, 440);
+  }
+}
+
 let root = null;
 let currentRoute = "strumenti";
 let currentToolId = null;
@@ -468,6 +494,7 @@ export function mount(rootEl) {
   setupBackHandler();
   setupRipple();
   setupAurora();
+  window.addEventListener("resize", moveNavBlob);
   checkPrepReminders();
   setInterval(checkPrepReminders, 60000);
   document.addEventListener("visibilitychange", () => {
@@ -1173,6 +1200,7 @@ export function render() {
     renderImpostazioni();
   }
   if (pendingSharedRecipe) consumeSharedRecipe();
+  moveNavBlob(); // riposiziona la goccia sotto la voce attiva
 }
 
 // ---------------- Schermata: Strumenti ----------------

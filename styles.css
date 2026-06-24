@@ -208,11 +208,17 @@ a { color: var(--primary-2); }
 .bottom-nav__btn { position: relative; }
 .bottom-nav__btn.is-active { color: var(--primary-2); }
 .bottom-nav__btn.is-active .bottom-nav__icon { opacity: 1; transform: translateY(-2px) scale(1.18); }
-.bottom-nav__btn.is-active::after { content: ""; position: absolute; bottom: 2px; left: 50%; width: 16px; height: 3px; border-radius: 3px; background: var(--primary); transform: translateX(-50%); }
+/* Goccia liquida che scivola sotto la voce attiva (indicatore condiviso) */
+.bottom-nav__blob { position: absolute; top: 5px; left: 0; width: 46px; height: 36px; pointer-events: none; opacity: 0; z-index: 0; transform: translateX(-50%); }
+.bottom-nav__blob.is-ready { opacity: 1; }
+.bottom-nav__blob i { display: block; width: 100%; height: 100%; border-radius: 999px; background: radial-gradient(circle at 50% 38%, rgba(var(--primary-rgb, 255,140,60), 0.34), rgba(var(--primary-rgb, 255,140,60), 0.10) 72%, transparent); }
+.bottom-nav__btn { z-index: 1; }
 @media (prefers-reduced-motion: no-preference) {
   .bottom-nav__btn.is-active .bottom-nav__icon { animation: navPop 0.4s cubic-bezier(0.2, 1.5, 0.4, 1); }
-  .bottom-nav__btn.is-active::after { animation: navBar 0.3s ease; }
+  .bottom-nav__blob { transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .bottom-nav__blob.is-moving i { animation: navBlobSquish 0.42s ease; }
 }
+@keyframes navBlobSquish { 0% { transform: scaleX(1) scaleY(1); } 42% { transform: scaleX(1.7) scaleY(0.72); } 100% { transform: scaleX(1) scaleY(1); } }
 @keyframes navPop { 0% { transform: translateY(-2px) scale(0.8); } 55% { transform: translateY(-2px) scale(1.32); } 100% { transform: translateY(-2px) scale(1.18); } }
 @keyframes navBar { from { width: 0; opacity: 0; } to { width: 16px; opacity: 1; } }
 

@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.81",
+    d: "2026-06-24",
+    items: [
+      "Effetto wow: la barra in basso ha un nuovo indicatore \"a goccia\" che scivola tra le voci con un rimbalzo elastico e una morbida deformazione liquida. (Rispetta \"riduci movimento\".)"
+    ]
+  },
+  {
     v: "7.80",
     d: "2026-06-24",
     items: [
