@@ -1849,6 +1849,7 @@ function renderRecipeDetail() {
     <button class="btn btn--block" id="cookedBtn" style="margin-bottom:10px">${iconHtml("fire")} Segna come cucinata${r.cookCount ? ` · ${r.cookCount} ${r.cookCount === 1 ? "volta" : "volte"}` : ""}</button>
     <button class="btn btn--block" id="reviewBtn" style="margin-bottom:10px">📝 Com'è venuta? (voto, foto, nota)</button>
     <button class="btn btn--block" id="timelineBtn" style="margin-bottom:10px">🕐 Quando inizio? (per servire in orario)</button>
+    <button class="btn btn--block" id="completeMealBtn" style="margin-bottom:10px">🍽️ Completa il pasto (abbinamenti)</button>
     ${(videoInfo(r.videoUrl) || videoInfo(r.url)) ? `<button class="btn btn--block" id="watchVideo" style="margin-bottom:10px">▶ Guarda il video</button>` : ""}
     <button class="btn btn--block" id="checkPhotoBtn" style="margin-bottom:10px">📷 Com'è venuto? Controlla con una foto</button>
     <input type="file" id="checkPhotoFile" accept="image/*" capture="environment" hidden />
@@ -1944,6 +1945,8 @@ function renderRecipeDetail() {
   if (reviewBtn) reviewBtn.addEventListener("click", () => openCookReview(r));
   const timelineBtn = root.querySelector("#timelineBtn");
   if (timelineBtn) timelineBtn.addEventListener("click", () => openCookTimeline([r]));
+  const completeMealBtn = root.querySelector("#completeMealBtn");
+  if (completeMealBtn) completeMealBtn.addEventListener("click", () => openCompleteMeal(r));
   const collectionsBtn = root.querySelector("#collectionsBtn");
   if (collectionsBtn) collectionsBtn.addEventListener("click", () => openCollections(r));
   const prepRemind = root.querySelector("#prepRemind");
@@ -5444,6 +5447,32 @@ function dayNutrition(entries) {
 
 // "Tutto pronto alle…": calcola a ritroso quando iniziare ogni piatto perché
 // siano pronti tutti alla stessa ora. `initial` = array di ricette (o {title,time}).
+// "Completa il pasto": dalla ricetta aperta propone abbinamenti dal ricettario
+// per le altre portate (di stagione e preferiti in cima).
+function openCompleteMeal(r) {
+  const month = currentMonth();
+  const ownCourse = eventCourseOf(r);
+  const order = ["Antipasti", "Primi", "Secondi", "Contorni", "Dolci"].filter((c) => c !== ownCourse);
+  const all = allRecipes();
+  let html = "";
+  for (const course of order) {
+    const cands = all.filter((x) => x.id !== r.id && eventCourseOf(x) === course)
+      .map((x) => { let s = 0; if (recipeSeasonalMatches(x, month).length) s += 30; if (x.favorite) s += 20; s += (x.cookCount || 0); s += Math.random() * 8; return { x, s }; })
+      .sort((a, b) => b.s - a.s).slice(0, 2).map((o) => o.x);
+    if (!cands.length) continue;
+    html += `<div class="cm-course"><div class="cm-course__t">${course}</div>${cands.map((x) => {
+      const tool = store.getTool(x.toolId);
+      const seas = recipeSeasonalMatches(x, month).length ? ` <span class="ev-chip ev-chip--season">di stagione</span>` : "";
+      return `<button class="pick-row cm-pick" data-id="${x.id}"><span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span><span class="day-row__name">${escapeHtml(x.title)}${seas}</span></button>`;
+    }).join("")}</div>`;
+  }
+  const body = html || `<div class="hint">Aggiungi altre ricette (primi, contorni, dolci…) al tuo ricettario per comporre un menu completo.</div>`;
+  const m = openModal(`<h3 class="modal__title">🍽️ Completa il pasto</h3><p class="hint" style="margin-top:-6px">Per <b>${escapeHtml(r.title)}</b>${ownCourse ? ` (${escapeHtml(ownCourse.toLowerCase())})` : ""}, ecco cosa abbinare dal tuo ricettario:</p>${body}<div class="modal__actions">${html ? `<button class="btn" data-act="shuffle">↻ Altre idee</button>` : ""}<button class="btn btn--primary" data-act="ok">Chiudi</button></div>`);
+  m.el.querySelector('[data-act="ok"]').onclick = m.close;
+  const sh = m.el.querySelector('[data-act="shuffle"]'); if (sh) sh.onclick = () => { m.close(); openCompleteMeal(r); };
+  m.el.querySelectorAll(".cm-pick").forEach((b) => b.addEventListener("click", () => { m.close(); openRecipe(b.dataset.id); }));
+}
+
 function openCookTimeline(initial, presetTarget) {
   const parseMin = (t) => { const mm = String(t == null ? "" : t).match(/\d+/); return mm ? parseInt(mm[0], 10) : null; };
   let dishes = (initial || []).filter(Boolean).map((r) => ({ id: r.id || null, title: r.title || "Piatto", time: parseMin(r.time) }));

@@ -1206,6 +1206,8 @@ a { color: var(--primary-2); }
 .ev-row-chk { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; cursor: pointer; }
 .ev-course { margin-bottom: 14px; }
 .ev-course__t { font-weight: 800; color: var(--primary-2); font-size: 0.9rem; margin-bottom: 6px; }
+.cm-course { margin-bottom: 12px; }
+.cm-course__t { font-weight: 800; color: var(--primary-2); font-size: 0.88rem; margin-bottom: 6px; }
 .ev-dish { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-bottom: 7px; color: var(--text); }
 .ev-dish__name { font-weight: 700; }
 .ev-dish__chips { display: flex; flex-wrap: wrap; gap: 5px; }

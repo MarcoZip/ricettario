@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.72",
+    d: "2026-06-24",
+    items: [
+      "Nuovo: \"Completa il pasto\" nel dettaglio di una ricetta — propone cosa abbinare (antipasto, primo, contorno, dolce…) scegliendo dal tuo ricettario, con i piatti di stagione e i preferiti in cima. Tocca \"Altre idee\" per nuovi abbinamenti."
+    ]
+  },
+  {
     v: "7.71",
     d: "2026-06-24",
     items: [
