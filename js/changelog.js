@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.74",
+    d: "2026-06-24",
+    items: [
+      "Effetto wow: cambiando tema (chiaro/scuro) in Opzioni, il nuovo tema si espande con un'onda circolare. (Rispetta \"riduci movimento\".)"
+    ]
+  },
+  {
     v: "7.73",
     d: "2026-06-24",
     items: [

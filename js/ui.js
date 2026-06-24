@@ -124,6 +124,24 @@ function animateCountUps(scope) {
   });
 }
 
+// Cambio tema con "onda" circolare: il nuovo tema si espande da dove tocchi
+// (View Transitions API). Fallback al cambio istantaneo se non supportato.
+function switchThemeReveal(newTheme, originEl) {
+  if (!document.startViewTransition || reduceMotion) { setTheme(newTheme); return; }
+  let x = window.innerWidth / 2, y = window.innerHeight / 2;
+  try { const r = originEl.getBoundingClientRect(); x = r.left + r.width / 2; y = r.top + r.height / 2; } catch (e) {}
+  document.documentElement.classList.add("theme-switching");
+  const vt = document.startViewTransition(() => setTheme(newTheme));
+  vt.ready.then(() => {
+    const end = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+    document.documentElement.animate(
+      { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${end}px at ${x}px ${y}px)`] },
+      { duration: 520, easing: "cubic-bezier(0.3,0.7,0.2,1)", pseudoElement: "::view-transition-new(root)" }
+    );
+  }).catch(() => {});
+  vt.finished.finally(() => document.documentElement.classList.remove("theme-switching"));
+}
+
 let root = null;
 let currentRoute = "strumenti";
 let currentToolId = null;
@@ -6723,7 +6741,7 @@ function renderImpostazioni() {
 
   const themeSel = root.querySelector("#themeSel");
   themeSel.value = getTheme();
-  themeSel.addEventListener("change", () => setTheme(themeSel.value));
+  themeSel.addEventListener("change", () => switchThemeReveal(themeSel.value, themeSel));
   const textSizeSel = root.querySelector("#textSizeSel");
   if (textSizeSel) { textSizeSel.value = String(getTextScale()); textSizeSel.addEventListener("change", () => setTextScale(parseInt(textSizeSel.value, 10))); }
   const contrastChk = root.querySelector("#contrastChk");

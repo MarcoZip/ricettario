@@ -708,6 +708,10 @@ a { color: var(--primary-2); }
 }
 @keyframes vtIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes vtOut { to { opacity: 0; } }
+/* Cambio tema a onda circolare: niente dissolvenza, nuovo tema sopra ritagliato a cerchio */
+html.theme-switching::view-transition-old(root), html.theme-switching::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+html.theme-switching::view-transition-old(root) { z-index: 1; }
+html.theme-switching::view-transition-new(root) { z-index: 2147483646; }
 @keyframes cardIn { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
 .tool-card { transition: transform 0.14s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.2s; }
 .tool-card:active { transform: perspective(700px) rotateX(8deg) scale(0.96); box-shadow: 0 10px 22px -12px rgba(0, 0, 0, 0.6); }
