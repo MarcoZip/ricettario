@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.73",
+    d: "2026-06-24",
+    items: [
+      "Nuovo: \"Che voglia hai?\" in Home — scegli un'occasione (comfort food, leggero, veloce, per ospiti, per bambini, voglia di dolce) e l'app pesca dalle tue ricette quelle giuste."
+    ]
+  },
+  {
     v: "7.72",
     d: "2026-06-24",
     items: [

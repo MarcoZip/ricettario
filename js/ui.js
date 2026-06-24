@@ -1454,7 +1454,8 @@ function renderStrumenti() {
       <input type="search" id="homeSearch" placeholder="Cerca una ricetta o un ingrediente…" value="${escapeHtml(homeQuery)}" />
       ${voiceOK ? `<button class="btn mic-btn" id="homeMic" title="Cerca a voce" aria-label="Cerca a voce">🎤</button>` : ""}
     </div>
-    ${total ? `<button class="btn btn--block" id="surpriseBtn" style="margin:4px 0 12px">${iconHtml("shuffle")} Cosa cucino oggi?</button>` : ""}
+    ${total ? `<button class="btn btn--block" id="surpriseBtn" style="margin:4px 0 8px">${iconHtml("shuffle")} Cosa cucino oggi?</button>` : ""}
+    ${total ? `<button class="btn btn--ghost btn--block" id="moodBtn" style="margin:0 0 12px">😋 Che voglia hai?</button>` : ""}
     <div class="home-tags">${chips}</div>
     <div id="homeBody"></div>
   `;
@@ -1481,6 +1482,8 @@ function renderStrumenti() {
     renderStrumenti();
   }));
 
+  const moodBtn = root.querySelector("#moodBtn");
+  if (moodBtn) moodBtn.addEventListener("click", () => openMoodPicker());
   const surprise = root.querySelector("#surpriseBtn");
   if (surprise) surprise.addEventListener("click", () => {
     const all = store.getAllRecipes();
@@ -5447,6 +5450,37 @@ function dayNutrition(entries) {
 
 // "Tutto pronto alle…": calcola a ritroso quando iniziare ogni piatto perché
 // siano pronti tutti alla stessa ora. `initial` = array di ricette (o {title,time}).
+// "Che voglia hai?": filtri per umore/occasione sulle proprie ricette.
+const moodText = (r) => ((r.title || "") + " " + (r.ingredients || []).map((i) => i.name || "").join(" ") + " " + (r.tags || []).join(" ")).toLowerCase();
+const MOODS = [
+  { key: "comfort", emoji: "🤗", label: "Comfort food", match: (r, t) => /lasagn|al forno|polpett|risott|zuppa|gratin|parmigian|gnocch|pur[eè]|brasat|stufat|carbonara|amatrician|cannellon|tortellin|fonduta|raclette/.test(t) },
+  { key: "leggero", emoji: "🥗", label: "Leggero", match: (r, t) => /insalat|verdur|vapore|light|zucchin|finocch|minestr|petto di pollo|legumi|orata|branzin|merluzz|cetriol|misticanz/.test(t) },
+  { key: "veloce", emoji: "⚡", label: "Veloce", match: (r) => r.time && r.time <= 20 },
+  { key: "ospiti", emoji: "🍷", label: "Per ospiti", match: (r) => r.favorite || (r.difficulty || 0) >= 2 },
+  { key: "bambini", emoji: "🧒", label: "Per bambini", match: (r, t) => /pizza|polpett|patat|crocchett|nugget|al pomodoro|frittat|cotolett|hamburger|gnocch|pancake|crepe|nutella|wurstel|bastoncini|sofficini/.test(t) },
+  { key: "dolce", emoji: "🍰", label: "Voglia di dolce", match: (r, t) => eventCourseOf(r) === "Dolci" || /dolc|torta|crostat|biscott|tiramis|budino|gelato|muffin|cheesecake|semifreddo|crema pasticc|panna cott|cioccolat|crepe alla nutella/.test(t) }
+];
+function openMoodPicker(initial) {
+  const all = allRecipes();
+  const m = openModal(`<h3 class="modal__title">😋 Che voglia hai?</h3>
+    <div class="diet-chips" id="moodChips" style="margin-bottom:12px">${MOODS.map((x) => `<button type="button" class="diet-chip" data-mood="${x.key}">${x.emoji} ${x.label}</button>`).join("")}</div>
+    <div id="moodBody"></div>`);
+  const month = currentMonth();
+  function draw(key) {
+    const mo = MOODS.find((x) => x.key === key) || MOODS[0];
+    const list = all.filter((r) => { try { return mo.match(r, moodText(r)); } catch (e) { return false; } });
+    list.sort((a, b) => ((b.favorite ? 1 : 0) - (a.favorite ? 1 : 0)) || ((recipeSeasonalMatches(b, month).length ? 1 : 0) - (recipeSeasonalMatches(a, month).length ? 1 : 0)) || (b.cookCount || 0) - (a.cookCount || 0));
+    const body = list.length
+      ? list.slice(0, 15).map((r) => { const tool = store.getTool(r.toolId); return `<button class="pick-row mood-pick" data-id="${r.id}"><span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span><span class="day-row__name">${escapeHtml(r.title)}${r.favorite ? ` <span class="meta-fav">${iconHtml("heart")}</span>` : ""}</span></button>`; }).join("")
+      : `<div class="hint">Nessuna ricetta per questa voglia. Aggiungine qualcuna o prova un'altra categoria.</div>`;
+    m.el.querySelector("#moodBody").innerHTML = body;
+    m.el.querySelectorAll(".mood-pick").forEach((b) => b.addEventListener("click", () => { m.close(); openRecipe(b.dataset.id); }));
+    m.el.querySelectorAll(".diet-chip[data-mood]").forEach((b) => b.classList.toggle("is-on", b.dataset.mood === key));
+  }
+  m.el.querySelectorAll(".diet-chip[data-mood]").forEach((b) => b.addEventListener("click", () => draw(b.dataset.mood)));
+  draw(initial || MOODS[0].key);
+}
+
 // "Completa il pasto": dalla ricetta aperta propone abbinamenti dal ricettario
 // per le altre portate (di stagione e preferiti in cima).
 function openCompleteMeal(r) {
