@@ -501,6 +501,11 @@ a { color: var(--primary-2); }
   border-bottom: 1px solid var(--border);
 }
 .setting-row:last-child { border-bottom: none; }
+/* Let the text column absorb the available width and wrap, so the action
+   button keeps its natural size instead of being squeezed and clipping its
+   label (e.g. "Aggiungi" -> "Aggiung"). */
+.setting-row > div:first-child { min-width: 0; flex: 1; }
+.setting-row > .btn { flex: 0 0 auto; white-space: nowrap; }
 .setting-row__label { font-weight: 700; }
 .setting-row__desc { color: var(--text-soft); font-size: 0.82rem; margin-top: 3px; }
 .setting-row__desc code { background: var(--surface-2); padding: 1px 5px; border-radius: 5px; font-size: 0.8em; }
