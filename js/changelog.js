@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.86",
+    d: "2026-06-24",
+    items: [
+      "Novità: \"Muro delle ricette\" — una galleria a mosaico di tutte le ricette con foto, da scorrere e toccare per aprire. Compare in Home (sotto \"Che voglia hai?\") quando hai almeno 4 ricette con foto."
+    ]
+  },
+  {
     v: "7.85",
     d: "2026-06-24",
     items: [

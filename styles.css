@@ -825,6 +825,19 @@ html.theme-switching::view-transition-new(root) { z-index: 2147483646; }
 .stats-top__t { font-weight: 800; }
 .stats-top__n { color: var(--text-soft); font-size: 0.85rem; }
 
+/* Muro delle ricette: galleria a mosaico (masonry) */
+.modal--wall { max-height: 90vh; }
+.pwall-scroll { max-height: 72vh; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+.pwall { columns: 3 104px; column-gap: 8px; }
+@media (max-width: 360px) { .pwall { columns: 2 130px; } }
+.pwall__it { position: relative; display: block; width: 100%; margin: 0 0 8px; padding: 0; border: none; border-radius: 14px; overflow: hidden; break-inside: avoid; background: var(--surface-2); cursor: pointer; }
+.pwall__it img { width: 100%; display: block; transition: transform 0.3s ease; }
+.pwall__it:active img { transform: scale(0.97); }
+.pwall__cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 8px 7px; background: linear-gradient(transparent, rgba(0, 0, 0, 0.78)); color: #fff; font-size: 0.74rem; font-weight: 700; line-height: 1.2; text-align: left; display: flex; flex-direction: column; gap: 2px; }
+.pwall__tool { font-size: 0.62rem; font-weight: 600; opacity: 0.85; }
+.pwall__fav { position: absolute; top: 6px; right: 6px; color: #ff5e6c; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); font-size: 0.9rem; }
+@media (prefers-reduced-motion: no-preference) { .pwall__it { animation: imgFade 0.4s ease backwards; } }
+
 /* Vetro liquido (glassmorphism): superfici smerigliate con un riflesso di luce
    che scorre seguendo lo scroll (variabile --sheen, aggiornata via JS). */
 :root.glass .tool-card,

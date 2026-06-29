@@ -1110,6 +1110,30 @@ function openStats() {
   m.el.querySelectorAll(".stat-num").forEach((el) => countUp(el, parseInt(el.textContent, 10) || 0));
 }
 
+// "Muro delle ricette": galleria a mosaico (masonry) di tutte le ricette con foto.
+function openPhotoWall() {
+  let recipes = store.getAllRecipes().filter((r) => r.photo);
+  if (!recipes.length) { toast("Nessuna ricetta con foto ancora", "error"); return; }
+  recipes = recipes.slice().sort((a, b) => (b.cookCount || 0) - (a.cookCount || 0) || (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+  const items = recipes.map((r) => {
+    const tool = store.getTool(r.toolId);
+    const fav = r.favorite ? `<span class="pwall__fav">${iconHtml("heart")}</span>` : "";
+    return `<button class="pwall__it" data-id="${r.id}">
+      <img src="${escapeHtml(proxiedImg(r.photo))}" alt="" loading="lazy" referrerpolicy="no-referrer"/>
+      ${fav}
+      <span class="pwall__cap">${escapeHtml(r.title)}${tool ? `<span class="pwall__tool">${iconHtml(tool.icon)} ${escapeHtml(tool.name)}</span>` : ""}</span>
+    </button>`;
+  }).join("");
+  const { el } = openModal(`
+    <h3 class="modal__title">🖼️ Muro delle ricette</h3>
+    <p class="hint" style="margin-top:-6px">${recipes.length} ricette con foto · tocca per aprire</p>
+    <div class="pwall-scroll"><div class="pwall">${items}</div></div>
+    <button class="btn btn--block" id="pwClose">Chiudi</button>`);
+  el.classList.add("modal--wall");
+  el.querySelector("#pwClose").onclick = closeAllModals;
+  el.querySelectorAll(".pwall__it").forEach((b) => b.addEventListener("click", () => { closeAllModals(); openRecipe(b.dataset.id); }));
+}
+
 // Traguardi di cucina (badge sbloccati in base ai dati raccolti).
 function computeCookStats() {
   const recipes = store.getAllRecipes();
@@ -1502,6 +1526,7 @@ function renderStrumenti() {
       : "";
 
   const total = tools.reduce((s, t) => s + store.countRecipes(t.id), 0);
+  const photoCount = store.getAllRecipes().filter((r) => r.photo).length;
   const allTags = store.getAllTags();
   const voiceOK = ("webkitSpeechRecognition" in window) || ("SpeechRecognition" in window);
 
@@ -1638,6 +1663,7 @@ function renderStrumenti() {
     </div>
     ${total ? `<button class="btn btn--block" id="surpriseBtn" style="margin:4px 0 8px">${iconHtml("shuffle")} Cosa cucino oggi?</button>` : ""}
     ${total ? `<button class="btn btn--ghost btn--block" id="moodBtn" style="margin:0 0 12px">😋 Che voglia hai?</button>` : ""}
+    ${photoCount >= 4 ? `<button class="btn btn--ghost btn--block" id="wallBtn" style="margin:-6px 0 12px">🖼️ Muro delle ricette</button>` : ""}
     <div class="home-tags">${chips}</div>
     <div id="homeBody"></div>
   `;
@@ -1666,6 +1692,8 @@ function renderStrumenti() {
 
   const moodBtn = root.querySelector("#moodBtn");
   if (moodBtn) moodBtn.addEventListener("click", () => openMoodPicker());
+  const wallBtn = root.querySelector("#wallBtn");
+  if (wallBtn) wallBtn.addEventListener("click", () => openPhotoWall());
   initGyroCard(); // carta del giorno reattiva al giroscopio (solo su dispositivi che lo supportano)
   const surprise = root.querySelector("#surpriseBtn");
   if (surprise) surprise.addEventListener("click", () => {
