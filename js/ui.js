@@ -208,10 +208,12 @@ function openStatsDashboard() {
         <div class="stats-top">${s.mostCooked.photo ? `<img src="${escapeHtml(proxiedImg(s.mostCooked.photo))}" alt="" referrerpolicy="no-referrer"/>` : `<span class="stats-top__ph">🍴</span>`}
           <div><div class="stats-top__t">${escapeHtml(s.mostCooked.title)}</div><div class="stats-top__n">cucinata ${s.mostCooked.cookCount} ${s.mostCooked.cookCount === 1 ? "volta" : "volte"}</div></div></div></div>` : ""}
     </div>
+    <button class="btn btn--primary btn--block" id="stJrn" style="margin-bottom:8px">📔 Sfoglia l'album di cucina</button>
     <button class="btn btn--block" id="stClose">Chiudi</button>`;
   const { el } = openModal(html);
   el.classList.add("modal--stats");
   el.querySelector("#stClose").onclick = closeAllModals;
+  el.querySelector("#stJrn").onclick = () => { closeAllModals(); openCookJournal(); };
   animateCountUps(el);
   // Barre che crescono
   requestAnimationFrame(() => { el.querySelectorAll(".stbar__fill").forEach((b) => { b.style.width = (b.dataset.w || 0) + "%"; }); });
@@ -1090,6 +1092,7 @@ function openStats() {
   const m = openModal(`
     <h3 class="modal__title">${iconHtml("fire")} Diario di cucina</h3>
     <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button class="btn btn--ghost" id="jrnBtn" style="flex:1">📔 Album</button>
       <button class="btn btn--ghost" id="achBtn" style="flex:1">🏆 Traguardi</button>
       <button class="btn btn--ghost" id="calBtn" style="flex:1">📅 Calendario</button>
     </div>
@@ -1105,6 +1108,7 @@ function openStats() {
     <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
   `);
   m.el.querySelector('[data-act="ok"]').onclick = m.close;
+  m.el.querySelector("#jrnBtn").onclick = () => { m.close(); openCookJournal(); };
   m.el.querySelector("#achBtn").onclick = openAchievements;
   m.el.querySelector("#calBtn").onclick = openCookCalendar;
   m.el.querySelectorAll(".stat-num").forEach((el) => countUp(el, parseInt(el.textContent, 10) || 0));
@@ -1132,6 +1136,41 @@ function openPhotoWall() {
   el.classList.add("modal--wall");
   el.querySelector("#pwClose").onclick = closeAllModals;
   el.querySelectorAll(".pwall__it").forEach((b) => b.addEventListener("click", () => { closeAllModals(); openRecipe(b.dataset.id); }));
+}
+
+// "Album del diario": le volte che hai cucinato in una bella linea del tempo
+// con foto, raggruppata per mese (dai cookLog già raccolti).
+const MESI_FULL = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+function openCookJournal() {
+  const diary = store.getCookDiary(200);
+  if (!diary.length) { toast("Il diario è ancora vuoto: completa o segna qualche ricetta come cucinata", "error"); return; }
+  const groups = [];
+  let cur = null;
+  diary.forEach((e) => {
+    const d = new Date(e.ts);
+    if (isNaN(d)) return;
+    const key = d.getFullYear() + "-" + d.getMonth();
+    if (!cur || cur.key !== key) { cur = { key, label: MESI_FULL[d.getMonth()] + " " + d.getFullYear(), items: [] }; groups.push(cur); }
+    cur.items.push({ e, r: store.getRecipe(e.recipeId), day: d.getDate() });
+  });
+  const entry = ({ e, r, day }) => {
+    const photo = r && r.photo ? `<img src="${escapeHtml(proxiedImg(r.photo))}" alt="" loading="lazy" referrerpolicy="no-referrer"/>` : `<span class="jrn__ph">🍴</span>`;
+    const stars = r && r.rating ? `<span class="jrn__stars">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</span>` : "";
+    return `<button class="jrn__it"${r ? ` data-id="${r.id}"` : ""}>
+      <span class="jrn__media">${photo}</span>
+      <span class="jrn__body"><span class="jrn__t">${escapeHtml(e.title)}</span><span class="jrn__meta">il giorno ${day}</span>${stars}</span>
+    </button>`;
+  };
+  const html = groups.map((g) => `<div class="jrn__month">${escapeHtml(g.label)}</div><div class="jrn__list">${g.items.map(entry).join("")}</div>`).join("");
+  const tot = diary.length;
+  const { el } = openModal(`
+    <h3 class="modal__title">📔 Album di cucina</h3>
+    <p class="hint" style="margin-top:-6px">${tot} ${tot === 1 ? "piatto cucinato" : "piatti cucinati"}, dal più recente</p>
+    <div class="jrn-scroll">${html}</div>
+    <button class="btn btn--block" id="jrnClose">Chiudi</button>`);
+  el.classList.add("modal--jrn");
+  el.querySelector("#jrnClose").onclick = closeAllModals;
+  el.querySelectorAll(".jrn__it[data-id]").forEach((b) => b.addEventListener("click", () => { closeAllModals(); openRecipe(b.dataset.id); }));
 }
 
 // Traguardi di cucina (badge sbloccati in base ai dati raccolti).

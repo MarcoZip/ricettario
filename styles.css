@@ -838,6 +838,22 @@ html.theme-switching::view-transition-new(root) { z-index: 2147483646; }
 .pwall__fav { position: absolute; top: 6px; right: 6px; color: #ff5e6c; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); font-size: 0.9rem; }
 @media (prefers-reduced-motion: no-preference) { .pwall__it { animation: imgFade 0.4s ease backwards; } }
 
+/* Album del diario: timeline dei piatti cucinati, per mese */
+.modal--jrn { max-height: 90vh; }
+.jrn-scroll { max-height: 70vh; overflow-y: auto; margin: 0 -2px; padding: 0 2px 4px; }
+.jrn__month { font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--primary-2); margin: 14px 0 8px; position: sticky; top: 0; background: var(--modal-bg); padding: 4px 0; z-index: 1; }
+.jrn__list { position: relative; padding-left: 14px; }
+.jrn__list::before { content: ""; position: absolute; left: 4px; top: 6px; bottom: 6px; width: 2px; background: var(--surface-3); border-radius: 2px; }
+.jrn__it { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: var(--surface-2); border: none; border-radius: 14px; padding: 8px; margin-bottom: 8px; cursor: pointer; }
+.jrn__it::before { content: ""; position: absolute; left: -12px; top: 50%; width: 9px; height: 9px; border-radius: 50%; background: var(--primary); transform: translateY(-50%); box-shadow: 0 0 0 3px var(--modal-bg); }
+.jrn__media { width: 52px; height: 52px; border-radius: 12px; overflow: hidden; flex-shrink: 0; background: var(--surface-3); display: flex; align-items: center; justify-content: center; }
+.jrn__media img { width: 100%; height: 100%; object-fit: cover; }
+.jrn__ph { font-size: 1.5rem; }
+.jrn__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.jrn__t { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jrn__meta { color: var(--text-soft); font-size: 0.8rem; }
+.jrn__stars { color: #ffb648; font-size: 0.8rem; letter-spacing: 1px; }
+
 /* Vetro liquido (glassmorphism): superfici smerigliate con un riflesso di luce
    che scorre seguendo lo scroll (variabile --sheen, aggiornata via JS). */
 :root.glass .tool-card,

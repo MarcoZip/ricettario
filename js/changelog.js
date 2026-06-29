@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.87",
+    d: "2026-06-24",
+    items: [
+      "Novità: \"Album di cucina\" — una linea del tempo con foto di tutti i piatti che hai cucinato, raggruppata per mese, da sfogliare come un album di ricordi (con voto se l'hai messo). La apri dal Diario di cucina o da \"I tuoi numeri\"."
+    ]
+  },
+  {
     v: "7.86",
     d: "2026-06-24",
     items: [
