@@ -16,7 +16,7 @@ import { GUEST_ALLERGENS, GUEST_DIETS, checkRecipeForGuests, guestsSummary, CUST
 import { estimateCost } from "./cost.js";
 import { seasonalProduce, recipeSeasonalMatches, monthName, currentMonth } from "./seasonal.js";
 import { convertMeasures } from "./measures.js";
-import { getNickname, setNickname } from "./profile.js";
+import { getNickname, setNickname, getCover, setCover } from "./profile.js";
 import { isImportConfigured, APP_VERSION, PUSH_WORKER_URL, SPOONACULAR_ENABLED, EDAMAM_ENABLED, WORKER_URL } from "./config.js";
 import { CHANGELOG } from "./changelog.js";
 import { fileToDataUrl } from "./image.js";
@@ -1828,9 +1828,19 @@ function renderStrumenti() {
   const chips = specials.map((s) => `<button class="filter-chip ${homeFilter === s.k ? "is-on" : ""}" data-filter="${s.k}">${iconHtml(s.icon)} ${s.label}</button>`).join("") +
     allTags.map((t) => `<button class="filter-chip ${homeFilter === t ? "is-on" : ""}" data-filter="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("");
 
+  const cover = getCover();
+  const coverHero = cover
+    ? `<div class="cover-hero" style="background-image:url('${cover.replace(/'/g, "%27")}')">
+        <div class="cover-hero__grad"></div>
+        <div class="cover-hero__txt">
+          <span class="cover-hero__sub">${greeting()}! ${(() => { const f = festiveInfo(); return f ? f.emoji : "👋"; })()}</span>
+          <span class="cover-hero__t">Il ricettario di ${escapeHtml(getNickname() || "casa")}</span>
+        </div>
+      </div>`
+    : `<h1 class="page-title">${greeting()}${getNickname() ? " " + escapeHtml(getNickname()) : ""}! ${(() => { const f = festiveInfo(); return f ? f.emoji : "👋"; })()}</h1>`;
   root.innerHTML = `
     ${(() => { const f = festiveInfo(); return f ? `<div class="festive-banner">${f.emoji} ${f.label}!</div>` : ""; })()}
-    <h1 class="page-title">${greeting()}${getNickname() ? " " + escapeHtml(getNickname()) : ""}! ${(() => { const f = festiveInfo(); return f ? f.emoji : "👋"; })()}</h1>
+    ${coverHero}
     ${rotdCard}
     <div class="home-hero">
       <div>
@@ -7000,6 +7010,17 @@ function renderImpostazioni() {
             <div class="setting-row__desc">${getNickname() ? "Come ti salutiamo: " + escapeHtml(getNickname()) : "Scegli come farti salutare."}</div>
           </div>
           <button class="btn" id="nickBtn">Cambia</button>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-row__label">🖼️ Copertina personale</div>
+            <div class="setting-row__desc">${getCover() ? "Una tua foto in cima alla Home." : "Metti una foto (un piatto, un ricordo) in cima alla Home."}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button class="btn" id="coverBtn">${getCover() ? "Cambia" : "Scegli"}</button>
+            ${getCover() ? `<button class="btn btn--ghost" id="coverDel" title="Rimuovi">${iconHtml("trash")}</button>` : ""}
+          </div>
+          <input type="file" id="coverFile" accept="image/*" hidden />
         </div>`;
   const householdRow = info.cloud ? `
         <div class="setting-row">
@@ -7274,6 +7295,23 @@ function renderImpostazioni() {
   const householdBtn = root.querySelector("#householdBtn");
   if (householdBtn) householdBtn.addEventListener("click", () => openHouseholdSheet());
   root.querySelector("#nickBtn").addEventListener("click", () => openChangeNickname());
+  const coverBtn = root.querySelector("#coverBtn");
+  const coverFile = root.querySelector("#coverFile");
+  if (coverBtn && coverFile) {
+    coverBtn.addEventListener("click", () => coverFile.click());
+    coverFile.addEventListener("change", async () => {
+      const f = coverFile.files[0]; coverFile.value = "";
+      if (!f) return;
+      try {
+        const url = await fileToDataUrl(f, 1100, 0.74);
+        setCover(url);
+        if (!getCover()) { toast("Foto troppo grande per la memoria del telefono", "error"); return; }
+        toast("Copertina impostata", "success"); render();
+      } catch (e) { toast("Immagine non valida", "error"); }
+    });
+  }
+  const coverDel = root.querySelector("#coverDel");
+  if (coverDel) coverDel.addEventListener("click", () => { setCover(""); toast("Copertina rimossa"); render(); });
   const chEmailBtn = root.querySelector("#chEmailBtn");
   if (chEmailBtn) chEmailBtn.addEventListener("click", () => openChangeEmail());
   const chPassBtn = root.querySelector("#chPassBtn");

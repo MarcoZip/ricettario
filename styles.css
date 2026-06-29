@@ -927,6 +927,14 @@ html.theme-switching::view-transition-new(root) { z-index: 2147483646; }
 .chg__n { font-weight: 800; color: var(--text-soft); flex-shrink: 0; }
 .chg.is-done .chg__n { color: #3ec77f; }
 
+/* Copertina personale in cima alla Home */
+.cover-hero { position: relative; height: 168px; border-radius: var(--radius); overflow: hidden; margin-bottom: 14px; background-size: cover; background-position: center; border: 1px solid var(--surface-3); }
+.cover-hero__grad { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.72), rgba(0,0,0,0.15) 55%, rgba(0,0,0,0.05)); }
+.cover-hero__txt { position: absolute; left: 16px; right: 16px; bottom: 13px; display: flex; flex-direction: column; gap: 2px; }
+.cover-hero__sub { color: rgba(255,255,255,0.92); font-size: 0.92rem; font-weight: 700; text-shadow: 0 1px 6px rgba(0,0,0,0.5); }
+.cover-hero__t { color: #fff; font-size: 1.5rem; font-weight: 800; line-height: 1.15; text-shadow: 0 2px 10px rgba(0,0,0,0.55); }
+@media (prefers-reduced-motion: no-preference) { .cover-hero { animation: imgFade 0.5s ease backwards; } }
+
 /* Vetro liquido (glassmorphism): superfici smerigliate con un riflesso di luce
    che scorre seguendo lo scroll (variabile --sheen, aggiornata via JS). */
 :root.glass .tool-card,

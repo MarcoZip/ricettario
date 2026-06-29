@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.92",
+    d: "2026-06-24",
+    items: [
+      "Novità: \"Copertina personale\" — metti una tua foto (un piatto del cuore, un ricordo) in cima alla Home, con il saluto e \"Il ricettario di …\". La scegli da Opzioni › Account."
+    ]
+  },
+  {
     v: "7.91",
     d: "2026-06-24",
     items: [
