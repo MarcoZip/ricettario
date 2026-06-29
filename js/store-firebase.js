@@ -30,6 +30,7 @@ export async function createFirebaseAdapter(uid) {
   // Casa condivisa: come la lista della spesa, i menù delle feste diventano
   // condivisi (households/{code}/events) così entrambi li vedono e modificano.
   const eventsTarget = household ? collection(db, "households", household, "events") : eventsCol;
+  const freezerCol = collection(db, "users", uid, "freezer");
 
   let tools = [];
   let recipes = [];
@@ -38,10 +39,11 @@ export async function createFirebaseAdapter(uid) {
   let pantry = [];
   let menus = [];
   let events = [];
+  let freezer = [];
   let onChange = () => {};
 
   function emit() {
-    onChange({ tools: [...tools], recipes: [...recipes], shopping: [...shopping], plan: [...plan], pantry: [...pantry], menus: [...menus], events: [...events] });
+    onChange({ tools: [...tools], recipes: [...recipes], shopping: [...shopping], plan: [...plan], pantry: [...pantry], menus: [...menus], events: [...events], freezer: [...freezer] });
   }
 
   return {
@@ -77,6 +79,10 @@ export async function createFirebaseAdapter(uid) {
       });
       onSnapshot(eventsTarget, (snap) => {
         events = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        emit();
+      });
+      onSnapshot(freezerCol, (snap) => {
+        freezer = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         emit();
       });
     },
@@ -166,6 +172,17 @@ export async function createFirebaseAdapter(uid) {
       await deleteDoc(doc(eventsTarget, id));
     },
 
+    async addFreezer(item) {
+      const { id, ...data } = item;
+      await setDoc(doc(freezerCol, id), data);
+    },
+    async updateFreezer(id, patch) {
+      await setDoc(doc(freezerCol, id), patch, { merge: true });
+    },
+    async deleteFreezer(id) {
+      await deleteDoc(doc(freezerCol, id));
+    },
+
     async replaceAll(data) {
       const batch = writeBatch(db);
       (data.tools || []).forEach((t) => {
@@ -195,6 +212,10 @@ export async function createFirebaseAdapter(uid) {
       (data.events || []).forEach((ev) => {
         const { id, ...rest } = ev;
         batch.set(doc(eventsCol, id), rest);
+      });
+      (data.freezer || []).forEach((fz) => {
+        const { id, ...rest } = fz;
+        batch.set(doc(freezerCol, id), rest);
       });
       await batch.commit();
     },

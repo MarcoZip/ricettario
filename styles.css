@@ -961,6 +961,23 @@ html.theme-switching::view-transition-new(root) { z-index: 2147483646; }
   box-shadow: none !important;
 }
 
+/* Porziona e congela: etichette del congelatore */
+.fz-months { display: flex; gap: 8px; flex-wrap: wrap; }
+.fz-month { cursor: pointer; }
+.fz-month.is-on { background: var(--primary); color: #fff; border-color: var(--primary); }
+.fz-item { display: flex; align-items: center; gap: 11px; background: var(--surface-2); border-radius: 14px; padding: 10px 12px; margin-bottom: 9px; border-left: 4px solid var(--surface-3); }
+.fz-item.is-soon { border-left-color: #ff9f43; }
+.fz-item.is-exp { border-left-color: var(--danger); }
+.fz-item__ic { font-size: 1.5rem; flex-shrink: 0; }
+.fz-item__main { flex: 1; min-width: 0; }
+.fz-item__t { font-weight: 800; }
+.fz-item__p { color: var(--primary-2); font-size: 0.85rem; }
+.fz-item__d { color: var(--text-soft); font-size: 0.8rem; margin-top: 1px; }
+.fz-item.is-exp .fz-item__d b { color: var(--danger); }
+.fz-item.is-soon .fz-item__d b { color: #ff9f43; }
+.fz-item__n { font-size: 0.8rem; margin-top: 2px; font-style: italic; }
+.fz-item__use { flex-shrink: 0; }
+
 /* Vetro liquido (glassmorphism): superfici smerigliate con un riflesso di luce
    che scorre seguendo lo scroll (variabile --sheen, aggiornata via JS). */
 :root.glass .tool-card,

@@ -5,7 +5,7 @@ import { createLocalAdapter } from "./store-local.js";
 import { combine, categorize } from "./ingredients.js";
 
 let adapter = null;
-let state = { tools: [], recipes: [], shopping: [], plan: [], pantry: [], menus: [], events: [] };
+let state = { tools: [], recipes: [], shopping: [], plan: [], pantry: [], menus: [], events: [], freezer: [] };
 const subscribers = new Set();
 
 function notify() {
@@ -407,6 +407,32 @@ export async function updateEvent(id, patch) {
 export async function deleteEvent(id) {
   await adapter.deleteEvent(id);
 }
+// ---- Congelatore (porziona e congela) ----
+export function getFreezer() {
+  return [...state.freezer].sort((a, b) => (a.bestBefore || "").localeCompare(b.bestBefore || ""));
+}
+export async function addFreezer(item) {
+  const id = newId();
+  const rec = {
+    id,
+    title: (item && item.title || "").trim() || "Piatto",
+    recipeId: item && item.recipeId || null,
+    portions: item && item.portions || 1,
+    frozenAt: item && item.frozenAt || now().slice(0, 10),
+    bestBefore: item && item.bestBefore || null,
+    note: item && item.note || "",
+    createdAt: now()
+  };
+  await adapter.addFreezer(rec);
+  return id;
+}
+export async function updateFreezer(id, patch) {
+  await adapter.updateFreezer(id, patch);
+}
+export async function deleteFreezer(id) {
+  await adapter.deleteFreezer(id);
+}
+
 // Crea un nuovo evento partendo da uno esistente (per "rifare" un menù un altro anno).
 export async function duplicateEvent(id, newName) {
   const e = getEvent(id);
@@ -516,7 +542,7 @@ export async function getAccessStats() {
 
 // ---- Esporta / Importa (backup manuale) ----
 export function exportData() {
-  return { version: 6, exportedAt: now(), tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan, pantry: state.pantry, menus: state.menus, events: state.events };
+  return { version: 6, exportedAt: now(), tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan, pantry: state.pantry, menus: state.menus, events: state.events, freezer: state.freezer };
 }
 
 export async function importData(data, { merge = false } = {}) {
@@ -529,6 +555,6 @@ export async function importData(data, { merge = false } = {}) {
     for (const t of data.tools) if (!existingTools.has(t.id)) await adapter.addTool(t);
     for (const r of data.recipes) if (!existingRecipes.has(r.id)) await adapter.addRecipe(r);
   } else {
-    await adapter.replaceAll({ tools: data.tools, recipes: data.recipes, shopping: data.shopping || [], plan: data.plan || [], pantry: data.pantry || [], menus: data.menus || [], events: data.events || [] });
+    await adapter.replaceAll({ tools: data.tools, recipes: data.recipes, shopping: data.shopping || [], plan: data.plan || [], pantry: data.pantry || [], menus: data.menus || [], events: data.events || [], freezer: data.freezer || [] });
   }
 }

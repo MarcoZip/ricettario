@@ -1380,6 +1380,65 @@ function openWeeklyChallenges() {
   } catch (e) { /* ignora */ }
 }
 
+// "Porziona e congela": crea un'etichetta per il congelatore (piatto, porzioni,
+// data e "da consumare entro"), e una vista con il conto alla rovescia.
+function fzDateIt(ds) { if (!ds) return ""; const p = String(ds).split("-"); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0].slice(2)}` : ds; }
+function fzDaysLeft(bestBefore) {
+  if (!bestBefore) return null;
+  const t = new Date(); const today = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  const p = String(bestBefore).split("-").map(Number);
+  const bb = new Date(p[0], p[1] - 1, p[2]);
+  return Math.round((bb - today) / 86400000);
+}
+function openFreezeDialog(recipe) {
+  const today = new Date();
+  let months = 3;
+  const m = openModal(`
+    <h3 class="modal__title">🧊 Porziona e congela</h3>
+    <div class="field"><label>Piatto</label><input type="text" id="fzTitle" value="${escapeHtml(recipe ? recipe.title : "")}" placeholder="Es. Ragù" /></div>
+    <div class="field"><label>Porzioni</label><input type="number" id="fzPort" min="1" inputmode="numeric" value="${recipe && recipe.servings ? recipe.servings : 2}" /></div>
+    <div class="field"><label>Da consumare entro</label><div class="fz-months">${[1, 3, 6, 12].map((n) => `<button type="button" class="chip fz-month ${n === 3 ? "is-on" : ""}" data-m="${n}">${n} mes${n === 1 ? "e" : "i"}</button>`).join("")}</div></div>
+    <div class="field"><label>Nota (facoltativa)</label><input type="text" id="fzNote" placeholder="Es. in 2 vaschette" /></div>
+    <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button><button class="btn btn--primary" data-act="ok">🧊 Congela</button></div>
+  `);
+  m.el.querySelectorAll(".fz-month").forEach((b) => b.onclick = () => { m.el.querySelectorAll(".fz-month").forEach((x) => x.classList.remove("is-on")); b.classList.add("is-on"); months = parseInt(b.dataset.m, 10) || 3; });
+  m.el.querySelector('[data-act="cancel"]').onclick = m.close;
+  m.el.querySelector('[data-act="ok"]').onclick = async () => {
+    const t = m.el.querySelector("#fzTitle").value.trim();
+    if (!t) { toast("Dai un nome al piatto", "error"); return; }
+    const port = Math.max(1, parseInt(m.el.querySelector("#fzPort").value, 10) || 1);
+    const note = m.el.querySelector("#fzNote").value.trim();
+    const bb = new Date(today.getFullYear(), today.getMonth() + months, today.getDate());
+    await store.addFreezer({ title: t, recipeId: recipe ? recipe.id : null, portions: port, note, frozenAt: ymd(today.getFullYear(), today.getMonth(), today.getDate()), bestBefore: ymd(bb.getFullYear(), bb.getMonth(), bb.getDate()) });
+    m.close(); haptic(12); toast("Aggiunto al congelatore 🧊", "success");
+  };
+}
+function openFreezerList() {
+  const items = store.getFreezer();
+  const rows = items.length
+    ? items.map((it) => {
+        const days = fzDaysLeft(it.bestBefore);
+        const cls = days == null ? "" : (days < 0 ? "is-exp" : (days <= 7 ? "is-soon" : ""));
+        const cdown = days == null ? "" : (days < 0 ? `scaduto da ${-days} g` : (days === 0 ? "scade oggi" : `tra ${days} g`));
+        return `<div class="fz-item ${cls}" data-id="${it.id}">
+          <span class="fz-item__ic">🧊</span>
+          <div class="fz-item__main">
+            <div class="fz-item__t">${escapeHtml(it.title)} <span class="fz-item__p">${it.portions}×</span></div>
+            <div class="fz-item__d">congelato il ${fzDateIt(it.frozenAt)}${it.bestBefore ? ` · entro ${fzDateIt(it.bestBefore)}${cdown ? ` <b>(${cdown})</b>` : ""}` : ""}</div>
+            ${it.note ? `<div class="fz-item__n">${escapeHtml(it.note)}</div>` : ""}
+          </div>
+          <button class="btn btn--ghost fz-item__use" data-use="${it.id}">Consumato</button>
+        </div>`;
+      }).join("")
+    : `<div class="hint">Niente in congelatore. Quando cucini in abbondanza, usa <b>“Porziona e congela”</b> da una ricetta.</div>`;
+  const m = openModal(`
+    <h3 class="modal__title">🧊 Congelatore</h3>
+    <div class="cl-scroll">${rows}</div>
+    <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>`);
+  m.el.querySelector('[data-act="ok"]').onclick = m.close;
+  m.el.querySelectorAll("[data-use]").forEach((b) => b.onclick = async () => { await store.deleteFreezer(b.dataset.use); m.close(); openFreezerList(); });
+}
+
 // Calendario del diario: i giorni in cui hai cucinato, con cosa.
 function openCookCalendar() {
   const map = {};
@@ -2272,6 +2331,7 @@ function renderRecipeDetail() {
     <button class="btn btn--block" id="reviewBtn" style="margin-bottom:10px">📝 Com'è venuta? (voto, foto, nota)</button>
     <button class="btn btn--block" id="timelineBtn" style="margin-bottom:10px">🕐 Quando inizio? (per servire in orario)</button>
     <button class="btn btn--block" id="completeMealBtn" style="margin-bottom:10px">🍽️ Completa il pasto (abbinamenti)</button>
+    <button class="btn btn--block" id="freezeBtn" style="margin-bottom:10px">🧊 Porziona e congela</button>
     ${(videoInfo(r.videoUrl) || videoInfo(r.url)) ? `<button class="btn btn--block" id="watchVideo" style="margin-bottom:10px">▶ Guarda il video</button>` : ""}
     <button class="btn btn--block" id="checkPhotoBtn" style="margin-bottom:10px">📷 Com'è venuto? Controlla con una foto</button>
     <input type="file" id="checkPhotoFile" accept="image/*" capture="environment" hidden />
@@ -2384,6 +2444,7 @@ function renderRecipeDetail() {
   if (cookBtn) cookBtn.addEventListener("click", () => openCookingMode(r));
 
   root.querySelector("#cookedBtn").addEventListener("click", async (e) => { haptic(25); fxBurstFrom(e.currentTarget); await store.markCooked(r.id); toast("Segnata come cucinata 🔥", "success"); });
+  root.querySelector("#freezeBtn").addEventListener("click", () => openFreezeDialog(r));
 
   const reviewBtn = root.querySelector("#reviewBtn");
   if (reviewBtn) reviewBtn.addEventListener("click", () => openCookReview(r));
@@ -5496,6 +5557,7 @@ function renderPantry() {
   wrap.innerHTML = `
     <div class="hint" style="margin-bottom:10px">Quello che metti qui non verrà aggiunto alla lista della spesa. La data di scadenza è facoltativa. Tocca la ⭐ per segnare una <b>scorta di base</b>: quando la elimini (finita) torna subito nella spesa.</div>
     <button class="btn btn--primary btn--block" id="cookSuggest" style="margin-bottom:10px">${iconHtml("fork-knife")} Cosa posso cucinare con questi?</button>
+    <button class="btn btn--block" id="freezerBtn" style="margin-bottom:10px">🧊 Congelatore${(() => { const n = store.getFreezer().length; return n ? ` · ${n}` : ""; })()}</button>
     ${isImportConfigured() ? `<button class="btn btn--block" id="fridgePhoto" style="margin-bottom:14px">🧊 Fotografa il frigo (l'AI riconosce gli alimenti)</button><input type="file" id="fridgeFile" accept="image/*" capture="environment" hidden />` : ""}
     <div class="pan-add">
       <input type="text" id="panAdd" placeholder="Aggiungi un alimento..." />
@@ -5520,6 +5582,7 @@ function renderPantry() {
   wrap.querySelector("#panAddBtn").addEventListener("click", doAdd);
   addInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdd(); });
   wrap.querySelector("#cookSuggest").addEventListener("click", openCookSuggestions);
+  wrap.querySelector("#freezerBtn").addEventListener("click", openFreezerList);
   const fridgePhoto = wrap.querySelector("#fridgePhoto");
   const fridgeFile = wrap.querySelector("#fridgeFile");
   if (fridgePhoto) fridgePhoto.addEventListener("click", () => fridgeFile.click());

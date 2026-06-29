@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.95",
+    d: "2026-06-24",
+    items: [
+      "Novità: \"Porziona e congela\" — da una ricetta crei un'etichetta per il congelatore (piatto, porzioni, data e \"da consumare entro\"). In Spesa › Dispensa trovi il \"Congelatore\" con il conto alla rovescia e l'avviso quando qualcosa sta per scadere; tocchi \"Consumato\" quando lo usi."
+    ]
+  },
+  {
     v: "7.94",
     d: "2026-06-24",
     items: [

@@ -6,16 +6,16 @@ const KEY = "ricettario.data.v1";
 function read() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { tools: [], recipes: [], shopping: [], plan: [], pantry: [], menus: [], events: [] };
+    if (!raw) return { tools: [], recipes: [], shopping: [], plan: [], pantry: [], menus: [], events: [], freezer: [] };
     const data = JSON.parse(raw);
-    return { tools: data.tools || [], recipes: data.recipes || [], shopping: data.shopping || [], plan: data.plan || [], pantry: data.pantry || [], menus: data.menus || [], events: data.events || [] };
+    return { tools: data.tools || [], recipes: data.recipes || [], shopping: data.shopping || [], plan: data.plan || [], pantry: data.pantry || [], menus: data.menus || [], events: data.events || [], freezer: data.freezer || [] };
   } catch {
-    return { tools: [], recipes: [], shopping: [], plan: [], pantry: [], menus: [], events: [] };
+    return { tools: [], recipes: [], shopping: [], plan: [], pantry: [], menus: [], events: [], freezer: [] };
   }
 }
 
 function write(state) {
-  localStorage.setItem(KEY, JSON.stringify({ tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan, pantry: state.pantry, menus: state.menus, events: state.events }));
+  localStorage.setItem(KEY, JSON.stringify({ tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan, pantry: state.pantry, menus: state.menus, events: state.events, freezer: state.freezer }));
 }
 
 export function createLocalAdapter() {
@@ -24,7 +24,7 @@ export function createLocalAdapter() {
 
   function commit() {
     write(state);
-    onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping], plan: [...state.plan], pantry: [...state.pantry], menus: [...state.menus], events: [...state.events] });
+    onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping], plan: [...state.plan], pantry: [...state.pantry], menus: [...state.menus], events: [...state.events], freezer: [...state.freezer] });
   }
 
   return {
@@ -33,7 +33,7 @@ export function createLocalAdapter() {
     async start(cb) {
       onChange = cb;
       // Emissione iniziale dello stato salvato.
-      onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping], plan: [...state.plan], pantry: [...state.pantry], menus: [...state.menus], events: [...state.events] });
+      onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping], plan: [...state.plan], pantry: [...state.pantry], menus: [...state.menus], events: [...state.events], freezer: [...state.freezer] });
     },
 
     async addTool(tool) {
@@ -135,6 +135,20 @@ export function createLocalAdapter() {
       commit();
     },
 
+    async addFreezer(item) {
+      state.freezer.push(item);
+      commit();
+    },
+    async updateFreezer(id, patch) {
+      const it = state.freezer.find((x) => x.id === id);
+      if (it) Object.assign(it, patch);
+      commit();
+    },
+    async deleteFreezer(id) {
+      state.freezer = state.freezer.filter((x) => x.id !== id);
+      commit();
+    },
+
     async replaceAll(data) {
       state.tools = data.tools || [];
       state.recipes = data.recipes || [];
@@ -143,6 +157,7 @@ export function createLocalAdapter() {
       state.pantry = data.pantry || [];
       state.menus = data.menus || [];
       state.events = data.events || [];
+      state.freezer = data.freezer || [];
       commit();
     }
   };
