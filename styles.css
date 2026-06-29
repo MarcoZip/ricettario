@@ -910,6 +910,23 @@ html.theme-switching::view-transition-new(root) { z-index: 2147483646; }
 .wn-verdict__t { font-weight: 800; }
 .wn-verdict__d { color: var(--text-soft); font-size: 0.86rem; margin-top: 2px; }
 
+/* Sfide della settimana */
+.chg-list { display: flex; flex-direction: column; gap: 10px; }
+.chg { display: flex; align-items: center; gap: 12px; background: var(--surface-2); border-radius: 14px; padding: 12px; }
+.chg.is-done { background: rgba(47, 158, 111, 0.16); }
+.chg__e { font-size: 1.6rem; flex-shrink: 0; }
+.chg.is-done .chg__e { filter: none; }
+.chg__main { flex: 1; min-width: 0; }
+.chg__t { font-weight: 800; }
+.chg.is-done .chg__t { color: #3ec77f; }
+.chg__h { color: var(--text-soft); font-size: 0.8rem; margin: 1px 0 7px; }
+.chg__track { height: 8px; background: var(--surface-3); border-radius: 99px; overflow: hidden; }
+.chg__fill { height: 100%; width: 0; border-radius: 99px; background: var(--primary-grad); }
+@media (prefers-reduced-motion: no-preference) { .chg__fill { transition: width 0.8s cubic-bezier(0.2, 0.7, 0.2, 1); } }
+.chg.is-done .chg__fill { background: linear-gradient(135deg, #3ec77f, #2f9e6f); }
+.chg__n { font-weight: 800; color: var(--text-soft); flex-shrink: 0; }
+.chg.is-done .chg__n { color: #3ec77f; }
+
 /* Vetro liquido (glassmorphism): superfici smerigliate con un riflesso di luce
    che scorre seguendo lo scroll (variabile --sheen, aggiornata via JS). */
 :root.glass .tool-card,

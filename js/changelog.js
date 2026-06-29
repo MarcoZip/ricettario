@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.91",
+    d: "2026-06-24",
+    items: [
+      "Novità: \"Sfide della settimana\" — 3 mini-obiettivi che cambiano ogni lunedì (di stagione, una ricetta nuova, anti-spreco, e altri) con barra di progresso e coriandoli quando le completi. Le trovi in Home. Diverse dai Traguardi, che restano fissi a vita."
+    ]
+  },
+  {
     v: "7.90",
     d: "2026-06-24",
     items: [

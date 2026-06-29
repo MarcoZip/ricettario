@@ -1313,6 +1313,73 @@ function openAchievements() {
   } catch (e) { /* ignora */ }
 }
 
+// "Sfide della settimana": 3 mini-obiettivi che ruotano ogni lunedì. Diverse dai
+// Traguardi (fissi a vita): qui conta solo cosa cucini in questa settimana.
+const CHALLENGE_POOL = [
+  { id: "season", e: "🍂", t: "Di stagione", goal: 1, hint: "Cucina un piatto con ingredienti di stagione", test: (ev) => ev.some((x) => recipeSeasonalMatches(x.r, currentMonth()).length) ? 1 : 0 },
+  { id: "new", e: "🆕", t: "Qualcosa di nuovo", goal: 1, hint: "Cucina una ricetta che non avevi mai fatto", test: (ev, wk) => ev.some((x) => (x.r.cookLog || []).every((ts) => new Date(ts) >= wk)) ? 1 : 0 },
+  { id: "three", e: "🔥", t: "Tre ai fornelli", goal: 3, hint: "Cucina almeno 3 volte in settimana", test: (ev) => ev.length },
+  { id: "tools", e: "🧰", t: "Cambio strumento", goal: 2, hint: "Usa 2 strumenti di cottura diversi", test: (ev) => new Set(ev.map((x) => x.r.toolId).filter(Boolean)).size },
+  { id: "pantry", e: "♻️", t: "Anti-spreco", goal: 1, hint: "Cucina usando qualcosa che hai in dispensa", test: (ev) => ev.some((x) => recipeUsesPantry(x.r)) ? 1 : 0 },
+  { id: "sweet", e: "🍰", t: "Coccola dolce", goal: 1, hint: "Prepara un dolce o un dessert", test: (ev) => ev.some((x) => /dolc|dessert|torta|biscott|crostat|budino|tiramis|musse|mousse|gelato/.test(moodText(x.r))) ? 1 : 0 },
+  { id: "veg", e: "🥗", t: "Verde in tavola", goal: 1, hint: "Cucina un piatto vegetariano o di verdure", test: (ev) => ev.some((x) => /insalat|verdur|vegetarian|legumi|minestr|zupp|vegan/.test(moodText(x.r))) ? 1 : 0 },
+  { id: "fav", e: "❤️", t: "Ritorno al cuore", goal: 1, hint: "Cucina una delle tue ricette preferite", test: (ev) => ev.some((x) => x.r.favorite) ? 1 : 0 }
+];
+function cookedThisWeek() {
+  const start = startOfWeek(new Date());
+  const ev = [];
+  store.getAllRecipes().forEach((r) => (r.cookLog || []).forEach((ts) => { const d = new Date(ts); if (!isNaN(d) && d >= start) ev.push({ r, d }); }));
+  return ev;
+}
+function recipeUsesPantry(r) {
+  let pantry = [];
+  try { pantry = store.getPantry() || []; } catch (e) {}
+  const names = pantry.map((p) => (p.name || "").toLowerCase().trim()).filter((n) => n.length > 1);
+  if (!names.length) return false;
+  return (r.ingredients || []).some((it) => { const n = (it.name || "").toLowerCase().trim(); return n && names.some((pn) => n.includes(pn) || pn.includes(n)); });
+}
+function weeklyChallenges() {
+  const wk = startOfWeek(new Date());
+  const seed = Math.floor(wk.getTime() / (7 * 86400000));
+  const ev = cookedThisWeek();
+  const startIdx = ((seed % CHALLENGE_POOL.length) + CHALLENGE_POOL.length) % CHALLENGE_POOL.length;
+  const chosen = [0, 1, 2].map((i) => CHALLENGE_POOL[(startIdx + i) % CHALLENGE_POOL.length]);
+  return { seed, list: chosen.map((c) => ({ c, prog: Math.min(c.goal, c.test(ev, wk)) })) };
+}
+function openWeeklyChallenges() {
+  const { seed, list } = weeklyChallenges();
+  const done = list.filter((x) => x.prog >= x.c.goal).length;
+  const rows = list.map((x) => {
+    const pct = Math.round(x.prog / x.c.goal * 100);
+    const ok = x.prog >= x.c.goal;
+    return `<div class="chg ${ok ? "is-done" : ""}">
+      <span class="chg__e">${x.c.e}</span>
+      <div class="chg__main">
+        <div class="chg__t">${escapeHtml(x.c.t)}${ok ? " ✓" : ""}</div>
+        <div class="chg__h">${escapeHtml(x.c.hint)}</div>
+        <div class="chg__track"><div class="chg__fill" data-w="${pct}"></div></div>
+      </div>
+      <span class="chg__n">${x.prog}/${x.c.goal}</span>
+    </div>`;
+  }).join("");
+  const { el } = openModal(`
+    <h3 class="modal__title">🎯 Sfide della settimana</h3>
+    <p class="hint" style="margin-top:-6px">${done}/3 completate · cambiano ogni lunedì</p>
+    <div class="chg-list">${rows}</div>
+    <button class="btn btn--block" id="chClose">Chiudi</button>`);
+  el.querySelector("#chClose").onclick = closeAllModals;
+  requestAnimationFrame(() => el.querySelectorAll(".chg__fill").forEach((f) => { f.style.width = (f.dataset.w || 0) + "%"; }));
+  try {
+    const saved = JSON.parse(localStorage.getItem("ricettario.chWeek") || "{}");
+    const prevDone = (saved.seed === seed && Array.isArray(saved.done)) ? saved.done : [];
+    const nowDone = list.filter((x) => x.prog >= x.c.goal).map((x) => x.c.id);
+    const fresh = nowDone.filter((id) => !prevDone.includes(id));
+    localStorage.setItem("ricettario.chWeek", JSON.stringify({ seed, done: nowDone }));
+    if (fresh.length && !reduceMotion) { setTimeout(() => { try { fxBurst(window.innerWidth / 2, window.innerHeight / 3, { emojis: ["🎯", "✨", "🎉"] }); } catch (e) {} playPling(); }, 250); }
+    if (fresh.length && nowDone.length === 3) toast("🏆 Tutte le sfide della settimana completate!", "success");
+  } catch (e) { /* ignora */ }
+}
+
 // Calendario del diario: i giorni in cui hai cucinato, con cosa.
 function openCookCalendar() {
   const map = {};
@@ -1650,6 +1717,8 @@ function renderStrumenti() {
 
   const total = tools.reduce((s, t) => s + store.countRecipes(t.id), 0);
   const photoCount = store.getAllRecipes().filter((r) => r.photo).length;
+  const chWeek = total ? weeklyChallenges() : null;
+  const chDone = chWeek ? chWeek.list.filter((x) => x.prog >= x.c.goal).length : 0;
   const allTags = store.getAllTags();
   const voiceOK = ("webkitSpeechRecognition" in window) || ("SpeechRecognition" in window);
 
@@ -1787,6 +1856,7 @@ function renderStrumenti() {
     ${total ? `<button class="btn btn--block" id="surpriseBtn" style="margin:4px 0 8px">${iconHtml("shuffle")} Cosa cucino stasera?</button>` : ""}
     ${total ? `<button class="btn btn--ghost btn--block" id="moodBtn" style="margin:0 0 12px">😋 Che voglia hai?</button>` : ""}
     ${photoCount >= 4 ? `<button class="btn btn--ghost btn--block" id="wallBtn" style="margin:-6px 0 12px">🖼️ Muro delle ricette</button>` : ""}
+    ${total ? `<button class="btn btn--ghost btn--block" id="chBtn" style="margin:-6px 0 12px">🎯 Sfide della settimana${chWeek ? ` · <b>${chDone}/3</b>` : ""}</button>` : ""}
     <div class="home-tags">${chips}</div>
     <div id="homeBody"></div>
   `;
@@ -1817,6 +1887,8 @@ function renderStrumenti() {
   if (moodBtn) moodBtn.addEventListener("click", () => openMoodPicker());
   const wallBtn = root.querySelector("#wallBtn");
   if (wallBtn) wallBtn.addEventListener("click", () => openPhotoWall());
+  const chBtn = root.querySelector("#chBtn");
+  if (chBtn) chBtn.addEventListener("click", () => openWeeklyChallenges());
   initGyroCard(); // carta del giorno reattiva al giroscopio (solo su dispositivi che lo supportano)
   const surprise = root.querySelector("#surpriseBtn");
   if (surprise) surprise.addEventListener("click", () => {
