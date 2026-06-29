@@ -870,6 +870,22 @@ html.theme-switching::view-transition-new(root) { z-index: 2147483646; }
 .mcard__name { display: block; font-weight: 800; line-height: 1.2; }
 .mcard__n { display: block; color: var(--text-soft); font-size: 0.78rem; margin-top: 2px; }
 
+/* Cosa cucino stasera: assistente con estrazione animata */
+.tn-times { display: flex; gap: 8px; margin: 4px 0 12px; flex-wrap: wrap; }
+.tn-time { cursor: pointer; }
+.tn-time.is-on { background: var(--primary); color: #fff; border-color: var(--primary); }
+.tn-reveal { min-height: 8px; margin-bottom: 12px; }
+.tn-spin { text-align: center; font-size: 1.3rem; font-weight: 800; padding: 26px 8px; color: var(--primary-2); border-radius: 16px; background: var(--surface-2); }
+@media (prefers-reduced-motion: no-preference) { .tn-spin { animation: tnSpin 80ms linear; } }
+@keyframes tnSpin { 0% { opacity: 0.3; transform: translateY(-8px); } 100% { opacity: 1; transform: translateY(0); } }
+.tn-card { display: flex; gap: 12px; align-items: center; background: var(--surface-2); border-radius: 16px; padding: 10px; }
+@media (prefers-reduced-motion: no-preference) { .tn-card { animation: donepop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; } }
+.tn-card img, .tn-card__ph { width: 76px; height: 76px; border-radius: 14px; object-fit: cover; flex-shrink: 0; }
+.tn-card__ph { display: flex; align-items: center; justify-content: center; font-size: 2.2rem; background: var(--surface-3); }
+.tn-card__t { font-size: 1.15rem; font-weight: 800; line-height: 1.2; }
+.tn-card__why { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.tn-why { font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 99px; background: rgba(var(--primary-rgb, 255,140,60), 0.16); color: var(--primary-2); }
+
 /* Vetro liquido (glassmorphism): superfici smerigliate con un riflesso di luce
    che scorre seguendo lo scroll (variabile --sheen, aggiornata via JS). */
 :root.glass .tool-card,

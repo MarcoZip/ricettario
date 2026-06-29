@@ -1173,6 +1173,90 @@ function openCookJournal() {
   el.querySelectorAll(".jrn__it[data-id]").forEach((b) => b.addEventListener("click", () => { closeAllModals(); openRecipe(b.dataset.id); }));
 }
 
+// "Cosa cucino stasera?": assistente che combina dispensa, stagione, tempo e
+// preferenze per proporre l'idea giusta, con estrazione animata e rilancio.
+function tonightCandidates(opts) {
+  const recipes = store.getAllRecipes();
+  if (!recipes.length) return [];
+  const month = currentMonth();
+  const maxT = opts.time || 0;
+  const pantry = {};
+  try { store.suggestFromPantry().forEach((s) => { if (s && s.recipe) pantry[s.recipe.id] = s; }); } catch (e) {}
+  const out = recipes.map((r) => {
+    let score = 0; const reasons = [];
+    const p = pantry[r.id];
+    if (p && p.total) {
+      const frac = (p.have || 0) / p.total;
+      if (frac >= 0.999) { score += 50; reasons.push("hai tutti gli ingredienti"); }
+      else if (frac >= 0.6) { score += 28; reasons.push(`ti manca poco${p.missing ? ` (${p.missing})` : ""}`); }
+    }
+    if (recipeSeasonalMatches(r, month).length) { score += 18; reasons.push("di stagione"); }
+    if (maxT && r.time) {
+      if (r.time <= maxT) { score += 14; reasons.push(`pronta in ${r.time}′`); }
+      else score -= 100; // troppo lunga per il tempo scelto
+    } else if (!maxT && r.time && r.time <= 30) { score += 6; }
+    if (r.favorite) { score += 8; reasons.push("tra i preferiti"); }
+    if (r.lastCooked) {
+      const days = (Date.now() - new Date(r.lastCooked)) / 86400000;
+      if (days < 3) score -= 16; else if (days > 30) score += 4;
+    }
+    score += Math.random() * 9; // pizzico di casualità: rilanci sempre diversi
+    return { r, score, reasons };
+  }).filter((x) => x.score > -50);
+  out.sort((a, b) => b.score - a.score);
+  return out;
+}
+function openTonightAssistant() {
+  if (!store.getAllRecipes().length) { toast("Aggiungi prima qualche ricetta", "error"); return; }
+  let time = 0;
+  const { el } = openModal(`
+    <h3 class="modal__title">🍽️ Cosa cucino stasera?</h3>
+    <p class="hint" style="margin-top:-6px">Quanto tempo hai? Poi ti propongo l'idea giusta combinando dispensa, stagione e gusti.</p>
+    <div class="tn-times">
+      <button class="chip tn-time is-on" data-t="0">⏳ Tempo libero</button>
+      <button class="chip tn-time" data-t="30">≤ 30 min</button>
+      <button class="chip tn-time" data-t="15">≤ 15 min</button>
+    </div>
+    <div id="tnReveal" class="tn-reveal"></div>
+    <button class="btn btn--primary btn--block" id="tnRoll">🎲 Proponimi un piatto</button>`);
+  const reveal = el.querySelector("#tnReveal");
+  el.querySelectorAll(".tn-time").forEach((c) => c.addEventListener("click", () => {
+    el.querySelectorAll(".tn-time").forEach((x) => x.classList.remove("is-on"));
+    c.classList.add("is-on"); time = parseInt(c.dataset.t, 10) || 0;
+  }));
+  const showPick = (c) => {
+    const r = c.r;
+    reveal.innerHTML = `
+      <div class="tn-card">
+        ${r.photo ? `<img src="${escapeHtml(proxiedImg(r.photo))}" alt="" referrerpolicy="no-referrer"/>` : `<div class="tn-card__ph">🍽️</div>`}
+        <div class="tn-card__body">
+          <div class="tn-card__t">${escapeHtml(r.title)}</div>
+          ${c.reasons.length ? `<div class="tn-card__why">${c.reasons.slice(0, 3).map((x) => `<span class="tn-why">${escapeHtml(x)}</span>`).join("")}</div>` : ""}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn--ghost" id="tnAgain" style="flex:1">🎲 Rilancia</button>
+        <button class="btn btn--primary" id="tnGo" style="flex:1">${iconHtml("cooking-pot")} Cuciniamo</button>
+      </div>`;
+    reveal.querySelector("#tnGo").onclick = () => { closeAllModals(); openRecipe(r.id); };
+    reveal.querySelector("#tnAgain").onclick = roll;
+  };
+  const roll = () => {
+    const pool = tonightCandidates({ time });
+    if (!pool.length) { reveal.innerHTML = `<div class="hint" style="text-align:center;padding:10px">Nessuna proposta adatta. Prova a togliere il limite di tempo o aggiungi ricette.</div>`; return; }
+    const topN = pool.slice(0, Math.min(8, pool.length));
+    if (reduceMotion) { showPick(topN[0]); return; }
+    let n = 0; const spins = 11;
+    const iv = setInterval(() => {
+      if (!reveal.isConnected) { clearInterval(iv); return; }
+      reveal.innerHTML = `<div class="tn-spin">${escapeHtml(topN[n % topN.length].r.title)}</div>`;
+      n++;
+      if (n >= spins) { clearInterval(iv); haptic(20); playPling(); showPick(topN[0]); }
+    }, 80);
+  };
+  el.querySelector("#tnRoll").onclick = roll;
+}
+
 // Traguardi di cucina (badge sbloccati in base ai dati raccolti).
 function computeCookStats() {
   const recipes = store.getAllRecipes();
@@ -1700,7 +1784,7 @@ function renderStrumenti() {
       <input type="search" id="homeSearch" placeholder="Cerca una ricetta o un ingrediente…" value="${escapeHtml(homeQuery)}" />
       ${voiceOK ? `<button class="btn mic-btn" id="homeMic" title="Cerca a voce" aria-label="Cerca a voce">🎤</button>` : ""}
     </div>
-    ${total ? `<button class="btn btn--block" id="surpriseBtn" style="margin:4px 0 8px">${iconHtml("shuffle")} Cosa cucino oggi?</button>` : ""}
+    ${total ? `<button class="btn btn--block" id="surpriseBtn" style="margin:4px 0 8px">${iconHtml("shuffle")} Cosa cucino stasera?</button>` : ""}
     ${total ? `<button class="btn btn--ghost btn--block" id="moodBtn" style="margin:0 0 12px">😋 Che voglia hai?</button>` : ""}
     ${photoCount >= 4 ? `<button class="btn btn--ghost btn--block" id="wallBtn" style="margin:-6px 0 12px">🖼️ Muro delle ricette</button>` : ""}
     <div class="home-tags">${chips}</div>
@@ -1736,11 +1820,9 @@ function renderStrumenti() {
   initGyroCard(); // carta del giorno reattiva al giroscopio (solo su dispositivi che lo supportano)
   const surprise = root.querySelector("#surpriseBtn");
   if (surprise) surprise.addEventListener("click", () => {
-    const all = store.getAllRecipes();
-    if (!all.length) { toast("Aggiungi prima qualche ricetta", "error"); return; }
-    const r = all[Math.floor(Math.random() * all.length)];
+    if (!store.getAllRecipes().length) { toast("Aggiungi prima qualche ricetta", "error"); return; }
     fxBurstFrom(surprise, { emojis: ["🍽️", "🎲", "✨"] });
-    setTimeout(() => openRecipe(r.id), 130);
+    openTonightAssistant();
   });
 
   const mic = root.querySelector("#homeMic");

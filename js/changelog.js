@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.89",
+    d: "2026-06-24",
+    items: [
+      "Novità: \"Cosa cucino stasera?\" ora è un assistente intelligente — scegli quanto tempo hai e ti propone il piatto giusto combinando cosa hai in dispensa, la stagione e i tuoi gusti, con un'estrazione animata e il tasto \"Rilancia\". (Il pulsante è in Home.)"
+    ]
+  },
+  {
     v: "7.88",
     d: "2026-06-24",
     items: [
