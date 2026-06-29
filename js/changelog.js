@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.90",
+    d: "2026-06-24",
+    items: [
+      "Novità: \"Bilancio della settimana\" — nel Piano tocca il riquadro nutrizionale e vedi calorie per giorno (a barre), la ripartizione di proteine/carboidrati/grassi e un giudizio sull'equilibrio, con consiglio. Stima per porzione sui pasti pianificati."
+    ]
+  },
+  {
     v: "7.89",
     d: "2026-06-24",
     items: [

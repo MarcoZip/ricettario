@@ -5704,10 +5704,10 @@ function renderPlanWeek() {
       const weekEntries = days.flatMap((d) => store.getPlanByDate(ymd(d.getFullYear(), d.getMonth(), d.getDate())));
       const wn = dayNutrition(weekEntries);
       if (!wn.counted) return "";
-      return `<div class="nutri-box" style="margin-top:16px">
+      return `<button class="nutri-box nutri-box--tap" id="weekNutriBox" style="margin-top:16px">
         <div class="nutri-row"><span class="nutri-lbl">${iconHtml("carrot")} Settimana (stima)</span><span class="nutri-val"><b>${wn.kcal}</b> kcal · P ${wn.p} · C ${wn.c} · G ${wn.f}</span></div>
-        <div class="nutri-row"><span class="nutri-lbl">Media al giorno</span><span class="nutri-val">${Math.round(wn.kcal / 7)} kcal</span></div>
-      </div>${wn.counted < wn.total ? `<div class="hint" style="margin-top:4px">${wn.total - wn.counted} pasti senza valori (calcolali nelle ricette).</div>` : ""}`;
+        <div class="nutri-row"><span class="nutri-lbl">Media al giorno · tocca per il bilancio</span><span class="nutri-val">${Math.round(wn.kcal / 7)} kcal ${iconHtml("caret-right")}</span></div>
+      </button>${wn.counted < wn.total ? `<div class="hint" style="margin-top:4px">${wn.total - wn.counted} pasti senza valori (calcolali nelle ricette).</div>` : ""}`;
     })()}
     <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
       <button class="btn btn--ghost" id="weekToday">Oggi</button>
@@ -5724,6 +5724,8 @@ function renderPlanWeek() {
   root.querySelector("#prevW").addEventListener("click", () => { const a = new Date(start); a.setDate(a.getDate() - 7); weekAnchor = a; render(); });
   root.querySelector("#nextW").addEventListener("click", () => { const a = new Date(start); a.setDate(a.getDate() + 7); weekAnchor = a; render(); });
   root.querySelector("#weekToday").addEventListener("click", () => { weekAnchor = startOfWeek(new Date()); render(); });
+  const wnBox = root.querySelector("#weekNutriBox");
+  if (wnBox) wnBox.addEventListener("click", () => openWeekNutrition(days));
   root.querySelector("#prepAhead").addEventListener("click", () => openPrepAheadPlan());
   root.querySelectorAll(".week-day__h").forEach((b) => b.addEventListener("click", () => openDaySheet(b.dataset.date)));
   root.querySelectorAll(".week-meal").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); if (b.dataset.recipe) openRecipe(b.dataset.recipe); }));
@@ -5850,6 +5852,49 @@ function dayNutrition(entries) {
     counted++;
   }
   return { kcal: Math.round(t.kcal), p: Math.round(t.p), c: Math.round(t.c), f: Math.round(t.f), counted, total };
+}
+
+// Bilancio nutrizionale della settimana: barre per giorno, ripartizione dei
+// macronutrienti e un giudizio sull'equilibrio (stima per porzione, dai pasti
+// pianificati che hanno i valori nutrizionali calcolati).
+function openWeekNutrition(days) {
+  const perDay = days.map((d, i) => {
+    const ds = ymd(d.getFullYear(), d.getMonth(), d.getDate());
+    return { wd: WEEKDAYS_IT[i], day: d.getDate(), n: dayNutrition(store.getPlanByDate(ds)) };
+  });
+  const wk = perDay.reduce((s, x) => { s.kcal += x.n.kcal; s.p += x.n.p; s.c += x.n.c; s.f += x.n.f; s.counted += x.n.counted; s.total += x.n.total; return s; }, { kcal: 0, p: 0, c: 0, f: 0, counted: 0, total: 0 });
+  if (!wk.counted) { toast("Nessun pasto con valori nutrizionali: apri le ricette per calcolarli", "error"); return; }
+  const pK = wk.p * 4, cK = wk.c * 4, fK = wk.f * 9, mt = Math.max(1, pK + cK + fK);
+  const pPct = Math.round(pK / mt * 100), cPct = Math.round(cK / mt * 100), fPct = Math.max(0, 100 - pPct - cPct);
+  const ok = pPct >= 15 && pPct <= 28 && cPct >= 42 && cPct <= 62 && fPct >= 20 && fPct <= 38;
+  const verdict = ok ? "Settimana equilibrata 🟢" : "Settimana un po' sbilanciata 🟡";
+  const tip = ok ? "Bel mix di proteine, carboidrati e grassi." : (pPct < 15 ? "Poche proteine: aggiungi carne, pesce, uova o legumi." : (fPct > 38 ? "Grassi un po' alti: alleggerisci i condimenti." : (cPct > 62 ? "Tanti carboidrati: bilancia con proteine e verdure." : "Prova a variare un po' i piatti.")));
+  const maxK = Math.max(1, ...perDay.map((x) => x.n.kcal));
+  const bars = perDay.map((x) => `<div class="bar-col"><span class="bar-n">${x.n.kcal || ""}</span><div class="bar" style="height:${Math.round((x.n.kcal / maxK) * 66) + 3}px"></div><span class="bar-lbl">${x.wd.slice(0, 1)}</span></div>`).join("");
+  const { el } = openModal(`
+    <h3 class="modal__title">🥗 Bilancio della settimana</h3>
+    <p class="hint" style="margin-top:-6px">Stima per porzione, sui pasti pianificati</p>
+    <div class="wn-scroll">
+      <div class="wn-top">
+        <div class="wn-big"><b data-countup="${wk.kcal}">0</b><span>kcal in 7 giorni</span></div>
+        <div class="wn-avg"><b data-countup="${Math.round(wk.kcal / 7)}">0</b><span>media al giorno</span></div>
+      </div>
+      <div class="stat-block"><div class="stat-block__t">Calorie per giorno</div><div class="bar-chart">${bars}</div></div>
+      <div class="stat-block"><div class="stat-block__t">Ripartizione dei macronutrienti</div>
+        <div class="macrobar"><span class="macroseg macroseg--p" style="width:${pPct}%"></span><span class="macroseg macroseg--c" style="width:${cPct}%"></span><span class="macroseg macroseg--f" style="width:${fPct}%"></span></div>
+        <div class="macrolegend">
+          <span><i class="mdot mdot--p"></i> Proteine ${pPct}% · ${wk.p} g</span>
+          <span><i class="mdot mdot--c"></i> Carboidrati ${cPct}% · ${wk.c} g</span>
+          <span><i class="mdot mdot--f"></i> Grassi ${fPct}% · ${wk.f} g</span>
+        </div>
+      </div>
+      <div class="wn-verdict ${ok ? "is-ok" : "is-warn"}"><div class="wn-verdict__t">${verdict}</div><div class="wn-verdict__d">${tip}</div></div>
+      ${wk.counted < wk.total ? `<div class="hint" style="margin-top:8px">${wk.total - wk.counted} pasti senza valori: apri quelle ricette per calcolarli e affinare la stima.</div>` : ""}
+    </div>
+    <button class="btn btn--block" id="wnClose">Chiudi</button>`);
+  el.querySelector("#wnClose").onclick = closeAllModals;
+  animateCountUps(el);
+  requestAnimationFrame(() => el.querySelectorAll(".macroseg").forEach((s) => { s.style.transform = "scaleX(1)"; }));
 }
 
 // "Tutto pronto alle…": calcola a ritroso quando iniziare ogni piatto perché
