@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.94",
+    d: "2026-06-24",
+    items: [
+      "Novità: \"Risparmio batteria\" in Opzioni › Aspetto — spegne con un tocco tutti gli effetti continui più pesanti (sfondo aurora, atmosfera stagionale, vetro liquido, Cucina viva, vapore). In \"Automatico\" si attiva da solo quando la batteria del telefono è scarica."
+    ]
+  },
+  {
     v: "7.93",
     d: "2026-06-24",
     items: [

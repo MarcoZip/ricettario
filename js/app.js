@@ -3,7 +3,7 @@
 import * as store from "./store.js";
 import * as ui from "./ui.js";
 import { isCloudConfigured } from "./config.js";
-import { applyTheme, applyAccent, applyTextScale, applyContrast, applyFesta, applySeason, applyDaylight, applyGlass } from "./theme.js";
+import { applyTheme, applyAccent, applyTextScale, applyContrast, applyFesta, applySeason, applyDaylight, applyGlass, applyPowerSave, setBatteryLow } from "./theme.js";
 import { runDailyReminders } from "./notify.js";
 import { isPushSubscribed, refreshReminders } from "./push.js";
 import { getNickname, setNickname } from "./profile.js";
@@ -41,6 +41,16 @@ applyFesta();
 applySeason();
 applyDaylight();
 setInterval(applyDaylight, 10 * 60 * 1000); // aggiorna la tinta col passare delle ore
+applyPowerSave();
+// Risparmio energia "automatico": riduce gli effetti quando la batteria è scarica.
+if (navigator.getBattery) {
+  navigator.getBattery().then((b) => {
+    const upd = () => setBatteryLow(b.level <= 0.2 && !b.charging);
+    upd();
+    b.addEventListener("levelchange", upd);
+    b.addEventListener("chargingchange", upd);
+  }).catch(() => {});
+}
 
 const root = document.getElementById("view");
 let mounted = false;

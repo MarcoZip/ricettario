@@ -944,6 +944,23 @@ html.theme-switching::view-transition-new(root) { z-index: 2147483646; }
 .react__who { margin-top: 9px; font-size: 0.84rem; color: var(--text-soft); }
 .react__hint { margin-top: 9px; font-size: 0.84rem; color: var(--text-soft); }
 
+/* Risparmio energia: spegne i layer/effetti continui più costosi */
+:root.power-save #aurora,
+:root.power-save #season,
+:root.power-save #festa,
+:root.power-save .cook__ambient,
+:root.power-save .steam { display: none !important; }
+:root.power-save .rotd::after { animation: none !important; }
+:root.power-save.glass .tool-card,
+:root.power-save.glass .section-card,
+:root.power-save.glass .setting-group,
+:root.power-save.glass .meal-card {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background: var(--card-grad) !important;
+  box-shadow: none !important;
+}
+
 /* Vetro liquido (glassmorphism): superfici smerigliate con un riflesso di luce
    che scorre seguendo lo scroll (variabile --sheen, aggiornata via JS). */
 :root.glass .tool-card,

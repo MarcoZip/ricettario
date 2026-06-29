@@ -20,7 +20,7 @@ import { getNickname, setNickname, getCover, setCover } from "./profile.js";
 import { isImportConfigured, APP_VERSION, PUSH_WORKER_URL, SPOONACULAR_ENABLED, EDAMAM_ENABLED, WORKER_URL } from "./config.js";
 import { CHANGELOG } from "./changelog.js";
 import { fileToDataUrl } from "./image.js";
-import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS, getTextScale, setTextScale, getContrast, setContrast, getFestaMode, setFesta, setFestaEventToday, getSeasonMode, setSeason, currentSeason, getGlassOn, setGlass } from "./theme.js";
+import { getTheme, setTheme, getAccent, setAccent, ACCENT_PRESETS, getTextScale, setTextScale, getContrast, setContrast, getFestaMode, setFesta, setFestaEventToday, getSeasonMode, setSeason, currentSeason, getGlassOn, setGlass, getPowerMode, setPowerMode, powerSaveActive } from "./theme.js";
 import { getSoundOn, setSoundOn, playPling, playChime, playFlip, playSample } from "./sound.js";
 
 // Tag suggeriti nel form ricetta.
@@ -250,7 +250,7 @@ function switchThemeReveal(newTheme, originEl) {
 // con un riflesso di luce che scorre. Su desktop/senza giroscopio resta ferma.
 let gyroCardInited = false;
 function initGyroCard() {
-  if (gyroCardInited || reduceMotion) return;
+  if (gyroCardInited || reduceMotion || powerSaveActive()) return;
   if (typeof window.DeviceOrientationEvent === "undefined") return;
   gyroCardInited = true;
   let last = 0, b0 = null;
@@ -3692,7 +3692,7 @@ function openCookingMode(recipe) {
     const m = method || "neutro";
     if (ambient.dataset.method === m) return;
     ambient.dataset.method = m;
-    if (reduceMotion) { ambient.innerHTML = ""; return; }
+    if (reduceMotion || powerSaveActive()) { ambient.innerHTML = ""; return; }
     ambient.innerHTML = buildAmbientBits(m);
   }
 
@@ -7186,6 +7186,17 @@ function renderImpostazioni() {
         </div>
         <input type="checkbox" id="glassChk" class="mini-check" ${getGlassOn() ? "checked" : ""} />
       </label>
+      <div class="setting-row">
+        <div>
+          <div class="setting-row__label">🔋 Risparmio batteria</div>
+          <div class="setting-row__desc">Spegne gli effetti continui più pesanti (sfondo aurora, atmosfera stagionale, vetro, Cucina viva, vapore). In "Automatico" si attiva da solo quando la batteria è scarica.</div>
+        </div>
+        <select id="powerSel" class="mini-select">
+          <option value="off">Spento</option>
+          <option value="auto">Automatico</option>
+          <option value="on">Sempre acceso</option>
+        </select>
+      </div>
     </div>
 
     <h2 class="setting-section"><span class="setting-section__ic">🍽️</span> Preferenze di cucina</h2>
@@ -7385,6 +7396,8 @@ function renderImpostazioni() {
   if (soundTest) soundTest.addEventListener("click", (e) => { e.preventDefault(); playSample(); });
   const glassChk = root.querySelector("#glassChk");
   if (glassChk) glassChk.addEventListener("change", () => setGlass(glassChk.checked));
+  const powerSel = root.querySelector("#powerSel");
+  if (powerSel) { powerSel.value = getPowerMode(); powerSel.addEventListener("change", () => setPowerMode(powerSel.value)); }
   const statsBtn = root.querySelector("#statsBtn");
   if (statsBtn) statsBtn.addEventListener("click", () => openStatsDashboard());
   const defServSel = root.querySelector("#defServSel");

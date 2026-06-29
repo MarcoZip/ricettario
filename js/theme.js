@@ -122,7 +122,7 @@ export function festaActive() {
 }
 export function getFesta() { return festaActive(); } // compat
 export function applyFesta() {
-  const v = festaActive();
+  const v = festaActive() && !powerSaveActive();
   document.documentElement.classList.toggle("theme-festa", !!v);
   const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let layer = document.getElementById("festa");
@@ -167,6 +167,35 @@ export function setGlass(on) {
   applyGlass(on);
 }
 
+// ---- Risparmio energia: spegne gli effetti continui più pesanti ----
+// (aurora, atmosfera stagionale, vetro liquido, Cucina viva, vapore, festa).
+// "auto" li riduce solo quando la batteria è scarica.
+const POWER_KEY = "ricettario.power";
+let batteryLow = false;
+export function getPowerMode() {
+  try { const v = localStorage.getItem(POWER_KEY); return (v === "on" || v === "off" || v === "auto") ? v : "auto"; }
+  catch { return "auto"; }
+}
+export function powerSaveActive() {
+  const m = getPowerMode();
+  return m === "on" || (m === "auto" && batteryLow);
+}
+export function applyPowerSave() {
+  document.documentElement.classList.toggle("power-save", powerSaveActive());
+  applySeason(); applyFesta();
+}
+export function setPowerMode(m) {
+  const v = (m === "on" || m === "off" || m === "auto") ? m : "auto";
+  try { localStorage.setItem(POWER_KEY, v); } catch {}
+  applyPowerSave();
+}
+export function setBatteryLow(v) {
+  const nv = !!v;
+  if (nv === batteryLow) return;
+  batteryLow = nv;
+  applyPowerSave();
+}
+
 // ---- Atmosfera stagionale (petali, pulviscolo dorato, foglie, neve) ----
 // Elementi leggeri che fluttuano sullo sfondo a seconda della stagione in corso.
 // Acceso di default; "off" lo disattiva. Rispetta sempre "riduci movimento".
@@ -188,6 +217,7 @@ const SEASON_BITS = {
   inverno: { emojis: ["❄️", "❄️", "❄️", "🌨️"], rise: false }
 };
 export function applySeason() {
+  if (powerSaveActive()) { const l = document.getElementById("season"); if (l) l.remove(); return; }
   const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const season = currentSeason();
   let layer = document.getElementById("season");
