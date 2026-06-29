@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.88",
+    d: "2026-06-24",
+    items: [
+      "Novità: le Raccolte ora hanno una bella copertina a collage (fino a 4 foto delle ricette dentro) e si vedono come schede affiancate. Le trovi nel filtro \"Menu/Raccolte\" del Ricettario."
+    ]
+  },
+  {
     v: "7.87",
     d: "2026-06-24",
     items: [

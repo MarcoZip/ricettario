@@ -5988,6 +5988,12 @@ function openPrompt(title, placeholder, onOk, value = "") {
   inp.addEventListener("keydown", (e) => { if (e.key === "Enter") ok(); });
 }
 
+// Copertina a collage di una raccolta: fino a 4 foto delle sue ricette.
+function menuCoverHtml(mn) {
+  const photos = store.getMenuRecipes(mn.id).filter((r) => r.photo).slice(0, 4).map((r) => proxiedImg(r.photo));
+  if (!photos.length) return `<span class="mcard__cover mcard__cover--empty">${iconHtml("book-bookmark")}</span>`;
+  return `<span class="mcard__cover mcard__cover--n${photos.length}">${photos.map((p) => `<img src="${escapeHtml(p)}" alt="" loading="lazy" referrerpolicy="no-referrer"/>`).join("")}</span>`;
+}
 function renderMenusBody(body) {
   const events = store.getEvents();
   const evList = events.length
@@ -5999,7 +6005,10 @@ function renderMenusBody(body) {
     : `<div class="hint">Organizza un grande menù (Natale, Pasqua…) con i tempi: spesa, preparazioni anticipate, piatti portati dagli ospiti e timeline del giorno. Si salva per rifarlo.</div>`;
   const menus = store.getMenus();
   const list = menus.length
-    ? menus.map((mn) => `<button class="pick-row" data-menu="${mn.id}"><span class="day-row__icon">${iconHtml("book-bookmark")}</span><span class="day-row__name">${escapeHtml(mn.name)}<span class="have-badge">${(mn.recipeIds || []).length} ricette</span></span></button>`).join("")
+    ? `<div class="mcards">${menus.map((mn) => {
+        const n = (mn.recipeIds || []).length;
+        return `<button class="mcard" data-menu="${mn.id}">${menuCoverHtml(mn)}<span class="mcard__body"><span class="mcard__name">${escapeHtml(mn.name)}</span><span class="mcard__n">${n} ${n === 1 ? "ricetta" : "ricette"}</span></span></button>`;
+      }).join("")}</div>`
     : `<div class="hint">Nessuna raccolta. Crea una raccolta per raggruppare più ricette (es. "Cena con amici") e generare un'unica lista della spesa.</div>`;
   body.innerHTML = `
     <div class="menus-sec__title">🎉 Menù delle feste</div>
