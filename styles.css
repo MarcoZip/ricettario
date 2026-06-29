@@ -935,6 +935,15 @@ html.theme-switching::view-transition-new(root) { z-index: 2147483646; }
 .cover-hero__t { color: #fff; font-size: 1.5rem; font-weight: 800; line-height: 1.15; text-shadow: 0 2px 10px rgba(0,0,0,0.55); }
 @media (prefers-reduced-motion: no-preference) { .cover-hero { animation: imgFade 0.5s ease backwards; } }
 
+/* Reazioni della famiglia */
+.reactions { display: flex; gap: 8px; }
+.react { flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 1.5rem; padding: 8px 4px; border: 1px solid var(--surface-3); border-radius: 14px; background: var(--surface-2); cursor: pointer; transition: transform 0.12s ease, border-color 0.2s, background 0.2s; }
+.react:active { transform: scale(0.92); }
+.react.is-on { border-color: var(--primary); background: rgba(var(--primary-rgb, 255,140,60), 0.16); }
+.react__n { font-size: 0.85rem; font-weight: 800; color: var(--primary-2); }
+.react__who { margin-top: 9px; font-size: 0.84rem; color: var(--text-soft); }
+.react__hint { margin-top: 9px; font-size: 0.84rem; color: var(--text-soft); }
+
 /* Vetro liquido (glassmorphism): superfici smerigliate con un riflesso di luce
    che scorre seguendo lo scroll (variabile --sheen, aggiornata via JS). */
 :root.glass .tool-card,

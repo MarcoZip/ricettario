@@ -2249,6 +2249,11 @@ function renderRecipeDetail() {
       <div id="voiceBody"></div>
     </div>
 
+    <div class="section-card" id="reactCard">
+      <h3 class="section-title">😋 Reazioni della famiglia</h3>
+      <div id="reactBody">${reactionsBarHtml(r)}</div>
+    </div>
+
     ${(() => { const sim = similarRecipes(r); return sim.length ? `<div class="section-card">
       <h3 class="section-title">${iconHtml("sparkle")} Ti potrebbe piacere</h3>
       <div class="sim-row">${sim.map((s) => `<button class="sim-card" data-sim="${s.id}">${s.photo ? `<img src="${escapeHtml(proxiedImg(s.photo))}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : `<span class="sim-card__ph">${iconHtml("fork-knife")}</span>`}<span class="sim-card__t">${escapeHtml(s.title)}</span></button>`).join("")}</div>
@@ -2496,6 +2501,7 @@ function renderRecipeDetail() {
 
   wireNutrition(r, base, detailServings);
   wireVoiceNote(r);
+  wireReactions(r);
   animateCountUps(root); // anima anelli nutrizionali e numeri della ricetta
 
   // Tinta dell'hero dal colore dominante della foto (ravvivato e scurito per
@@ -2512,6 +2518,47 @@ function renderRecipeDetail() {
 // Nota vocale di una ricetta: registrata col microfono e salvata SOLO su questo
 // telefono (in localStorage, non sincronizzata). Max 30 secondi.
 function voiceKey(id) { return "ricettario.voice." + id; }
+// Reazioni della famiglia: ognuno (per nickname) lascia una reazione rapida a un
+// piatto. Si sincronizzano con le ricette (stesso account/casa).
+const REACTIONS = ["😍", "🔥", "👍", "😐"];
+function reactionsBarHtml(r) {
+  const list = Array.isArray(r.reactions) ? r.reactions : [];
+  const me = getNickname() || "Io";
+  const mine = list.find((x) => x.by === me);
+  const counts = {};
+  list.forEach((x) => { (counts[x.emoji] = counts[x.emoji] || []).push(x.by); });
+  const btns = REACTIONS.map((e) => {
+    const who = counts[e] || [];
+    const on = mine && mine.emoji === e;
+    return `<button class="react ${on ? "is-on" : ""}" data-react="${e}">${e}${who.length ? `<span class="react__n">${who.length}</span>` : ""}</button>`;
+  }).join("");
+  const whoLine = list.length
+    ? `<div class="react__who">${list.map((x) => `${x.emoji} ${escapeHtml(x.by)}`).join(" · ")}</div>`
+    : `<div class="react__hint">Tocca un'emoji per dire com'era!</div>`;
+  return `<div class="reactions">${btns}</div>${whoLine}`;
+}
+async function toggleReaction(r, emoji) {
+  const me = getNickname() || "Io";
+  let list = Array.isArray(r.reactions) ? r.reactions.slice() : [];
+  const existing = list.find((x) => x.by === me);
+  if (existing && existing.emoji === emoji) list = list.filter((x) => x.by !== me); // ri-tocco = tolgo
+  else { list = list.filter((x) => x.by !== me); list.push({ by: me, emoji, ts: new Date().toISOString() }); }
+  r.reactions = list;
+  haptic(8);
+  try { await store.updateRecipe(r.id, { reactions: list }); } catch (e) { /* offline: resta locale */ }
+}
+function wireReactions(r) {
+  const body = root.querySelector("#reactBody");
+  if (!body) return;
+  body.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-react]");
+    if (!b) return;
+    const wasOn = b.classList.contains("is-on");
+    await toggleReaction(r, b.dataset.react);
+    body.innerHTML = reactionsBarHtml(r);
+    if (!wasOn && !reduceMotion) { try { fxBurstFrom(body.querySelector(".react.is-on") || body, { emojis: [b.dataset.react, "✨"], count: 8 }); } catch (e2) {} }
+  });
+}
 function wireVoiceNote(r) {
   const body = root.querySelector("#voiceBody");
   if (!body) return;

@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "7.93",
+    d: "2026-06-24",
+    items: [
+      "Novità: \"Reazioni della famiglia\" — nel dettaglio di una ricetta, tu e Federica lasciate una reazione veloce (😍🔥👍😐); la ricetta mostra chi ha reagito e come. Si sincronizza con le ricette."
+    ]
+  },
+  {
     v: "7.92",
     d: "2026-06-24",
     items: [
