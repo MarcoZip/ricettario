@@ -978,6 +978,15 @@ html.theme-switching::view-transition-new(root) { z-index: 2147483646; }
 .fz-item__n { font-size: 0.8rem; margin-top: 2px; font-style: italic; }
 .fz-item__use { flex-shrink: 0; }
 
+/* Riga compatta di scorciatoie in Home (voglia / sfide / muro) */
+.home-quick { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+.home-quick .btn { flex: 1 1 30%; min-width: 0; padding-left: 6px; padding-right: 6px; }
+
+/* Coerenza riduci-movimento: niente animazioni una-tantum delle barre */
+@media (prefers-reduced-motion: reduce) {
+  .macroseg, .stbar__fill, .chg__fill, .nring__fg, .stats-ring__fg { transition: none !important; }
+}
+
 /* Vetro liquido (glassmorphism): superfici smerigliate con un riflesso di luce
    che scorre seguendo lo scroll (variabile --sheen, aggiornata via JS). */
 :root.glass .tool-card,

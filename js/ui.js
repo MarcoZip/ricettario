@@ -1923,9 +1923,11 @@ function renderStrumenti() {
       ${voiceOK ? `<button class="btn mic-btn" id="homeMic" title="Cerca a voce" aria-label="Cerca a voce">🎤</button>` : ""}
     </div>
     ${total ? `<button class="btn btn--block" id="surpriseBtn" style="margin:4px 0 8px">${iconHtml("shuffle")} Cosa cucino stasera?</button>` : ""}
-    ${total ? `<button class="btn btn--ghost btn--block" id="moodBtn" style="margin:0 0 12px">😋 Che voglia hai?</button>` : ""}
-    ${photoCount >= 4 ? `<button class="btn btn--ghost btn--block" id="wallBtn" style="margin:-6px 0 12px">🖼️ Muro delle ricette</button>` : ""}
-    ${total ? `<button class="btn btn--ghost btn--block" id="chBtn" style="margin:-6px 0 12px">🎯 Sfide della settimana${chWeek ? ` · <b>${chDone}/3</b>` : ""}</button>` : ""}
+    ${total ? `<div class="home-quick">
+      <button class="btn btn--ghost" id="moodBtn">😋 Che voglia hai?</button>
+      <button class="btn btn--ghost" id="chBtn">🎯 Sfide${chWeek ? ` · <b>${chDone}/3</b>` : ""}</button>
+      ${photoCount >= 4 ? `<button class="btn btn--ghost" id="wallBtn">🖼️ Muro</button>` : ""}
+    </div>` : ""}
     <div class="home-tags">${chips}</div>
     <div id="homeBody"></div>
   `;

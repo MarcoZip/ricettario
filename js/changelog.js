@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.96",
+    d: "2026-06-24",
+    minor: true,
+    items: [
+      "Rifinitura: in Home le scorciatoie (Che voglia hai?, Sfide, Muro) sono ora su un'unica riga ordinata; le barre e gli anelli animati rispettano meglio \"riduci movimento\"."
+    ]
+  },
+  {
     v: "7.95",
     d: "2026-06-24",
     items: [
