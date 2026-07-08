@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "8.04",
+    d: "2026-06-24",
+    items: [
+      "Novità: filtro \"Consigliati\" in Home — l'app impara dai tuoi gusti (cosa cucini, preferiti, reazioni della famiglia, categorie che ami, stagione) e ti mette davanti le ricette giuste, variando per non riproporre sempre le stesse. Tutto sul telefono, niente dati fuori."
+    ]
+  },
+  {
     v: "8.03",
     d: "2026-06-24",
     items: [

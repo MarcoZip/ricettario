@@ -1697,6 +1697,33 @@ function recipeResultRow(r, i = 0) {
   return `<button class="pick-row stagger" data-id="${r.id}" style="--i:${i}"><span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span><span class="day-row__name">${escapeHtml(r.title)}${fav}${rate}${cooked}${tm}${diff}${src}</span></button>`;
 }
 
+// Punteggio delle reazioni della famiglia su una ricetta (😍>🔥>👍>😐).
+function reactionScore(r) {
+  const map = { "😍": 3, "🔥": 2, "👍": 1, "😐": 0 };
+  return (Array.isArray(r.reactions) ? r.reactions : []).reduce((s, x) => s + (map[x.emoji] || 0), 0);
+}
+// Motore "Consigliati": impara dai tuoi gusti (cotture, preferiti, reazioni, tag
+// ricorrenti, stagione) e ordina le ricette; penalizza quelle cucinate proprio
+// ora per varietà. Tutto lato client, nessun dato inviato fuori.
+function recommendedRecipes() {
+  const all = store.getAllRecipes();
+  if (!all.length) return [];
+  const norm = (t) => (t || "").toLowerCase().trim();
+  const tagScore = {};
+  all.forEach((r) => { const w = (r.cookCount || 0) + (r.favorite ? 2 : 0) + reactionScore(r); (r.tags || []).forEach((t) => { const k = norm(t); if (k) tagScore[k] = (tagScore[k] || 0) + w; }); });
+  const month = currentMonth();
+  return all.map((r) => {
+    let s = 0;
+    (r.tags || []).forEach((t) => s += (tagScore[norm(t)] || 0) * 0.5);
+    if (recipeSeasonalMatches(r, month).length) s += 5;
+    s += reactionScore(r) * 2;
+    if (r.favorite) s += 3;
+    if (r.lastCooked) { const d = (Date.now() - new Date(r.lastCooked)) / 86400000; if (d < 4) s -= 6; else if (d > 40) s += 2; }
+    s += Math.random() * 3;
+    return { r, s };
+  }).sort((a, b) => b.s - a.s).slice(0, 15).map((x) => x.r);
+}
+
 function renderHomeBody() {
   const body = root.querySelector("#homeBody");
   if (!body) return;
@@ -1708,7 +1735,8 @@ function renderHomeBody() {
     let emptyIcon = "magnifying-glass", emptyMsg = "Nessuna ricetta trovata.";
     // 1) Base in funzione del filtro/categoria scelto (o tutte le ricette).
     let base;
-    if (homeFilter === "permeo") { base = store.getAllRecipes().filter(matchesDiet); emptyIcon = "heart"; emptyMsg = "Nessuna ricetta adatta alle tue preferenze alimentari (impostale in Opzioni)."; }
+    if (homeFilter === "reco") { base = recommendedRecipes(); emptyIcon = "sparkle"; emptyMsg = "Cucina e reagisci a qualche ricetta: imparerò cosa consigliarti."; }
+    else if (homeFilter === "permeo") { base = store.getAllRecipes().filter(matchesDiet); emptyIcon = "heart"; emptyMsg = "Nessuna ricetta adatta alle tue preferenze alimentari (impostale in Opzioni)."; }
     else if (homeFilter === "fav") { base = store.getFavorites(); emptyIcon = "heart"; emptyMsg = "Nessun preferito: tocca il cuore in una ricetta."; }
     else if (homeFilter === "cooked") { base = store.getMostCooked(); emptyIcon = "fire"; emptyMsg = "Nessuna ricetta ancora segnata come cucinata."; }
     else if (homeFilter === "recent") { base = store.getRecentCooked(); emptyIcon = "timer"; emptyMsg = "Niente cucinato di recente."; }
@@ -1948,6 +1976,7 @@ function renderStrumenti() {
     : "";
 
   const specials = [
+    ...(total >= 4 ? [{ k: "reco", label: "Consigliati", icon: "sparkle" }] : []),
     ...(anyDietPref() ? [{ k: "permeo", label: "Per me", icon: "heart" }] : []),
     { k: "season", label: "Di stagione", icon: "carrot" },
     { k: "fav", label: "Preferiti", icon: "heart" },
