@@ -168,9 +168,27 @@ export async function receiptItems(image) {
     });
   } catch (e) { throw new Error("Servizio non raggiungibile. Controlla la connessione."); }
   const d = await res.json().catch(() => ({}));
-  if (d && Array.isArray(d.items) && d.items.length) return d.items;
+  if (d && Array.isArray(d.items) && d.items.length) return cleanReceiptItems(d.items);
   if (d && d.error === "noai") throw new Error("La funzione non è ancora attiva sul worker (manca il collegamento all'AI).");
   throw new Error((d && d.message) || "Non ho riconosciuto la spesa. Riprova con una foto più nitida.");
+}
+
+// Ripulisce la lista dello scontrino: toglie aggettivi/descrittori che a volte
+// il riconoscimento stacca dal nome (es. "integrale", "magro"), unità e doppioni.
+const RECEIPT_JUNK = new Set(["integrale", "magro", "magra", "fresche", "fresco", "fresca", "freschi", "bio", "light", "scremato", "intero", "classico", "classica", "grande", "piccolo", "misto", "misti", "assortiti", "assortito", "naturale", "gr", "kg", "lt", "ml", "pz", "conf", "confezione", "busta", "bustina", "scatola", "barattolo", "vasetto", "vaschetta", "sacchetto", "surgelato", "surgelati", "bianco", "rosso", "nero", "x6", "x4", "x2"]);
+function cleanReceiptItems(items) {
+  const out = [];
+  const seen = new Set();
+  for (const raw of items) {
+    let s = String(raw || "").toLowerCase().replace(/[^0-9a-zà-ù\s'-]/g, " ").replace(/\s{2,}/g, " ").trim();
+    // Toglie le parole-spazzatura anche dentro voci multi-parola (es. "insalata busta" -> "insalata").
+    s = s.split(" ").filter((w) => w && !RECEIPT_JUNK.has(w)).join(" ").trim();
+    if (!s || s.length < 2) continue;
+    if (seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+  return out;
 }
 
 // Pianificatore settimanale AI: dai titoli → 7 giorni { pranzo?, cena }.

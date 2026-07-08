@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.08",
+    d: "2026-06-24",
+    minor: true,
+    items: [
+      "Ritocco: \"Scansiona lo scontrino\" ora pulisce meglio la lista (toglie descrittori come \"integrale/magro\" e i doppioni)."
+    ]
+  },
+  {
     v: "8.07",
     d: "2026-06-24",
     minor: true,
