@@ -1064,6 +1064,12 @@ p, li, .setting-row__desc, .hint, .recipe-item__notes, .steps-list li { text-wra
 /* Secondo strato soffuso (toni freddi) per un effetto "mesh" con più profondità. */
 #aurora::after { content: ""; position: absolute; inset: 0; background: radial-gradient(34% 34% at 78% 18%, rgba(120, 170, 255, 0.07), transparent 70%), radial-gradient(40% 40% at 22% 82%, rgba(199, 125, 255, 0.06), transparent 70%); }
 @media (prefers-reduced-motion: no-preference) { #aurora { animation: aurora 22s ease-in-out infinite alternate; } #aurora::after { animation: aurora2 30s ease-in-out infinite alternate; } }
+/* Aurora 2.0: un vortice conico lentissimo, animato via @property (--ah), che
+   dà movimento organico allo sfondo. Molto tenue; nascosto in Risparmio batteria. */
+@property --ah { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+#aurora::before { content: ""; position: absolute; inset: -35%; pointer-events: none; background: conic-gradient(from var(--ah), transparent, rgba(var(--primary-rgb, 255,140,60), 0.05) 0.22turn, transparent 0.5turn, rgba(120, 170, 255, 0.04) 0.75turn, transparent); }
+@media (prefers-reduced-motion: no-preference) { #aurora::before { animation: auroraSpin 52s linear infinite; } }
+@keyframes auroraSpin { to { --ah: 360deg; } }
 @keyframes aurora2 { 0% { transform: translate(0, 0) scale(1.08); } 100% { transform: translate(-5%, -3%) scale(1); } }
 @media (prefers-reduced-motion: no-preference) {
   .view-anim { animation: viewIn 0.24s ease; }

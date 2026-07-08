@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.01",
+    d: "2026-06-24",
+    minor: true,
+    items: [
+      "Rifinitura: lo sfondo aurora ha ora un lentissimo movimento a vortice, più organico e vivo. Tenue e disattivabile con \"Risparmio batteria\"."
+    ]
+  },
+  {
     v: "8.00",
     d: "2026-06-24",
     items: [
