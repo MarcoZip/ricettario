@@ -1504,6 +1504,22 @@ export function navigate(route) {
   if (root) { root.classList.remove("view-anim"); void root.offsetWidth; root.classList.add("view-anim"); }
 }
 
+// Condivisione ricevuta da un'altra app (Web Share Target, Android): apre il form
+// nuova ricetta col link già dentro e avvia l'importazione automaticamente.
+export function handleSharedLink(url) {
+  if (!url) return;
+  setTimeout(() => {
+    openRecipeForm({});
+    setTimeout(() => {
+      const u = document.querySelector("#rUrl");
+      const imp = document.querySelector("#rImport");
+      if (u) u.value = url;
+      if (imp) { toast("Link ricevuto: importo…", "success"); imp.click(); }
+      else if (u) toast("Link inserito: tocca Importa", "success");
+    }, 350);
+  }, 500);
+}
+
 // Scorciatoie dall'icona dell'app (manifest "shortcuts"): ?action=new|surprise|timer.
 export function handleShortcut(action) {
   if (!action) return;

@@ -9,7 +9,7 @@ export function applyTheme(t) {
   const v = t || getTheme();
   document.documentElement.setAttribute("data-theme", v);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", v === "light" ? "#fbf7f2" : "#0e0f13");
+  if (meta) meta.setAttribute("content", v === "light" ? "#fbf7f2" : "#14110d");
 }
 
 export function setTheme(t) {

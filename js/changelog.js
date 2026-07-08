@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "8.00",
+    d: "2026-06-24",
+    items: [
+      "Novità: puoi condividere una ricetta a Fornelli da un'altra app! Su Android, dal tasto \"Condividi\" di un browser/Instagram/blog scegli Fornelli e il link arriva pronto: l'app apre il form e prova a importarlo da solo. (Su iPhone Apple non lo permette ancora.)"
+    ]
+  },
+  {
     v: "7.99",
     d: "2026-06-24",
     minor: true,

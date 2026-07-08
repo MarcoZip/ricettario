@@ -22,9 +22,19 @@ function scheduleReminders() {
 }
 
 // Scorciatoie dall'icona dell'app (manifest shortcuts): ?action=new|surprise|timer.
+// E condivisioni ricevute da altre app (Web Share Target): ?share_url/share_text.
 function consumeShortcut() {
   try {
-    const a = new URLSearchParams(location.search).get("action");
+    const q = new URLSearchParams(location.search);
+    // Condivisione ricevuta: prendi il primo link da share_url o dal testo condiviso.
+    const shared = q.get("share_url") || q.get("share_text") || "";
+    if (shared) {
+      const m = shared.match(/https?:\/\/[^\s]+/);
+      if (m && ui.handleSharedLink) ui.handleSharedLink(m[0]);
+      history.replaceState(null, "", location.pathname);
+      return;
+    }
+    const a = q.get("action");
     if (!a) return;
     ui.handleShortcut(a);
     // pulisci l'URL così la scorciatoia non si ripete al refresh
