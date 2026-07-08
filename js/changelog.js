@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.97",
+    d: "2026-06-24",
+    minor: true,
+    items: [
+      "Rifinitura grafica: tema scuro più caldo (toni pane/antracite invece di grigio freddo), riflesso \"vetro liquido\" sui bordi, titoli bilanciati senza parole a capo orfane, e micro-rimbalzo \"a molla\" su card e barra di navigazione."
+    ]
+  },
+  {
     v: "7.96",
     d: "2026-06-24",
     minor: true,

@@ -1,27 +1,28 @@
 :root {
-  --bg: #0e0f13;
-  --surface: #1a1b21;
-  --surface-2: #22232b;
-  --surface-3: #2c2d36;
-  --text: #ece7df;
-  --text-soft: #8b8478;
+  /* Scuro "caldo": base antracite/marrone invece di grigio freddo (tono cucina). */
+  --bg: #14110d;
+  --surface: #201b15;
+  --surface-2: #2a231b;
+  --surface-3: #362d23;
+  --text: #efe8dd;
+  --text-soft: #9a9082;
   --primary: #ff7a3d;
   --primary-2: #ffb86b;
   --primary-grad: linear-gradient(135deg, #ffb86b, #ff7a3d);
   --accent: #36d1b7;
   --danger: #ff5e6c;
-  --border: #2a2b34;
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --border: #342b21;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.38);
   --glow: 0 0 36px -6px rgba(255, 140, 60, 0.55);
-  --input-bg: #15161b;
-  --card-grad: linear-gradient(160deg, #22232b, #191a20);
-  --modal-bg: #1b1c22;
-  --tile-mix: #22232b;
-  --tile-bg: #1a1b21;
-  --header-bg: rgba(14, 15, 19, 0.72);
-  --nav-bg: rgba(16, 17, 21, 0.82);
-  --hairline: rgba(255, 255, 255, 0.06);
-  --glass-rgb: 28, 30, 38;
+  --input-bg: #19140f;
+  --card-grad: linear-gradient(160deg, #2a231b, #1d1811);
+  --modal-bg: #221c15;
+  --tile-mix: #2a231b;
+  --tile-bg: #201b15;
+  --header-bg: rgba(20, 17, 13, 0.72);
+  --nav-bg: rgba(22, 18, 14, 0.82);
+  --hairline: rgba(255, 240, 220, 0.06);
+  --glass-rgb: 40, 33, 24;
   --glass-a: 0.52;
   --glass-border: 0.10;
   --radius: 22px;
@@ -985,6 +986,26 @@ html.theme-switching::view-transition-new(root) { z-index: 2147483646; }
 /* Coerenza riduci-movimento: niente animazioni una-tantum delle barre */
 @media (prefers-reduced-motion: reduce) {
   .macroseg, .stbar__fill, .chg__fill, .nring__fg, .stats-ring__fg { transition: none !important; }
+}
+
+/* --- Lotto quick-win: tipografia curata, bordo liquid-glass, molla --- */
+/* Titoli bilanciati (niente parola orfana) e paragrafi senza righe vedove. */
+h1, h2, h3, .page-title, .modal__title, .section-title, .cover-hero__t,
+.tool-card__name, .pcard__title, .rotd__title, .recipe-hero__title { text-wrap: balance; }
+p, li, .setting-row__desc, .hint, .recipe-item__notes, .steps-list li { text-wrap: pretty; }
+
+/* Bordo "Liquid Glass": riflesso speculare sui bordi (solo su superfici colorate/
+   scure, non sul testo). Leggero, niente filtri SVG. */
+.bottom-nav { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10); }
+.btn--primary { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28); }
+:root.glass .tool-card, :root.glass .section-card, :root.glass .setting-group, :root.glass .meal-card {
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.20), inset -1px -1px 2px rgba(0, 0, 0, 0.16), 0 8px 24px -14px rgba(0, 0, 0, 0.5);
+}
+
+/* Molla fisica su micro-interazioni chiave (rispetta già reduce-motion a monte). */
+@media (prefers-reduced-motion: no-preference) {
+  .bottom-nav__blob { transition: transform 0.55s var(--spring); }
+  .tool-card:active, .pick-row:active, .meal-card:active { transition: transform 0.4s var(--spring); }
 }
 
 /* Vetro liquido (glassmorphism): superfici smerigliate con un riflesso di luce

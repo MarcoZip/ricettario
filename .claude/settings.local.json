@@ -153,7 +153,10 @@
       "WebFetch(domain:www.americastestkitchen.com)",
       "WebFetch(domain:www.scriptbyai.com)",
       "WebFetch(domain:www.lifeasastrawberry.com)",
-      "WebFetch(domain:gastronomiafasani.com)"
+      "WebFetch(domain:gastronomiafasani.com)",
+      "WebFetch(domain:www.foodieprep.ai)",
+      "WebFetch(domain:developer.chrome.com)",
+      "WebFetch(domain:blog.riadkilani.com)"
     ]
   }
 }
