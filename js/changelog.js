@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "8.03",
+    d: "2026-06-24",
+    items: [
+      "Novità: nel dettaglio ricetta un badge \"Impatto ambientale\" (Basso/Medio/Alto) stimato dagli ingredienti, con un consiglio per alleggerirlo quando è alto. È una stima indicativa, non un dato preciso."
+    ]
+  },
+  {
     v: "8.02",
     d: "2026-06-24",
     items: [

@@ -1006,6 +1006,15 @@ html.theme-switching::view-transition-new(root) { z-index: 2147483646; }
 .uiu-row:last-child { border-bottom: none; }
 .uiu-exp { font-size: 0.7rem; font-weight: 800; color: #ff9f43; background: rgba(255, 159, 67, 0.16); padding: 2px 7px; border-radius: 99px; }
 
+/* Badge impatto ambientale (CO2e) */
+.impact { display: flex; align-items: center; gap: 12px; border-radius: var(--radius); padding: 12px 16px; margin-bottom: 14px; border: 1px solid var(--surface-3); }
+.impact--basso { background: rgba(47, 158, 111, 0.14); border-color: rgba(47, 158, 111, 0.3); }
+.impact--medio { background: rgba(255, 159, 67, 0.14); border-color: rgba(255, 159, 67, 0.3); }
+.impact--alto { background: rgba(255, 94, 108, 0.14); border-color: rgba(255, 94, 108, 0.3); }
+.impact__e { font-size: 1.5rem; flex-shrink: 0; }
+.impact__t { font-weight: 800; }
+.impact__d { color: var(--text-soft); font-size: 0.82rem; margin-top: 1px; }
+
 /* Riga compatta di scorciatoie in Home (voglia / sfide / muro) */
 .home-quick { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
 .home-quick .btn { flex: 1 1 30%; min-width: 0; padding-left: 6px; padding-right: 6px; }

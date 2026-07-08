@@ -14,6 +14,7 @@ import { shareRecipeImage, shareMenuImage } from "./share-image.js";
 import { findSubstitutions } from "./substitutions.js";
 import { GUEST_ALLERGENS, GUEST_DIETS, checkRecipeForGuests, guestsSummary, CUSTOM_CATS, getCustomTerms, addCustomTerm, removeCustomTerm } from "./diets.js";
 import { estimateCost } from "./cost.js";
+import { estimateImpact } from "./co2.js";
 import { seasonalProduce, recipeSeasonalMatches, monthName, currentMonth } from "./seasonal.js";
 import { convertMeasures } from "./measures.js";
 import { getNickname, setNickname, getCover, setCover } from "./profile.js";
@@ -2367,6 +2368,8 @@ function renderRecipeDetail() {
     </div>
 
     ${ingredients.length ? `<div class="section-card" id="nutriCard">${nutritionCardHtml(r, base, detailServings)}</div>` : ""}
+
+    ${(() => { const im = estimateImpact(ingredients); return im ? `<div class="impact impact--${im.level.toLowerCase()}"><span class="impact__e">${im.emoji}</span><div class="impact__b"><div class="impact__t">Impatto ambientale: ${im.level}</div><div class="impact__d">Stima indicativa dagli ingredienti.${im.tip ? " " + escapeHtml(im.tip) : ""}</div></div></div>` : ""; })()}
 
     ${costCard}
     ${subsCard}
