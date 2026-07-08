@@ -7,7 +7,7 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchBlogGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo, robotProgram, fridgeIngredients, planWeekAI, convertRecipe, appHelp, structureRecipeText, dishNameFromPhoto } from "./import-recipe.js";
+import { importFromUrl, searchGz, searchBlogGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo, robotProgram, fridgeIngredients, receiptItems, planWeekAI, convertRecipe, appHelp, structureRecipeText, dishNameFromPhoto } from "./import-recipe.js";
 import { HELP_TOPICS, findHelpTopics } from "./app-help.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage, shareMenuImage } from "./share-image.js";
@@ -3330,6 +3330,38 @@ async function openFridgePhoto(file) {
   catch (e) { if (!body.isConnected) return; body.innerHTML = `<div class="hint" style="color:var(--danger)">${escapeHtml(e.message || "Non riuscito.")}</div>`; }
 }
 
+// "Scansiona lo scontrino": foto → alimenti comprati → in dispensa (con scadenza
+// facoltativa). Richiede la rotta /receipt sul worker.
+async function openReceiptScan(file) {
+  let dataUrl;
+  try { dataUrl = await fileToDataUrl(file, 1000, 0.7); } catch (e) { toast("Foto non valida", "error"); return; }
+  const m = openModal(`
+    <h3 class="modal__title">🧾 Scontrino → Dispensa</h3>
+    <div id="rcBody"><div style="text-align:center;padding:8px 0"><div class="ai-load"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div><div class="sk sk--line"></div></div><div class="hint">Leggo la spesa…</div></div></div>
+    <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
+  `);
+  m.el.querySelector('[data-act="ok"]').onclick = m.close;
+  const body = m.el.querySelector("#rcBody");
+  let items = [];
+  const draw = () => {
+    body.innerHTML = `<div class="hint" style="margin-bottom:8px">Spesa riconosciuta (tocca per togliere ciò che non è cibo):</div>
+      <div class="fr-chips">${items.length ? items.map((x, i) => `<button class="chip fr-chip" data-i="${i}">${escapeHtml(x)} ✕</button>`).join("") : '<span class="hint">Niente riconosciuto.</span>'}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+        <button class="btn btn--primary" id="rcPantry">${iconHtml("basket")} Aggiungi in dispensa</button>
+      </div>`;
+    body.querySelectorAll(".fr-chip").forEach((b) => b.onclick = () => { items.splice(parseInt(b.dataset.i, 10), 1); draw(); });
+    body.querySelector("#rcPantry").onclick = async () => {
+      if (!items.length) { toast("Niente da aggiungere", "error"); return; }
+      for (const it of items) await store.addPantryItem(it, null);
+      m.close();
+      toast(`${items.length} alimenti aggiunti in dispensa`, "success");
+      if (currentRoute === "spesa") renderShopping();
+    };
+  };
+  try { items = await receiptItems(dataUrl); if (!body.isConnected) return; draw(); }
+  catch (e) { if (!body.isConnected) return; body.innerHTML = `<div class="hint" style="color:var(--danger)">${escapeHtml(e.message || "Non riuscito.")}</div>`; }
+}
+
 // Pianificatore settimanale AI: propone le cene della settimana scegliendo tra le
 // tue ricette, con anteprima (rigenera / applica). Riempie solo i giorni vuoti.
 function openWeekPlanner(days) {
@@ -5672,7 +5704,8 @@ function renderPantry() {
     <button class="btn btn--primary btn--block" id="cookSuggest" style="margin-bottom:10px">${iconHtml("fork-knife")} Cosa posso cucinare con questi?</button>
     <button class="btn btn--block" id="useItUp" style="margin-bottom:10px">♻️ Svuota il frigo (scegli gli avanzi)</button>
     <button class="btn btn--block" id="freezerBtn" style="margin-bottom:10px">🧊 Congelatore${(() => { const n = store.getFreezer().length; return n ? ` · ${n}` : ""; })()}</button>
-    ${isImportConfigured() ? `<button class="btn btn--block" id="fridgePhoto" style="margin-bottom:14px">🧊 Fotografa il frigo (l'AI riconosce gli alimenti)</button><input type="file" id="fridgeFile" accept="image/*" capture="environment" hidden />` : ""}
+    ${isImportConfigured() ? `<button class="btn btn--block" id="fridgePhoto" style="margin-bottom:10px">🧊 Fotografa il frigo (l'AI riconosce gli alimenti)</button><input type="file" id="fridgeFile" accept="image/*" capture="environment" hidden />` : ""}
+    ${isImportConfigured() ? `<button class="btn btn--block" id="receiptScan" style="margin-bottom:14px">🧾 Scansiona lo scontrino</button><input type="file" id="receiptFile" accept="image/*" capture="environment" hidden />` : ""}
     <div class="pan-add">
       <input type="text" id="panAdd" placeholder="Aggiungi un alimento..." />
       <div class="pan-add__row">
@@ -5702,6 +5735,10 @@ function renderPantry() {
   const fridgeFile = wrap.querySelector("#fridgeFile");
   if (fridgePhoto) fridgePhoto.addEventListener("click", () => fridgeFile.click());
   if (fridgeFile) fridgeFile.addEventListener("change", () => { const f = fridgeFile.files[0]; fridgeFile.value = ""; if (f) openFridgePhoto(f); });
+  const receiptScan = wrap.querySelector("#receiptScan");
+  const receiptFile = wrap.querySelector("#receiptFile");
+  if (receiptScan) receiptScan.addEventListener("click", () => receiptFile.click());
+  if (receiptFile) receiptFile.addEventListener("change", () => { const f = receiptFile.files[0]; receiptFile.value = ""; if (f) openReceiptScan(f); });
   const scanBtn = wrap.querySelector("#panScan");
   if (scanBtn) scanBtn.addEventListener("click", openBarcodeScanner);
   wrap.querySelectorAll(".shop-row").forEach((rowEl) => {

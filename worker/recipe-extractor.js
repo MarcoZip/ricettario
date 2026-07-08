@@ -433,6 +433,7 @@ export default {
     if (url.pathname === "/importvideo") return handleImportVideo(request, env);
     if (url.pathname === "/robot") return handleRobot(request, env);
     if (url.pathname === "/fridge") return handleFridge(request, env);
+    if (url.pathname === "/receipt") return handleReceipt(request, env);
     if (url.pathname === "/structure") return handleStructure(request, env);
     if (url.pathname === "/dishname") return handleDishName(request, env);
     if (url.pathname === "/planweek") return handlePlanWeek(request, env);
@@ -940,6 +941,37 @@ async function handleFridge(request, env) {
     } catch (e) { lastErr = (e && e.message) || String(e); }
   }
   return json({ error: "empty", message: "Non ho riconosciuto alimenti. Riprova con una foto più chiara." + (lastErr ? " (" + lastErr.slice(0, 100) + ")" : "") }, 200);
+}
+
+// "Scansiona lo scontrino": foto dello scontrino → lista degli alimenti comprati.
+// POST { image: base64 } → { items: [...] }. Salta prezzi, codici e reparti.
+async function handleReceipt(request, env) {
+  if (request.method !== "POST") return json({ error: "method", message: "Usa POST" }, 405);
+  if (!env || !env.AI) return json({ error: "noai", message: "Workers AI non collegato (binding AI mancante)." }, 200);
+  let body;
+  try { body = await request.json(); } catch (e) { return json({ error: "badreq" }, 400); }
+  const b64 = String((body && body.image) || "").replace(/^data:[^,]+,/, "");
+  if (!b64) return json({ error: "noimage", message: "Foto mancante" }, 400);
+  let bytes;
+  try { const bin = atob(b64); bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); }
+  catch (e) { return json({ error: "badimage", message: "Foto non leggibile" }, 400); }
+  const prompt = "Questa è la foto di uno scontrino della spesa. Elenca SOLO i prodotti alimentari acquistati, con il loro nome comune in italiano (es: latte, uova, pane, zucchine, pasta, pollo). IGNORA prezzi, quantità, codici, sconti, il nome del negozio, l'IVA e i totali. Se un nome è abbreviato, espandilo al nome comune dell'alimento. Rispondi con un semplice elenco separato da virgole, solo i nomi degli alimenti.";
+  const models = ["@cf/meta/llama-3.2-11b-vision-instruct", "@cf/llava-hf/llava-1.5-7b-hf"];
+  let lastErr = "";
+  for (const model of models) {
+    try {
+      const out = await env.AI.run(model, { image: [...bytes], prompt, max_tokens: 400 });
+      const text = String((out && (out.response || out.description || out.text)) || "").trim();
+      if (text) {
+        const items = text.replace(/^[^:]*:/, "").split(/[,\n;•\-]+/)
+          .map((s) => clean(s).toLowerCase().replace(/^(e |ed |un |una |dei |del |della |delle |degli )/, "").replace(/\d+([.,]\d+)?\s*(€|eur|kg|g|gr|l|ml|pz|x)?/gi, "").trim())
+          .filter((s) => s.length >= 2 && s.length <= 30 && /[a-zà-ù]/i.test(s));
+        const uniq = [...new Set(items)].slice(0, 40);
+        if (uniq.length) return json({ items: uniq }, 200);
+      }
+    } catch (e) { lastErr = (e && e.message) || String(e); }
+  }
+  return json({ error: "empty", message: "Non ho riconosciuto la spesa. Riprova con una foto più nitida e dritta." + (lastErr ? " (" + lastErr.slice(0, 100) + ")" : "") }, 200);
 }
 
 // "Fotografa una ricetta": riceve il TESTO (OCR fatto sul telefono) di una pagina

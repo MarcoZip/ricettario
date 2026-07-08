@@ -156,6 +156,23 @@ export async function fridgeIngredients(image) {
   throw new Error((d && d.message) || "Non ho riconosciuto alimenti. Riprova.");
 }
 
+// Legge la foto di uno scontrino e ne estrae la lista della spesa (nomi degli
+// alimenti). Richiede la rotta /receipt sul worker (vision AI).
+export async function receiptItems(image) {
+  if (!WORKER_URL) throw new Error("Funzione non disponibile (worker non configurato).");
+  let res;
+  try {
+    res = await fetch(`${WORKER_URL}/receipt`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image })
+    });
+  } catch (e) { throw new Error("Servizio non raggiungibile. Controlla la connessione."); }
+  const d = await res.json().catch(() => ({}));
+  if (d && Array.isArray(d.items) && d.items.length) return d.items;
+  if (d && d.error === "noai") throw new Error("La funzione non è ancora attiva sul worker (manca il collegamento all'AI).");
+  throw new Error((d && d.message) || "Non ho riconosciuto la spesa. Riprova con una foto più nitida.");
+}
+
 // Pianificatore settimanale AI: dai titoli → 7 giorni { pranzo?, cena }.
 export async function planWeekAI(titles, includeLunch, expiring) {
   if (!WORKER_URL) throw new Error("Funzione non disponibile (worker non configurato).");

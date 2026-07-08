@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.07",
+    d: "2026-06-24",
+    minor: true,
+    items: [
+      "Novità: in Spesa › Dispensa arriva \"Scansiona lo scontrino\" — fotografi lo scontrino e l'app riconosce la spesa e la mette in dispensa (niente più inserimento a mano)."
+    ]
+  },
+  {
     v: "8.06",
     d: "2026-06-24",
     items: [
