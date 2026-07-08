@@ -651,14 +651,18 @@ a { color: var(--primary-2); }
   z-index: 200; pointer-events: none;
 }
 .toast {
-  background: #2c2d36; color: #fff;
-  border: 1px solid var(--surface-3);
+  background: var(--surface-3); color: var(--text);
+  border: 1px solid var(--border);
   padding: 12px 18px; border-radius: 999px;
   font-size: 0.9rem; font-weight: 700;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  animation: fade 0.2s ease;
   max-width: 90%;
 }
+/* Entrata "a molla" con @starting-style (fallback: appare secco su browser vecchi). */
+@media (prefers-reduced-motion: no-preference) {
+  .toast { transition: opacity 0.25s ease, transform 0.32s var(--spring); }
+}
+@starting-style { .toast { opacity: 0; transform: translateY(14px) scale(0.96); } }
 .toast--error { background: #3a1f24; border-color: rgba(255, 94, 108, 0.4); color: #ffb3bb; }
 .toast--success { background: #14302a; border-color: rgba(54, 209, 183, 0.4); color: #7fe6cf; }
 

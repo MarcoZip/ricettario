@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.98",
+    d: "2026-06-24",
+    items: [
+      "Novità: se installi l'app in Home, ora compare un pallino con il numero sull'icona quando hai alimenti in dispensa o piatti nel congelatore in scadenza (o già scaduti) — un colpo d'occhio senza aprire l'app.",
+      "Ritocco: gli avvisi (toast) entrano con un morbido rimbalzo e seguono il tema caldo."
+    ]
+  },
+  {
     v: "7.97",
     d: "2026-06-24",
     minor: true,

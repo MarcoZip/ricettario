@@ -1589,6 +1589,20 @@ export function render() {
   }
   if (pendingSharedRecipe) consumeSharedRecipe();
   moveNavBlob(); // riposiziona la goccia sotto la voce attiva
+  updateAppBadge(); // pallino sull'icona app: alimenti/piatti in scadenza
+}
+
+// Badge numerico sull'icona dell'app (PWA installata): somma di alimenti in
+// dispensa e piatti nel congelatore che scadono a breve o sono già scaduti.
+function updateAppBadge() {
+  if (!("setAppBadge" in navigator)) return;
+  try {
+    let n = 0;
+    (store.getFreezer() || []).forEach((it) => { const d = fzDaysLeft(it.bestBefore); if (d != null && d <= 3) n++; });
+    try { n += (store.getExpiringPantry(2) || []).length; } catch (e) {}
+    if (n > 0) navigator.setAppBadge(n).catch(() => {});
+    else navigator.clearAppBadge().catch(() => {});
+  } catch (e) { /* non supportato o permesso mancante */ }
 }
 
 // ---------------- Schermata: Strumenti ----------------
