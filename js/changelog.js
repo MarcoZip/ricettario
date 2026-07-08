@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "8.02",
+    d: "2026-06-24",
+    items: [
+      "Novità: \"Svuota il frigo\" in Dispensa — scegli gli alimenti da consumare (quelli in scadenza sono già spuntati) e l'app ti trova le tue ricette che li usano, oppure te ne inventa una con l'AI. Anti-spreco mirato."
+    ]
+  },
+  {
     v: "8.01",
     d: "2026-06-24",
     minor: true,

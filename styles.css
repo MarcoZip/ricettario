@@ -1001,6 +1001,11 @@ html.theme-switching::view-transition-new(root) { z-index: 2147483646; }
 .fz-item__n { font-size: 0.8rem; margin-top: 2px; font-style: italic; }
 .fz-item__use { flex-shrink: 0; }
 
+/* Svuota il frigo: righe di selezione alimenti */
+.uiu-row { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid var(--hairline); cursor: pointer; }
+.uiu-row:last-child { border-bottom: none; }
+.uiu-exp { font-size: 0.7rem; font-weight: 800; color: #ff9f43; background: rgba(255, 159, 67, 0.16); padding: 2px 7px; border-radius: 99px; }
+
 /* Riga compatta di scorciatoie in Home (voglia / sfide / muro) */
 .home-quick { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
 .home-quick .btn { flex: 1 1 30%; min-width: 0; padding-left: 6px; padding-right: 6px; }

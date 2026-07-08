@@ -1439,6 +1439,51 @@ function openFreezerList() {
   m.el.querySelectorAll("[data-use]").forEach((b) => b.onclick = async () => { await store.deleteFreezer(b.dataset.use); m.close(); openFreezerList(); });
 }
 
+// "Svuota il frigo" mirato: scegli gli alimenti (in scadenza già spuntati) e
+// trova tra le tue ricette quelle che li usano, o inventane una con l'AI.
+function openUseItUp() {
+  const pantry = store.getPantry() || [];
+  if (!pantry.length) { toast("La dispensa è vuota: aggiungi qualcosa prima", "error"); return; }
+  const expSet = new Set((store.getExpiringPantry(5) || []).map((p) => p.name));
+  const items = pantry.slice().sort((a, b) => (expSet.has(b.name) ? 1 : 0) - (expSet.has(a.name) ? 1 : 0) || (a.name || "").localeCompare(b.name || ""));
+  const rows = items.map((p) => {
+    const exp = expSet.has(p.name);
+    return `<label class="uiu-row"><input type="checkbox" class="mini-check uiu-chk" data-name="${escapeHtml(p.name)}" ${exp ? "checked" : ""}/><span>${escapeHtml(p.name)}${exp ? ` <span class="uiu-exp">in scadenza</span>` : ""}</span></label>`;
+  }).join("");
+  const m = openModal(`
+    <h3 class="modal__title">♻️ Svuota il frigo</h3>
+    <p class="hint" style="margin-top:-6px">Scegli cosa consumare (gli alimenti in scadenza sono già spuntati): ti trovo o invento una ricetta con quelli.</p>
+    <div class="cl-scroll">${rows}</div>
+    <div class="modal__actions" style="flex-direction:column;gap:8px">
+      <button class="btn btn--primary btn--block" data-act="find">${iconHtml("fork-knife")} Trova tra le mie ricette</button>
+      ${isImportConfigured() ? `<button class="btn btn--block" data-act="invent">✨ Inventane una (AI)</button>` : ""}
+    </div>`);
+  const picked = () => [...m.el.querySelectorAll(".uiu-chk:checked")].map((c) => c.dataset.name);
+  m.el.querySelector('[data-act="find"]').onclick = () => {
+    const sel = picked();
+    if (!sel.length) { toast("Seleziona almeno un alimento", "error"); return; }
+    const norm = (s) => (s || "").toLowerCase().trim();
+    const scored = store.getAllRecipes().map((r) => {
+      const names = (r.ingredients || []).map((i) => norm(i.name));
+      const hits = sel.filter((s) => names.some((n) => n && (n.includes(norm(s)) || norm(s).includes(n)))).length;
+      return { r, hits };
+    }).filter((x) => x.hits > 0).sort((a, b) => b.hits - a.hits);
+    if (!scored.length) { toast("Nessuna tua ricetta usa questi — prova a inventarne una!", "error"); return; }
+    m.close();
+    const list = scored.slice(0, 20).map(({ r, hits }) => `<button class="pick-row" data-id="${r.id}"><span class="day-row__icon">${iconHtml("fork-knife")}</span><span class="day-row__name">${escapeHtml(r.title)}<span class="have-badge">${hits}/${sel.length} ingredienti</span></span></button>`).join("");
+    const m2 = openModal(`<h3 class="modal__title">♻️ Ricette con i tuoi avanzi</h3><div class="cl-scroll">${list}</div><div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>`);
+    m2.el.querySelector('[data-act="ok"]').onclick = m2.close;
+    m2.el.querySelectorAll("[data-id]").forEach((b) => b.onclick = () => { m2.close(); openRecipe(b.dataset.id); });
+  };
+  const inv = m.el.querySelector('[data-act="invent"]');
+  if (inv) inv.onclick = () => {
+    const sel = picked();
+    if (!sel.length) { toast("Seleziona almeno un alimento", "error"); return; }
+    m.close();
+    openGenerateRecipe(sel.join(", "), (data) => openRecipeForm({ prefill: { title: data.title, servings: data.servings, time: data.time, ingredients: data.ingredients, steps: data.steps, tags: data.tags || [] } }));
+  };
+}
+
 // Calendario del diario: i giorni in cui hai cucinato, con cosa.
 function openCookCalendar() {
   const map = {};
@@ -5590,6 +5635,7 @@ function renderPantry() {
   wrap.innerHTML = `
     <div class="hint" style="margin-bottom:10px">Quello che metti qui non verrà aggiunto alla lista della spesa. La data di scadenza è facoltativa. Tocca la ⭐ per segnare una <b>scorta di base</b>: quando la elimini (finita) torna subito nella spesa.</div>
     <button class="btn btn--primary btn--block" id="cookSuggest" style="margin-bottom:10px">${iconHtml("fork-knife")} Cosa posso cucinare con questi?</button>
+    <button class="btn btn--block" id="useItUp" style="margin-bottom:10px">♻️ Svuota il frigo (scegli gli avanzi)</button>
     <button class="btn btn--block" id="freezerBtn" style="margin-bottom:10px">🧊 Congelatore${(() => { const n = store.getFreezer().length; return n ? ` · ${n}` : ""; })()}</button>
     ${isImportConfigured() ? `<button class="btn btn--block" id="fridgePhoto" style="margin-bottom:14px">🧊 Fotografa il frigo (l'AI riconosce gli alimenti)</button><input type="file" id="fridgeFile" accept="image/*" capture="environment" hidden />` : ""}
     <div class="pan-add">
@@ -5615,6 +5661,7 @@ function renderPantry() {
   wrap.querySelector("#panAddBtn").addEventListener("click", doAdd);
   addInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdd(); });
   wrap.querySelector("#cookSuggest").addEventListener("click", openCookSuggestions);
+  wrap.querySelector("#useItUp").addEventListener("click", openUseItUp);
   wrap.querySelector("#freezerBtn").addEventListener("click", openFreezerList);
   const fridgePhoto = wrap.querySelector("#fridgePhoto");
   const fridgeFile = wrap.querySelector("#fridgeFile");
