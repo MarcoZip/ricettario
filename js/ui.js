@@ -2281,6 +2281,7 @@ function renderRecipeDetail() {
     </div>` : "";
 
   root.innerHTML = `
+    <div class="read-progress" aria-hidden="true"></div>
     <div class="toolbar">
       <button class="back-btn" id="back">${iconHtml("arrow-left")}</button>
       <div class="toolbar__title" style="flex:1">${r.photo ? "" : escapeHtml(r.title)}</div>

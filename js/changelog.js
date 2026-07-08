@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "7.99",
+    d: "2026-06-24",
+    minor: true,
+    items: [
+      "Rifinitura: i titoli scalano in modo fluido sugli schermi di ogni dimensione, e nel dettaglio di una ricetta compare una sottile barra di avanzamento lettura in cima mentre scorri."
+    ]
+  },
+  {
     v: "7.98",
     d: "2026-06-24",
     items: [
