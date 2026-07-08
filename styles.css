@@ -1020,9 +1020,18 @@ html.theme-switching::view-transition-new(root) { z-index: 2147483646; }
 .pop { max-width: 280px; border: 1px solid var(--surface-3); background: var(--modal-bg); color: var(--text); border-radius: 14px; padding: 12px 14px; font-size: 0.84rem; line-height: 1.4; box-shadow: var(--shadow); margin: auto; }
 .pop:popover-open { animation: fade 0.16s ease; }
 
-/* Riga compatta di scorciatoie in Home (voglia / sfide / muro) */
+/* Bento delle scorciatoie in Home: una tessera grande + tessere piccole. */
+.home-bento { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 14px; }
+.bento-tile { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; min-height: 66px; padding: 12px 14px; border: 1px solid var(--surface-3); border-radius: 18px; background: var(--card-grad); color: var(--text); text-align: left; cursor: pointer; }
+.bento-tile:active { transform: scale(0.97); transition: transform 0.35s var(--spring); }
+.bento-tile__e { font-size: 1.5rem; line-height: 1; }
+.bento-tile__l { font-weight: 800; font-size: 0.92rem; line-height: 1.15; }
+.bento-tile--wide { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 12px; min-height: 60px; background: var(--primary-grad); color: #fff; border: none; box-shadow: inset 0 1px 0 rgba(255,255,255,0.3); }
+.bento-tile--wide .bento-tile__e { font-size: 1.7rem; }
+.bento-tile--wide .bento-tile__l { font-size: 1.05rem; }
+/* Riga compatta legacy (non più usata in Home, mantenuta per sicurezza) */
 .home-quick { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
-.home-quick .btn { flex: 1 1 30%; min-width: 0; padding-left: 6px; padding-right: 6px; }
+.home-quick .btn { flex: 1 1 30%; min-width: 0; }
 
 /* Coerenza riduci-movimento: niente animazioni una-tantum delle barre */
 @media (prefers-reduced-motion: reduce) {

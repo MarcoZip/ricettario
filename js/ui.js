@@ -2027,11 +2027,12 @@ function renderStrumenti() {
       <input type="search" id="homeSearch" placeholder="Cerca una ricetta o un ingrediente…" value="${escapeHtml(homeQuery)}" />
       ${voiceOK ? `<button class="btn mic-btn" id="homeMic" title="Cerca a voce" aria-label="Cerca a voce">🎤</button>` : ""}
     </div>
-    ${total ? `<button class="btn btn--block" id="surpriseBtn" style="margin:4px 0 8px">${iconHtml("shuffle")} Cosa cucino stasera?</button>` : ""}
-    ${total ? `<div class="home-quick">
-      <button class="btn btn--ghost" id="moodBtn">😋 Che voglia hai?</button>
-      <button class="btn btn--ghost" id="chBtn">🎯 Sfide${chWeek ? ` · <b>${chDone}/3</b>` : ""}</button>
-      ${photoCount >= 4 ? `<button class="btn btn--ghost" id="wallBtn">🖼️ Muro</button>` : ""}
+    ${total ? `<div class="home-bento">
+      <button class="bento-tile bento-tile--wide" id="surpriseBtn"><span class="bento-tile__e">🍽️</span><span class="bento-tile__l">Cosa cucino stasera?</span></button>
+      <button class="bento-tile" id="moodBtn"><span class="bento-tile__e">😋</span><span class="bento-tile__l">Che voglia hai?</span></button>
+      <button class="bento-tile" id="chBtn"><span class="bento-tile__e">🎯</span><span class="bento-tile__l">Sfide${chWeek ? ` ${chDone}/3` : ""}</span></button>
+      <button class="bento-tile" id="recoTile"><span class="bento-tile__e">✨</span><span class="bento-tile__l">Consigliati</span></button>
+      ${photoCount >= 4 ? `<button class="bento-tile" id="wallBtn"><span class="bento-tile__e">🖼️</span><span class="bento-tile__l">Muro</span></button>` : ""}
     </div>` : ""}
     <div class="home-tags">${chips}</div>
     <div id="homeBody"></div>
@@ -2065,6 +2066,8 @@ function renderStrumenti() {
   if (wallBtn) wallBtn.addEventListener("click", () => openPhotoWall());
   const chBtn = root.querySelector("#chBtn");
   if (chBtn) chBtn.addEventListener("click", () => openWeeklyChallenges());
+  const recoTile = root.querySelector("#recoTile");
+  if (recoTile) recoTile.addEventListener("click", () => { homeFilter = "reco"; homeQuery = ""; renderStrumenti(); });
   initGyroCard(); // carta del giorno reattiva al giroscopio (solo su dispositivi che lo supportano)
   const surprise = root.querySelector("#surpriseBtn");
   if (surprise) surprise.addEventListener("click", () => {

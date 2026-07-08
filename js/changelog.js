@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "8.06",
+    d: "2026-06-24",
+    items: [
+      "Nuovo look: in Home le scorciatoie sono ora \"tessere\" in stile bento — una grande \"Cosa cucino stasera?\" e le piccole Voglia, Sfide, Consigliati e Muro. Più ariose e a colpo d'occhio."
+    ]
+  },
+  {
     v: "8.05",
     d: "2026-06-24",
     items: [
