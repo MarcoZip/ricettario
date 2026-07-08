@@ -181,14 +181,42 @@ function cleanReceiptItems(items) {
   const seen = new Set();
   for (const raw of items) {
     let s = String(raw || "").toLowerCase().replace(/[^0-9a-zà-ù\s'-]/g, " ").replace(/\s{2,}/g, " ").trim();
-    // Toglie le parole-spazzatura anche dentro voci multi-parola (es. "insalata busta" -> "insalata").
-    s = s.split(" ").filter((w) => w && !RECEIPT_JUNK.has(w)).join(" ").trim();
+    // Toglie parole-spazzatura e numeri isolati anche dentro voci multi-parola
+    // (es. "insalata busta" -> "insalata", "pomodori 0 650" -> "pomodori").
+    s = s.split(" ").filter((w) => w && !RECEIPT_JUNK.has(w) && !/^\d+$/.test(w)).join(" ").trim();
     if (!s || s.length < 2) continue;
     if (seen.has(s)) continue;
     seen.add(s);
     out.push(s);
   }
   return out;
+}
+
+// Righe di intestazione/piè di pagina e diciture da scartare in uno scontrino.
+const RECEIPT_SKIP = /supermerc|iperm|conad|esselunga|coop\b|lidl|eurospin|carrefour|todis|penny|despar|sigma|famila|\bpam\b|\bmd\b|crai|in's|tigros|bennet|scontrino|documento\b|comm\.|totale|subtot|sub[- ]?tot|\biva\b|imponibile|imposta|contant|carta\b|banco|maestro|\bvisa\b|resto\b|importo|pagat|pagament|\bcassa\b|cass\.|operator|addett|art\.|articoli|pezzi|\bsconto\b|risparm|\bpunti\b|fedelt|fidaty|codice|cod\.|p\.?\s?iva|partita iva|\bc\.?f\b|\bvia\b|viale|corso|\bc\.so|piazza|p\.zza|\btel\b|grazie|arrivederci|www\.|reg\.\s?rec|chiusura|apertura|scontr/i;
+
+// Estrae i nomi degli alimenti dal TESTO di uno scontrino letto dall'OCR sul
+// telefono. Tutto client-side: nessuna AI, quindi nessuna invenzione.
+export function parseReceiptText(text) {
+  const lines = String(text || "").split(/\r?\n/);
+  const items = [];
+  for (let line of lines) {
+    line = line.trim();
+    if (line.length < 2 || RECEIPT_SKIP.test(line)) continue;
+    const letters = (line.match(/[a-zà-ù]/gi) || []).length;
+    const digits = (line.match(/\d/g) || []).length;
+    if (letters < 2 || digits > letters) continue; // righe di soli numeri/date
+    let name = line
+      .replace(/[.,]?\s*€?\s*\d+[.,]\d{2}\s*[A-Z]?\s*$/, "")        // prezzo finale "1,29" o "1,29 A"
+      .replace(/\b\d+\s*[xX]\s*\d+[.,]?\d*\b/g, "")                  // "1 x 2,49"
+      .replace(/\b\d+[.,]?\d*\s*(kg|g|gr|lt|l|ml|pz|cf|conf)\b/gi, "") // "0,500 kg"
+      .replace(/^\s*\d{3,}\s*/, "")                                  // codice iniziale lungo
+      .replace(/[*#%@|]/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+    if (name.length >= 2) items.push(name);
+  }
+  return cleanReceiptItems(items).slice(0, 40);
 }
 
 // Pianificatore settimanale AI: dai titoli → 7 giorni { pranzo?, cena }.

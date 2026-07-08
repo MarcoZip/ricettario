@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "8.09",
+    d: "2026-06-24",
+    items: [
+      "Migliorato: \"Scansiona lo scontrino\" ora legge il testo direttamente sul telefono (OCR), invece di affidarsi all'AI di visione: più affidabile (legge quello che c'è scritto, senza inventare) e più privato (la foto non lascia il telefono). La prima volta scarica il riconoscitore (serve internet un momento)."
+    ]
+  },
+  {
     v: "8.08",
     d: "2026-06-24",
     minor: true,

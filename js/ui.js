@@ -7,7 +7,7 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchBlogGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo, robotProgram, fridgeIngredients, receiptItems, planWeekAI, convertRecipe, appHelp, structureRecipeText, dishNameFromPhoto } from "./import-recipe.js";
+import { importFromUrl, searchGz, searchBlogGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo, robotProgram, fridgeIngredients, receiptItems, parseReceiptText, planWeekAI, convertRecipe, appHelp, structureRecipeText, dishNameFromPhoto } from "./import-recipe.js";
 import { HELP_TOPICS, findHelpTopics } from "./app-help.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage, shareMenuImage } from "./share-image.js";
@@ -3330,14 +3330,12 @@ async function openFridgePhoto(file) {
   catch (e) { if (!body.isConnected) return; body.innerHTML = `<div class="hint" style="color:var(--danger)">${escapeHtml(e.message || "Non riuscito.")}</div>`; }
 }
 
-// "Scansiona lo scontrino": foto → alimenti comprati → in dispensa (con scadenza
-// facoltativa). Richiede la rotta /receipt sul worker.
+// "Scansiona lo scontrino": foto → OCR sul telefono (Tesseract) → alimenti in
+// dispensa. Tutto locale: nessuna AI, quindi legge ciò che c'è, senza inventare.
 async function openReceiptScan(file) {
-  let dataUrl;
-  try { dataUrl = await fileToDataUrl(file, 1000, 0.7); } catch (e) { toast("Foto non valida", "error"); return; }
   const m = openModal(`
     <h3 class="modal__title">🧾 Scontrino → Dispensa</h3>
-    <div id="rcBody"><div style="text-align:center;padding:8px 0"><div class="ai-load"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div><div class="sk sk--line"></div></div><div class="hint">Leggo la spesa…</div></div></div>
+    <div id="rcBody"><div style="text-align:center;padding:10px 0"><div class="ai-load"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div><div class="sk sk--line"></div></div><div class="hint rc-prog">Leggo lo scontrino sul telefono…</div></div></div>
     <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
   `);
   m.el.querySelector('[data-act="ok"]').onclick = m.close;
@@ -3358,8 +3356,17 @@ async function openReceiptScan(file) {
       if (currentRoute === "spesa") renderShopping();
     };
   };
-  try { items = await receiptItems(dataUrl); if (!body.isConnected) return; draw(); }
-  catch (e) { if (!body.isConnected) return; body.innerHTML = `<div class="hint" style="color:var(--danger)">${escapeHtml(e.message || "Non riuscito.")}</div>`; }
+  try {
+    const { ocrImage } = await import("./ocr.js");
+    const text = await ocrImage(file, (p) => { const el = body.querySelector(".rc-prog"); if (el) el.textContent = `Leggo lo scontrino… ${Math.round(p * 100)}%`; });
+    if (!body.isConnected) return;
+    items = parseReceiptText(text);
+    if (!items.length) { body.innerHTML = `<div class="hint">Non ho letto la spesa. Prova con una foto più nitida, dritta e ben illuminata (inquadra solo lo scontrino).</div>`; return; }
+    draw();
+  } catch (e) {
+    if (!body.isConnected) return;
+    body.innerHTML = `<div class="hint" style="color:var(--danger)">${escapeHtml(e.message || "Riconoscimento non riuscito.")}</div>`;
+  }
 }
 
 // Pianificatore settimanale AI: propone le cene della settimana scegliendo tra le
