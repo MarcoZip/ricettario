@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.05",
+    d: "2026-06-24",
+    items: [
+      "Novità: nel Piano (vista Settimana) c'è \"Coordina i piatti\" — aggiungi 2-3 ricette e l'app calcola quando iniziare ognuna per servirle tutte in orario.",
+      "Ritocco: la spiegazione del badge \"Impatto ambientale\" ora è una finestrella al tocco della ⓘ (badge più pulito)."
+    ]
+  },
+  {
     v: "8.04",
     d: "2026-06-24",
     items: [

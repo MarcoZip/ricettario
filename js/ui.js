@@ -2398,7 +2398,7 @@ function renderRecipeDetail() {
 
     ${ingredients.length ? `<div class="section-card" id="nutriCard">${nutritionCardHtml(r, base, detailServings)}</div>` : ""}
 
-    ${(() => { const im = estimateImpact(ingredients); return im ? `<div class="impact impact--${im.level.toLowerCase()}"><span class="impact__e">${im.emoji}</span><div class="impact__b"><div class="impact__t">Impatto ambientale: ${im.level}</div><div class="impact__d">Stima indicativa dagli ingredienti.${im.tip ? " " + escapeHtml(im.tip) : ""}</div></div></div>` : ""; })()}
+    ${(() => { const im = estimateImpact(ingredients); return im ? `<div class="impact impact--${im.level.toLowerCase()}"><span class="impact__e">${im.emoji}</span><div class="impact__b"><div class="impact__t">Impatto ambientale: ${im.level} <button class="impact__i" popovertarget="impactInfo" aria-label="Come si calcola">ⓘ</button></div>${im.tip ? `<div class="impact__d">${escapeHtml(im.tip)}</div>` : ""}</div><div id="impactInfo" popover class="pop">Stima indicativa dai principali ingredienti (dati aggregati Poore &amp; Nemecek, 2018). Serve solo a dare un'idea: non è un valore preciso.</div></div>` : ""; })()}
 
     ${costCard}
     ${subsCard}
@@ -6020,6 +6020,7 @@ function renderPlanWeek() {
       <button class="btn btn--ghost" id="fillWeek">${iconHtml("sparkle")} Riempi le cene</button>
       <button class="btn btn--ghost" id="weekShop">${iconHtml("shopping-cart-simple")} Spesa settimana</button>
       <button class="btn btn--ghost" id="prepAhead">🧠 Prepara in anticipo</button>
+      <button class="btn btn--ghost" id="coordDishes">🕐 Coordina i piatti</button>
       <button class="btn btn--ghost" id="weekShare">${iconHtml("image")} Condividi il menù</button>
     </div>
   `;
@@ -6031,6 +6032,7 @@ function renderPlanWeek() {
   const wnBox = root.querySelector("#weekNutriBox");
   if (wnBox) wnBox.addEventListener("click", () => openWeekNutrition(days));
   root.querySelector("#prepAhead").addEventListener("click", () => openPrepAheadPlan());
+  root.querySelector("#coordDishes").addEventListener("click", () => openCookTimeline([]));
   root.querySelectorAll(".week-day__h").forEach((b) => b.addEventListener("click", () => openDaySheet(b.dataset.date)));
   root.querySelectorAll(".week-meal").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); if (b.dataset.recipe) openRecipe(b.dataset.recipe); }));
   wireUpcomingEvents();

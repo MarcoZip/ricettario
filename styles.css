@@ -1014,6 +1014,11 @@ html.theme-switching::view-transition-new(root) { z-index: 2147483646; }
 .impact__e { font-size: 1.5rem; flex-shrink: 0; }
 .impact__t { font-weight: 800; }
 .impact__d { color: var(--text-soft); font-size: 0.82rem; margin-top: 1px; }
+.impact__i { border: none; background: none; color: var(--text-soft); font-size: 0.85rem; cursor: pointer; padding: 0 2px; }
+
+/* Popover nativi (Popover API): info al tocco, top-layer, chiusura con Esc/fuori. */
+.pop { max-width: 280px; border: 1px solid var(--surface-3); background: var(--modal-bg); color: var(--text); border-radius: 14px; padding: 12px 14px; font-size: 0.84rem; line-height: 1.4; box-shadow: var(--shadow); margin: auto; }
+.pop:popover-open { animation: fade 0.16s ease; }
 
 /* Riga compatta di scorciatoie in Home (voglia / sfide / muro) */
 .home-quick { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
