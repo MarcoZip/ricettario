@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.13",
+    d: "2026-06-24",
+    minor: true,
+    items: [
+      "Ritocco: le gallerie orizzontali (es. \"Ti potrebbe piacere\" in una ricetta) ora hanno i puntini indicatori e lo scorrimento a scatti, come un carosello."
+    ]
+  },
+  {
     v: "8.12",
     d: "2026-06-24",
     items: [
