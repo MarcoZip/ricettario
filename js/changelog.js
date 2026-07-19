@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.11",
+    d: "2026-06-24",
+    minor: true,
+    items: [
+      "Ritocco grafico: una grana sottilissima \"da ricettario\" dà calore e materia allo sfondo. Impercettibile, si spegne con \"Risparmio batteria\"."
+    ]
+  },
+  {
     v: "8.10",
     d: "2026-06-24",
     items: [
