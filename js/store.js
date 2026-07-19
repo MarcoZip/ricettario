@@ -3,6 +3,7 @@
 
 import { createLocalAdapter } from "./store-local.js";
 import { combine, categorize } from "./ingredients.js";
+import { logPurchase } from "./restock.js";
 
 let adapter = null;
 let state = { tools: [], recipes: [], shopping: [], plan: [], pantry: [], menus: [], events: [], freezer: [] };
@@ -479,6 +480,7 @@ export async function addPantryItem(name, expiry = null) {
     return;
   }
   await adapter.addPantry({ id: newId(), name: clean, expiry: expiry || null, createdAt: now() });
+  try { logPurchase(clean); } catch (e) { /* restock è best-effort */ }
 }
 export async function setPantryExpiry(id, expiry) {
   await adapter.updatePantry(id, { expiry: expiry || null });

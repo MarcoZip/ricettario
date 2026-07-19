@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "8.15",
+    d: "2026-06-24",
+    items: [
+      "Novità: \"Presto da ricomprare\" — l'app inizia a imparare ogni quanto ricompri gli alimenti e, col tempo, in Dispensa ti segnala quelli che probabilmente stanno per finire (con un tocco li aggiungi alla spesa). Impara da sola con l'uso: all'inizio è vuoto, si riempie mano a mano. Tutto sul telefono."
+    ]
+  },
+  {
     v: "8.14",
     d: "2026-06-24",
     minor: true,

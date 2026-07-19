@@ -15,6 +15,7 @@ import { findSubstitutions } from "./substitutions.js";
 import { GUEST_ALLERGENS, GUEST_DIETS, checkRecipeForGuests, guestsSummary, CUSTOM_CATS, getCustomTerms, addCustomTerm, removeCustomTerm } from "./diets.js";
 import { estimateCost } from "./cost.js";
 import { estimateImpact } from "./co2.js";
+import { restockDue, forgetRestock } from "./restock.js";
 import { seasonalProduce, recipeSeasonalMatches, monthName, currentMonth } from "./seasonal.js";
 import { convertMeasures } from "./measures.js";
 import { getNickname, setNickname, getCover, setCover } from "./profile.js";
@@ -5755,6 +5756,20 @@ function renderPantry() {
     ? pantry.map(pantryRow).join("")
     : `<div class="empty">${emptyArt("jar")}<div style="margin-top:6px">Dispensa vuota.<br>Aggiungi ciò che hai già in casa: non verrà inserito nella spesa.</div></div>`;
 
+  // Restock predittivo: alimenti che di solito ricompri e che ora potrebbero mancare.
+  const restockList = restockDue(pantry.map((p) => p.name));
+  const restockHtml = restockList.length
+    ? `<div class="restock-box">
+        <div class="restock-box__t">🔁 Presto da ricomprare</div>
+        ${restockList.map((x) => `<div class="restock-row">
+          <span class="restock-row__n">${escapeHtml(x.name)}</span>
+          <span class="restock-row__m">di solito ogni ~${x.avg} gg · preso ${x.sinceLast} gg fa</span>
+          <button class="restock-row__add" data-radd="${escapeHtml(x.name)}" title="Aggiungi alla spesa">${iconHtml("plus")}</button>
+          <button class="restock-row__x" data-rforget="${escapeHtml(x.name)}" title="Ignora">✕</button>
+        </div>`).join("")}
+      </div>`
+    : "";
+
   wrap.innerHTML = `
     <div class="hint" style="margin-bottom:10px">Quello che metti qui non verrà aggiunto alla lista della spesa. La data di scadenza è facoltativa. Tocca la ⭐ per segnare una <b>scorta di base</b>: quando la elimini (finita) torna subito nella spesa.</div>
     <button class="btn btn--primary btn--block" id="cookSuggest" style="margin-bottom:10px">${iconHtml("fork-knife")} Cosa posso cucinare con questi?</button>
@@ -5762,6 +5777,7 @@ function renderPantry() {
     <button class="btn btn--block" id="freezerBtn" style="margin-bottom:10px">🧊 Congelatore${(() => { const n = store.getFreezer().length; return n ? ` · ${n}` : ""; })()}</button>
     ${isImportConfigured() ? `<button class="btn btn--block" id="fridgePhoto" style="margin-bottom:10px">🧊 Fotografa il frigo (l'AI riconosce gli alimenti)</button><input type="file" id="fridgeFile" accept="image/*" capture="environment" hidden />` : ""}
     ${isImportConfigured() ? `<button class="btn btn--block" id="receiptScan" style="margin-bottom:14px">🧾 Scansiona lo scontrino</button><input type="file" id="receiptFile" accept="image/*" capture="environment" hidden />` : ""}
+    ${restockHtml}
     <div class="pan-add">
       <input type="text" id="panAdd" placeholder="Aggiungi un alimento..." />
       <div class="pan-add__row">
@@ -5795,6 +5811,13 @@ function renderPantry() {
   const receiptFile = wrap.querySelector("#receiptFile");
   if (receiptScan) receiptScan.addEventListener("click", () => receiptFile.click());
   if (receiptFile) receiptFile.addEventListener("change", () => { const f = receiptFile.files[0]; receiptFile.value = ""; if (f) openReceiptScan(f); });
+  wrap.querySelectorAll("[data-radd]").forEach((b) => b.addEventListener("click", async () => {
+    const name = b.dataset.radd;
+    await store.addShoppingItems([{ name, category: categorize(name), from: "Da ricomprare" }]);
+    toast(`${name} aggiunto alla spesa`, "success");
+    b.closest(".restock-row").style.opacity = "0.4";
+  }));
+  wrap.querySelectorAll("[data-rforget]").forEach((b) => b.addEventListener("click", () => { forgetRestock(b.dataset.rforget); renderShopping(); }));
   const scanBtn = wrap.querySelector("#panScan");
   if (scanBtn) scanBtn.addEventListener("click", openBarcodeScanner);
   wrap.querySelectorAll(".shop-row").forEach((rowEl) => {

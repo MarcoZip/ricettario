@@ -1021,6 +1021,17 @@ html.theme-switching::view-transition-new(root) { z-index: 2147483646; }
 .uiu-row:last-child { border-bottom: none; }
 .uiu-exp { font-size: 0.7rem; font-weight: 800; color: #ff9f43; background: rgba(255, 159, 67, 0.16); padding: 2px 7px; border-radius: 99px; }
 
+/* Restock predittivo: alimenti che di solito ricompri e che ora mancano */
+.restock-box { background: rgba(var(--primary-rgb, 255,140,60), 0.10); border: 1px solid var(--surface-3); border-radius: 14px; padding: 10px 12px; margin-bottom: 12px; }
+.restock-box__t { font-weight: 800; margin-bottom: 6px; }
+.restock-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--hairline); }
+.restock-row:first-of-type { border-top: none; }
+.restock-row__n { font-weight: 700; text-transform: capitalize; }
+.restock-row__m { flex: 1; color: var(--text-soft); font-size: 0.76rem; }
+.restock-row__add, .restock-row__x { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--surface-3); background: var(--surface-2); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.restock-row__add { background: var(--primary); color: #fff; border-color: var(--primary); }
+.restock-row__x { color: var(--text-soft); }
+
 /* Badge impatto ambientale (CO2e) */
 .impact { display: flex; align-items: center; gap: 12px; border-radius: var(--radius); padding: 12px 16px; margin-bottom: 14px; border: 1px solid var(--surface-3); }
 .impact--basso { background: rgba(47, 158, 111, 0.14); border-color: rgba(47, 158, 111, 0.3); }
