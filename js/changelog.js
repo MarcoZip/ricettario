@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.14",
+    d: "2026-06-24",
+    minor: true,
+    items: [
+      "Ritocco: le ricette senza foto ora hanno una bella copertina colorata (sfumatura calda, diversa per ogni ricetta) con l'icona dello strumento, invece di restare senza intestazione."
+    ]
+  },
+  {
     v: "8.13",
     d: "2026-06-24",
     minor: true,

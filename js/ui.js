@@ -2381,7 +2381,9 @@ function renderRecipeDetail() {
       <div class="toolbar__title" style="flex:1">${r.photo ? "" : escapeHtml(r.title)}</div>
       <button class="back-btn fav-btn ${r.favorite ? "is-fav" : ""}" id="favBtn" title="Preferito">${iconHtml("heart")}</button>
     </div>
-    ${r.photo ? `<div class="recipe-hero"><img src="${escapeHtml(proxiedImg(r.photo))}" alt="" referrerpolicy="no-referrer" style="view-transition-name:vt-hero" /><div class="recipe-hero__grad"></div>${STEAM_HTML}<h2 class="recipe-hero__title">${escapeHtml(r.title)}</h2></div>` : ""}
+    ${r.photo
+      ? `<div class="recipe-hero"><img src="${escapeHtml(proxiedImg(r.photo))}" alt="" referrerpolicy="no-referrer" style="view-transition-name:vt-hero" /><div class="recipe-hero__grad"></div>${STEAM_HTML}<h2 class="recipe-hero__title">${escapeHtml(r.title)}</h2></div>`
+      : `<div class="recipe-hero recipe-hero--mesh" style="--mh:${(() => { let h = 0; const s = r.title || ""; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 1000; return 12 + (h % 66); })()}"><span class="recipe-hero__meshic">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span><div class="recipe-hero__grad"></div><h2 class="recipe-hero__title">${escapeHtml(r.title)}</h2></div>`}
     <div class="detail-top">
       ${tool ? `<span class="recipe-tool-chip" style="margin:0">${iconHtml(tool.icon)} ${escapeHtml(tool.name)}</span>` : "<span></span>"}
       ${ratingRow}

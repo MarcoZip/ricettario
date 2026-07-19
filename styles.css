@@ -1485,6 +1485,21 @@ p, li, .setting-row__desc, .hint, .recipe-item__notes, .steps-list li { text-wra
 .recipe-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .recipe-hero__grad { position: absolute; inset: 0; background: linear-gradient(to top, rgba(var(--hero-tint),0.82) 0%, rgba(var(--hero-tint),0.32) 42%, rgba(0,0,0,0.10) 70%, transparent 100%); transition: background 0.4s ease; }
 .recipe-hero__title { position: absolute; left: 16px; right: 16px; bottom: 12px; margin: 0; color: #fff; font-size: 1.5rem; font-weight: 800; line-height: 1.15; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+/* Mesh gradient caldo come copertina per le ricette SENZA foto (tinta variata
+   per ricetta, sempre nella banda calda). Fallback senza oklch: gradiente accento. */
+.recipe-hero--mesh {
+  background:
+    radial-gradient(60% 70% at 18% 22%, oklch(0.62 0.15 var(--mh, 40) / 0.9), transparent 60%),
+    radial-gradient(55% 65% at 85% 30%, oklch(0.55 0.16 calc(var(--mh, 40) + 22) / 0.85), transparent 62%),
+    radial-gradient(70% 80% at 60% 100%, oklch(0.45 0.14 calc(var(--mh, 40) - 16) / 0.9), transparent 65%),
+    oklch(0.4 0.1 var(--mh, 40));
+}
+@supports not (color: oklch(0.5 0.1 40)) {
+  .recipe-hero--mesh { background: var(--primary-grad); }
+}
+.recipe-hero__meshic { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -60%); font-size: 3.4rem; color: rgba(255, 255, 255, 0.32); }
+.recipe-hero__meshic svg { width: 1em; height: 1em; }
+
 /* "Impiattamento": la foto si serve a cerchio e il titolo si scrive */
 @media (prefers-reduced-motion: no-preference) {
   .recipe-hero.is-plating img { animation: platingReveal 0.75s cubic-bezier(0.22,0.61,0.36,1) both; }
