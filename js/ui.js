@@ -3768,6 +3768,39 @@ function fmtDur(mins) {
   const h = Math.floor(mins / 60), m = mins % 60;
   return h + "h" + (m ? " " + m : "");
 }
+// Dà un nome al timer in base all'azione vicina alla durata nel passo
+// (es. "cuoci 10 min" -> "Cottura", "lascia riposare 5 min" -> "Riposo").
+const TIMER_VERBS = [
+  [/inforn|in forno/, "Forno"],
+  [/frigg|frittura/, "Frittura"],
+  [/bolli|bollore|lessa|sbollent/, "Bollitura"],
+  [/rosol|soffrigg|soffri/, "Rosolatura"],
+  [/lievit/, "Lievitazione"],
+  [/marin/, "Marinatura"],
+  [/ammoll|in acqua|a bagno/, "Ammollo"],
+  [/raffredd|in frigo|frigorifero|riposa in frigo/, "In frigo"],
+  [/ripos|lascia\s+riposare|far\s+riposare/, "Riposo"],
+  [/tosta/, "Tostatura"],
+  [/gratin/, "Gratinatura"],
+  [/scongel/, "Scongelamento"],
+  [/manteca|mescol|gira/, "Mescola"],
+  [/cuoc|cuoci|cottura|cuocere|cuocete/, "Cottura"]
+];
+function timerLabelFor(text, min) {
+  const low = String(text || "").toLowerCase();
+  const patts = [new RegExp("\\b" + min + "\\s*minut"), new RegExp("\\b" + min + "\\s*min\\b")];
+  if (min % 60 === 0) patts.push(new RegExp("\\b" + (min / 60) + "\\s*or[ae]"));
+  if (min === 30) patts.push(/mezz['\s]?or/);
+  if (min === 60) patts.push(/un['\s]?or/);
+  let idx = -1;
+  for (const p of patts) { const m = low.match(p); if (m) { idx = m.index; break; } }
+  if (idx < 0) return null;
+  const before = low.slice(Math.max(0, idx - 42), idx);
+  // Sceglie il verbo più VICINO alla durata (posizione più avanzata nel testo).
+  let best = null, bestPos = -1;
+  for (const [rx, lab] of TIMER_VERBS) { const mm = before.match(rx); if (mm && mm.index > bestPos) { bestPos = mm.index; best = lab; } }
+  return best;
+}
 // Pulisce il nome di un ingrediente da numeri e unità (alcune fonti scrivono
 // "Merluzzo 500 g", quindi il nome grezzo contiene la quantità).
 const ING_STOP = new Set(["di", "da", "in", "il", "la", "lo", "le", "gli", "un", "una", "uno", "con", "per", "del", "della", "dello", "delle", "degli", "dei", "al", "allo", "alla", "alle", "sul", "sulla", "fresco", "fresca", "fresche", "freschi", "medie", "medio", "media", "medi", "grande", "grandi", "piccolo", "piccola", "tipo", "circa", "fino", "fine", "extra", "vergine", "qb", "quanto", "basta"]);
@@ -4132,7 +4165,7 @@ function openCookingMode(recipe) {
       <div class="cook__track"><div class="cook__fill" style="width:${((idx + 1) / steps.length) * 100}%"></div></div>
       <div class="cook__body"><div class="cook__step">${buildStepHtml(steps[idx], recipe.ingredients)}</div></div>
       <div class="cook__timers" id="ckTimers"></div>
-      ${(() => { const ds = parseDurations(steps[idx]); return ds.length ? `<div class="cook__quick">${ds.map((d) => `<button class="chip" data-qmin="${d}">${iconHtml("timer")} ${fmtDur(d)}</button>`).join("")}</div>` : ""; })()}
+      ${(() => { const ds = parseDurations(steps[idx]); return ds.length ? `<div class="cook__quick">${ds.map((d) => { const lab = timerLabelFor(steps[idx], d); return `<button class="chip" data-qmin="${d}" data-tlabel="${lab ? escapeHtml(lab) : ""}">${iconHtml("timer")} ${lab ? escapeHtml(lab) + " · " : ""}${fmtDur(d)}</button>`; }).join("")}</div>` : ""; })()}
       <div class="cook__addtimer">
         <input type="number" id="tMin" min="1" inputmode="numeric" value="5" />
         <input type="text" id="tName" placeholder="Nome (es. pasta)" />
@@ -4152,7 +4185,7 @@ function openCookingMode(recipe) {
     el.querySelector("#ckPrev").onclick = goPrev;
     el.querySelector("#ckNext").onclick = goNext;
     el.querySelector("#tAdd").onclick = () => { addTimer(el.querySelector("#tMin").value, el.querySelector("#tName").value); el.querySelector("#tName").value = ""; };
-    el.querySelectorAll("[data-qmin]").forEach((b) => b.onclick = () => addTimer(parseInt(b.dataset.qmin, 10), stepTimerLabel(steps[idx], idx + 1)));
+    el.querySelectorAll("[data-qmin]").forEach((b) => b.onclick = () => addTimer(parseInt(b.dataset.qmin, 10), b.dataset.tlabel || stepTimerLabel(steps[idx], idx + 1)));
     // Tocca un ingrediente nel testo del passo → mostra la quantità in un fumetto.
     el.querySelectorAll(".cook-ing").forEach((s) => s.addEventListener("click", () => {
       document.querySelectorAll(".cook-ing-pop").forEach((p) => p.remove());

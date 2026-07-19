@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "8.12",
+    d: "2026-06-24",
+    items: [
+      "Migliorato: in Modalità cucina, i timer rapidi di un passo ora hanno un nome automatico in base all'azione (es. \"Cottura · 10 min\", \"Riposo · 5 min\", \"Lievitazione · 1h\") — così con più tempi nello stesso passo capisci al volo quale timer è quale."
+    ]
+  },
+  {
     v: "8.11",
     d: "2026-06-24",
     minor: true,
