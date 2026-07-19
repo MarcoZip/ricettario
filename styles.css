@@ -602,6 +602,8 @@ a { color: var(--primary-2); }
 .bar-chart { display: flex; align-items: flex-end; justify-content: space-between; gap: 6px; padding: 8px 2px 0; height: 110px; }
 .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; }
 .bar-col .bar { width: 100%; max-width: 30px; border-radius: 6px 6px 0 0; background: var(--primary-grad, linear-gradient(180deg, var(--primary-2), var(--primary))); }
+.bar-col .bar--over { background: linear-gradient(180deg, #ff8a8a, var(--danger)); }
+@media (prefers-reduced-motion: no-preference) { .bar-col .bar { transition: height 0.5s cubic-bezier(0.2, 0.7, 0.2, 1); } }
 .bar-lbl { font-size: 0.7rem; color: var(--text-soft); }
 .bar-n { font-size: 0.72rem; font-weight: 800; color: var(--text-soft); }
 .pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 18px 0 4px; }

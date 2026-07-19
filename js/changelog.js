@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.10",
+    d: "2026-06-24",
+    items: [
+      "Novità: dal Piano, toccando un giorno, ora c'è \"Aggiungi al calendario\" — mette i pasti nel calendario del telefono (iPhone e Android) con un promemoria 2 ore prima.",
+      "Novità: la \"Spesa per mese\" ora mostra anche un grafico a barre dell'andamento negli ultimi 6 mesi, con media e barre rosse quando superi il budget."
+    ]
+  },
+  {
     v: "8.09",
     d: "2026-06-24",
     items: [

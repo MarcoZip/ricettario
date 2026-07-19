@@ -4806,6 +4806,19 @@ function setBudget(v) { try { if (v > 0) localStorage.setItem(BUDGET_KEY, String
 function openSpendHistory() {
   const s = getSpend();
   const MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+  const M3 = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
+  // Grafico andamento: ultimi 6 mesi (anche quelli a zero, per continuità).
+  const nowD = new Date();
+  const months6 = [];
+  for (let i = 5; i >= 0; i--) { const d = new Date(nowD.getFullYear(), nowD.getMonth() - i, 1); const ym = d.toISOString().slice(0, 7); months6.push({ label: M3[d.getMonth()], val: s[ym] || 0 }); }
+  const maxV = Math.max(1, ...months6.map((x) => x.val));
+  const budget = getBudget();
+  const chart = months6.some((x) => x.val > 0)
+    ? `<div class="stat-block"><div class="stat-block__t">${iconHtml("basket")} Andamento (ultimi 6 mesi)</div>
+        <div class="bar-chart">${months6.map((x) => `<div class="bar-col"><span class="bar-n">${x.val ? "€" + Math.round(x.val) : ""}</span><div class="bar${budget && x.val > budget ? " bar--over" : ""}" style="height:${Math.round(x.val / maxV * 64) + 3}px"></div><span class="bar-lbl">${x.label}</span></div>`).join("")}</div>
+        ${(() => { const vals = months6.filter((x) => x.val > 0).map((x) => x.val); if (!vals.length) return ""; const avg = vals.reduce((a, b) => a + b, 0) / vals.length; return `<div class="hint" style="margin-top:6px">Media: <b>€ ${avg.toFixed(0)}</b> al mese${budget ? ` · budget € ${budget.toFixed(0)}` : ""}</div>`; })()}
+      </div>`
+    : "";
   const rows = Object.keys(s).sort().reverse().slice(0, 12).map((ym) => {
     const [y, mo] = ym.split("-");
     return `<div class="stat-row"><span>${MESI[+mo - 1]} ${y}</span><b>€ ${(s[ym] || 0).toFixed(2)}</b></div>`;
@@ -4816,6 +4829,7 @@ function openSpendHistory() {
       <input type="number" id="budgetIn" inputmode="decimal" min="0" step="10" placeholder="es. 400" value="${getBudget() || ""}" />
       <div class="hint" style="margin-top:4px">Lascia vuoto per non usare il budget.</div>
     </div>
+    ${chart}
     <div class="cl-scroll">${rows}</div><div class="hint" style="margin-top:8px">Stima indicativa, calcolata quando tocchi "Spesa fatta".</div>
     <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Salva</button></div>`);
   m.el.querySelector('[data-act="ok"]').addEventListener("click", () => {
@@ -6362,6 +6376,33 @@ function openCookTimeline(initial, presetTarget) {
   paintDishes(); paintLine();
 }
 
+// Genera e condivide un file .ics standard (aggiunge pasti/eventi al calendario
+// del telefono). Usa orari "locali" (senza fuso) e un promemoria 2 ore prima.
+function icsEscape(s) { return String(s || "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n"); }
+function icsStamp(d) { const p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}T${p(d.getHours())}${p(d.getMinutes())}00`; }
+function buildICS(events) {
+  const L = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Fornelli//IT", "CALSCALE:GREGORIAN"];
+  events.forEach((e, i) => {
+    const end = new Date(e.start.getTime() + (e.durMin || 60) * 60000);
+    L.push("BEGIN:VEVENT", `UID:fornelli-${e.start.getTime()}-${i}@fornelli.app`, `DTSTAMP:${icsStamp(new Date())}`, `DTSTART:${icsStamp(e.start)}`, `DTEND:${icsStamp(end)}`, `SUMMARY:${icsEscape(e.title)}`);
+    if (e.desc) L.push(`DESCRIPTION:${icsEscape(e.desc)}`);
+    L.push("BEGIN:VALARM", "ACTION:DISPLAY", "TRIGGER:-PT2H", `DESCRIPTION:${icsEscape(e.title)}`, "END:VALARM", "END:VEVENT");
+  });
+  L.push("END:VCALENDAR");
+  return L.join("\r\n");
+}
+async function shareICS(filename, ics) {
+  try {
+    const file = new File([ics], filename, { type: "text/calendar" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: "Aggiungi al calendario" }); return; }
+  } catch (e) { if (e && e.name === "AbortError") return; }
+  const blob = new Blob([ics], { type: "text/calendar" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  toast("Calendario scaricato: aprilo per aggiungerlo", "success");
+}
+
 function openDaySheet(date) {
   const entries = store.getPlanByDate(date);
   let groupsHtml = "";
@@ -6395,7 +6436,20 @@ function openDaySheet(date) {
     </div>
     ${entries.length ? `<button class="btn btn--block" data-act="timeline" style="margin-top:8px">🕐 A che ora inizio? (tutto pronto in orario)</button>` : ""}
     ${entries.length ? `<button class="btn btn--block" data-act="toshop" style="margin-top:8px">${iconHtml("shopping-cart-simple")} Aggiungi ingredienti alla spesa</button>` : ""}
+    ${entries.length ? `<button class="btn btn--block" data-act="ics" style="margin-top:8px">${iconHtml("calendar-dots")} Aggiungi al calendario</button>` : ""}
   `);
+  const icsBtn = m.el.querySelector('[data-act="ics"]');
+  if (icsBtn) icsBtn.addEventListener("click", () => {
+    const [Y, Mo, Da] = date.split("-").map(Number);
+    const SLOT_TIME = { colazione: [8, 0], pranzo: [13, 0], spuntino: [16, 30], cena: [20, 0] };
+    const evs = entries.map((e) => {
+      const r = store.getRecipe(e.recipeId);
+      const [hh, mm] = SLOT_TIME[e.slot] || [12, 0];
+      return { title: `${SLOT_LABEL[e.slot] ? SLOT_LABEL[e.slot] + ": " : ""}${r ? r.title : "Pasto"}`, start: new Date(Y, Mo - 1, Da, hh, mm), durMin: 60, desc: "Pianificato con Fornelli" };
+    });
+    if (!evs.length) { toast("Niente da aggiungere", "error"); return; }
+    shareICS(`pasti-${date}.ics`, buildICS(evs));
+  });
 
   m.el.querySelectorAll(".day-row").forEach((row) => {
     const planId = row.dataset.plan;
