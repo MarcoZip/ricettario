@@ -3450,15 +3450,28 @@ function openConvertRecipe(r) {
 // Riconosce se uno strumento è un apparecchio "da impostare" (forno, microonde,
 // friggitrice ad aria...). Se l'utente ha salvato un modello, vale comunque.
 const APPLIANCE_KINDS = [
-  { rx: /microonde|micro-onde|combinato/i, label: "microonde" },
-  { rx: /friggitrice|air ?fry|airfryer/i, label: "friggitrice ad aria" },
-  { rx: /forno|fornetto|dual cook|pirolit/i, label: "forno" },
-  { rx: /piastra|griglia|barbecue|bbq/i, label: "griglia" },
-  { rx: /vapore|steam/i, label: "forno a vapore" }
+  { rx: /microonde|micro-onde|combinato/i, label: "microonde", family: "microonde" },
+  { rx: /friggitrice|air ?fry|airfryer/i, label: "friggitrice ad aria", family: "forno" },
+  { rx: /induzion|piano cottura|piano a gas|fornell|vetroceramic/i, label: "piano cottura", family: "piano" },
+  { rx: /forno|fornetto|dual cook|pirolit/i, label: "forno", family: "forno" },
+  { rx: /piastra|griglia|barbecue|bbq/i, label: "griglia", family: "piano" },
+  { rx: /vapore|steam/i, label: "forno a vapore", family: "forno" }
 ];
+// Famiglia dell'apparecchio: cambia quali parametri hanno senso (un piano a
+// induzione non ha ripiani né gradi, un microonde ragiona in watt).
+function applianceFamily(tool) {
+  if (!tool) return "forno";
+  const hay = `${tool.name || ""} ${tool.model || ""}`;
+  const hit = APPLIANCE_KINDS.find((k) => k.rx.test(hay));
+  // Apparecchio non riconosciuto: prudenza, niente ripiani o funzioni da forno.
+  return hit ? hit.family : "altro";
+}
+// I robot da cucina hanno già la loro "Modalità robot": qui non li trattiamo.
+const ROBOT_RX = /bimby|thermomix|\btm\s?[56]\b|companion|monsieur cuisine|cooking chef|cookeo|multicooker/i;
 function applianceKind(tool) {
   if (!tool) return null;
   const hay = `${tool.name || ""} ${tool.model || ""}`;
+  if (ROBOT_RX.test(hay)) return null;
   const hit = APPLIANCE_KINDS.find((k) => k.rx.test(hay));
   if (hit) return hit.label;
   return (tool.model || "").trim() ? (tool.name || "apparecchio").toLowerCase() : null;
@@ -3510,6 +3523,16 @@ function ovenBasics(recipe, tool) {
     rule = { rack: kbRack.rack, why: kbRack.note || (kb ? kb.label : "") };
     if (!mode && kbRack.mode) mode = kbRack.mode;
   }
+  // Su piano cottura e microonde ripiano/funzione-forno non hanno senso.
+  const family = applianceFamily(tool);
+  if (family !== "forno") { rule = null; mode = null; }
+  if (family === "microonde") {
+    const w = txt.match(/\b(\d{3,4})\s*w(?:att)?\b/);
+    return { family, watt: w ? parseInt(w[1], 10) : null, time: recipe.time || null, kb, temp: null, mode: null, rack: null, preheat: false, altMode: null, kbTemp: null };
+  }
+  if (family === "piano" || family === "altro") {
+    return { family, time: recipe.time || null, kb, temp: family === "altro" ? temp : null, mode: null, rack: null, preheat: false, altMode: null, kbTemp: null };
+  }
   return {
     temp, mode, preheat, kb, kbTemp: kbRack && kbRack.temp ? kbRack.temp : null,
     time: recipe.time || null,
@@ -3521,6 +3544,7 @@ function ovenBasics(recipe, tool) {
 }
 function ovenBasicsHtml(b) {
   const rows = [];
+  if (b.watt) rows.push(["Potenza", `${b.watt} W`]);
   if (b.mode) rows.push(["Funzione", escapeHtml(b.mode) + (b.altMode ? ` <span class="ovb__alt">(${escapeHtml(b.altMode)})</span>` : "")]);
   if (b.temp) rows.push(["Temperatura", `${b.temp}°C${b.kbTemp ? ` <span class="ovb__alt">(manuale: ${escapeHtml(b.kbTemp)})</span>` : ""}`]);
   else if (b.kbTemp) rows.push(["Temperatura", `${escapeHtml(b.kbTemp)} <span class="ovb__alt">(dal manuale)</span>`]);
@@ -4422,7 +4446,7 @@ function openToolForm(tool = null) {
     <div class="field">
       <label>Marca e modello <span style="font-weight:400;color:var(--text-soft)">(facoltativo)</span></label>
       <input type="text" id="toolModel" placeholder="Es. Samsung Dual Cook NV7B5740TBS" value="${escapeHtml(tool && tool.model ? tool.model : "")}" />
-      <div class="hint" style="margin-top:4px">Si scrive una volta sola: resta salvato e serve per la guida "Come lo imposto?" nelle ricette.</div>
+      <div class="hint" style="margin-top:4px">Si scrive una volta sola: resta salvato e serve per la guida "Come lo imposto?" nelle ricette. <a href="#" id="toolManual">Cerca il manuale</a></div>
     </div>
     <details class="tool-howto">
       <summary>Note su come si imposta (opzionale, migliora molto la guida)</summary>
@@ -4445,6 +4469,14 @@ function openToolForm(tool = null) {
   );
   const nameInput = m.el.querySelector("#toolName");
   setTimeout(() => nameInput.focus(), 50);
+  const manualLink = m.el.querySelector("#toolManual");
+  if (manualLink) manualLink.addEventListener("click", (e) => {
+    e.preventDefault();
+    const mod = (m.el.querySelector("#toolModel").value || "").trim();
+    if (!mod) { toast("Scrivi prima marca e modello", "error"); return; }
+    // Apre la ricerca del manuale: le istruzioni ufficiali le copi da lì nelle note.
+    window.open("https://duckduckgo.com/?q=" + encodeURIComponent(mod + " manuale d'uso pdf"), "_blank", "noopener");
+  });
 
   m.el.querySelector('[data-act="cancel"]').onclick = m.close;
   m.el.querySelector('[data-act="save"]').onclick = async () => {

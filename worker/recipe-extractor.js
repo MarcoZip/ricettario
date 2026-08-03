@@ -921,8 +921,11 @@ async function handleOven(request, env) {
   const sys = [
     `Sei un tecnico esperto di elettrodomestici da cucina e un cuoco. Devi spiegare passo-passo come impostare un ${applianceName}${model ? ` (modello dichiarato: ${model})` : ""} per cuocere una ricetta.`,
     "REGOLA FONDAMENTALE, NON VIOLARLA MAI: NON inventare nomi di tasti, manopole, voci di menu o simboli di questo modello. Se le 'note dell'utente' qui sotto contengono i nomi reali dei comandi, USA QUELLI alla lettera. Se NON li hai, NON descrivere quali tasti premere: indica invece QUALE FUNZIONE cercare (con i nomi generici comuni, es. \"cottura statica (sopra+sotto)\", \"ventilata\", \"grill\") e scrivi che si seleziona dal pannello del forno.",
-    "Concentrati su ciò che sai davvero e che è utile: funzione di cottura giusta per il piatto, temperatura in °C, ripiano/livello consigliato (e conta i ripiani dal basso), se preriscaldare, durata indicativa e a metà cottura cosa controllare.",
-    "Se il piatto e l'apparecchio lo consentono, dai anche l'equivalenza statico/ventilato (ventilato = circa 20°C in meno).",
+    /forno|friggitrice/i.test(applianceName)
+      ? "Concentrati su: funzione di cottura giusta per il piatto, temperatura in °C, ripiano/livello consigliato (conta i ripiani dal basso), se preriscaldare, durata e cosa controllare a metà cottura. Dai anche l'equivalenza statico/ventilato (ventilato = circa 20°C in meno)."
+      : /microonde/i.test(applianceName)
+        ? "Concentrati su: potenza in Watt (o livello di potenza), durata, se coprire il contenitore, se e quando mescolare o girare a metà, e il tempo di riposo finale. NON parlare di ripiani, gradi centigradi o preriscaldamento: in un microonde non esistono. Ricorda i contenitori adatti (no metallo)."
+        : "Si tratta di un piano cottura: concentrati su livello di potenza (scala 1-9 o simile), diametro della pentola adatto, quando alzare o abbassare la fiamma/potenza, coperchio sì o no, e i tempi. NON parlare di ripiani, funzioni da forno o preriscaldamento del forno: non esistono su un piano.",
     "Rispondi SOLO con JSON valido: {\"note\": string, \"steps\": [{\"azione\": string, \"impostazioni\": string}], \"check\": string}. 'note' = una riga di contesto (max 20 parole). 'steps' = 3-7 passi in ordine. 'impostazioni' = i valori concreti (es. \"Statico · 180°C · 2° ripiano dal basso\"). 'check' = come capire che è cotto. Tutto in italiano, niente markdown."
   ].join(" ");
 

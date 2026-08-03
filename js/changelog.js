@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.19",
+    d: "2026-06-24",
+    items: [
+      "\"Come lo imposto?\" ora vale anche per microonde e piano cottura, con i parametri giusti per ciascuno: il microonde ragiona in Watt, durata, coprire e mescolare (niente gradi né ripiani), il piano cottura in livelli di potenza e diametro pentola.",
+      "Nello strumento c'è il tasto \"Cerca il manuale\": trova le istruzioni ufficiali del tuo modello, così puoi incollarne i punti utili nelle note."
+    ]
+  },
+  {
     v: "8.18",
     d: "2026-06-24",
     minor: true,
