@@ -10,7 +10,9 @@ export const APPLIANCE_KB = [
     match: /nv7b5\d{3}|dual\s?cook/i,
     label: "Samsung Dual Cook Flex (serie NV7B5)",
     source: "Manuale ufficiale Samsung in italiano + foto del pannello reale",
-    caveat: "Sul display di questo forno la cottura sopra+sotto si chiama \"Tradizionale\", mentre il manuale la chiama \"Convenzionale\": qualche altro nome potrebbe differire, fidati di quello che leggi sul display.",
+    // Nomi del menu letti direttamente sul display dall'utente: sono la verità,
+    // il manuale usa termini diversi (Convenzionale, Convezione, Grill grande...).
+    caveat: "",
     // Sequenza reale del pannello, mostrata così com'è (non passa dall'AI).
     sequence: "Accendi · RUOTA il Selettore (manopola a destra) per scegliere la modalità e PREMILO per confermare · ruota per la temperatura e premi · imposta la durata col tasto “Tempo di cottura” · parte il preriscaldamento e un segnale avvisa quando puoi infornare.",
     limits: "In cottura singola la temperatura arriva a 250 °C; in doppia cottura ogni zona sta tra 40 e 250 °C e le due zone si limitano a vicenda. Air Fry richiede il divisorio e va da 150 a 250 °C.",
@@ -20,7 +22,7 @@ export const APPLIANCE_KB = [
     racks: [
       { rx: /lasagn|cannellon|pasta al forno|gratin|sformat/i, rack: "livello 3", temp: "190-200°C", note: "tabella Samsung: lasagne al livello 3" },
       { rx: /quiche|torta salata/i, rack: "livello 2", temp: "180-190°C", note: "tabella Samsung" },
-      { rx: /pizza/i, rack: "livello 2", temp: "190-210°C", note: "pizza fatta in casa, tabella Samsung", mode: "Riscaldamento inferiore + Convezione" },
+      { rx: /pizza/i, rack: "livello 2", temp: "190-210°C", note: "pizza fatta in casa, tabella Samsung", mode: "CALORE INFERIORE + VENTILATO" },
       { rx: /crostat|torta marmorizz|soufflé|souffle|crumble|meringh/i, rack: "livello 3", temp: null, note: "tabella Samsung" },
       { rx: /torta|pan di spagna|ciambell|plumcake|cheesecake/i, rack: "livello 2", temp: "160-170°C", note: "tabella Samsung: torte al livello 2" },
       { rx: /biscott|frollin/i, rack: "livello 3 (o 1+3 su due teglie)", temp: "140-165°C", note: "tabella Samsung" },
@@ -32,8 +34,8 @@ export const APPLIANCE_KB = [
     howto: [
       "PANNELLO (verificato dalla foto reale): display al centro con il nome della modalità e la temperatura, tasti touch al centro-destra su DUE RIGHE e la manopola 'Selettore' a DESTRA. La riga di tasti in alto comanda la zona superiore, quella in basso la zona inferiore (zona e avvio). Ci sono poi orologio, Smart Control, luce, Opzioni (☰), Indietro (↩) e un tasto info (ⓘ) a sinistra del display.",
       "SEQUENZA REALE: 1) premi Accensione. 2) RUOTA il Selettore per scegliere la modalità e PREMI il Selettore per confermare. 3) RUOTA il Selettore per la temperatura e PREMI per confermare. 4) per la durata tocca il tasto 'Tempo di cottura' (oppure ruota fino a 'Impostazione tempo di cottura'), imposta e conferma. 5) parte il preriscaldamento: un segnale acustico avvisa quando è pronto per infornare.",
-      "ATTENZIONE AI NOMI: sul display di QUESTO forno la cottura sopra+sotto si chiama 'Tradizionale' (verificato dalla foto del pannello), anche se il manuale la chiama 'Convenzionale'. Se un nome non corrisponde, fai riferimento alla descrizione della funzione.",
-      "NOMI DELLE MODALITÀ (con temperatura suggerita da Samsung): Convezione (160°C, ventilata, più livelli insieme); Tradizionale, detta Convenzionale sul manuale (180°C, sopra+sotto, cottura standard); Convezione Eco (160°C, NON va preriscaldata); Grill grande (220°C, per rosolare la superficie di carne, lasagne o gratin); Grill Eco (220°C, porzioni piccole); Grill ventilato (180°C); Riscaldamento superiore + Convezione (180°C, per doratura in superficie); Riscaldamento inferiore + Convezione (200°C, consigliata per pizza, pane e torte); Riscaldamento inferiore (150°C, per dorare il fondo a fine cottura); Rosolatura (160°C); Sottovuoto ad aria (60°C); Air Fry (220°C).",
+      "NOMI ESATTI DEL MENU, letti sul display di QUESTO forno (usa SEMPRE questi, non quelli del manuale): TRADIZIONALE (sopra+sotto, cottura standard, ~180°C) · VENTILATO (aria calda con ventola, più livelli insieme, ~160°C) · GRILL (~220°C, per rosolare la superficie di carne, lasagne o gratin) · ECO-VENTILATO (~160°C, NON va preriscaldata) · CALORE SUPERIORE + VENTILATO (~180°C, per la doratura in superficie) · CALORE INFERIORE + VENTILATO (~200°C, la migliore per pizza, pane e torte) · CALORE INFERIORE (~150°C, per dorare il fondo a fine cottura) · ROSOLATURA (~160°C) · FUNZIONE DI COTTURA A VAPORE · AIR SOUS VIDE (cottura sottovuoto a bassa temperatura, ~60°C) · FUNZIONE SPECIALE (contiene Mantieni caldo, Riscalda piatto, Scongelamento) · COTTURA AUTOMATICA (ricette preimpostate, si sceglie il piatto e il peso) · PULIZIA.",
+      "Air Fry non compare nel menu principale: è disponibile solo in doppia cottura, quindi dopo aver inserito il divisorio, per la zona superiore.",
       "RIPIANI: 5 livelli numerati DAL BASSO (1 = più basso, 5 = più alto).",
       "DUAL COOK: il divisorio va inserito al LIVELLO 3; il forno lo rileva da solo e attiva la doppia cottura preselezionando la zona superiore. Le zone si scelgono con i tasti 'Selettore zona alta/bassa', attivi solo col divisorio inserito. Avvio: il tasto Avvio superiore per la zona alta, quello inferiore per la zona bassa.",
       "Air Fry: richiede il divisorio, va nella zona superiore con la teglia al livello 4, non serve preriscaldare e blocca l'uso della zona inferiore."
@@ -44,7 +46,8 @@ export const APPLIANCE_KB = [
       "Il display touch non risponde con i guanti da forno.",
       "In doppia cottura le due temperature non sono libere: si limitano a vicenda (es. con 200°C sopra, sotto puoi stare tra 145 e 250°C).",
       "La 'Convezione Eco' è l'unica che non va preriscaldata.",
-      "Vapore naturale: acqua nella teglia a forno FREDDO e solo insieme alla modalità Convezione."
+      "Vapore naturale: acqua nella teglia a forno FREDDO e solo insieme alla modalità Ventilato.",
+      "Questo forno HA la cottura a vapore (voce \"Funzione di cottura a vapore\" nel menu) e l'Air Sous Vide per le cotture sottovuoto a bassa temperatura."
     ]
   },
   {

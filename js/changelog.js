@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.29",
+    d: "2026-06-24",
+    items: [
+      "Forno Samsung: inseriti i nomi ESATTI letti sul display (Tradizionale, Ventilato, Eco-Ventilato, Calore superiore/inferiore + Ventilato, Rosolatura, Air Sous Vide…). Erano quasi tutti diversi da quelli del manuale, quindi ora l'app ti dice il nome che vedi davvero girando il Selettore.",
+      "Scoperto che il forno ha anche la cottura a vapore e l'Air Sous Vide (il manuale generico lasciava il dubbio). Air Fry invece compare solo in doppia cottura, col divisorio inserito."
+    ]
+  },
+  {
     v: "8.28",
     d: "2026-06-24",
     items: [
