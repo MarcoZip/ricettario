@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.22",
+    d: "2026-06-24",
+    items: [
+      "Anche il microonde Whirlpool JT 359 è ora \"conosciuto\": i nomi veri dei tasti (MANUAL, WATTS, FOOD, Avvio), le sequenze reali di ogni funzione, i programmi automatici con le classi e i pesi (Crisp, 6° Senso, Aria Ventilata, Jet Defrost) e le regole del piatto Crisp.",
+      "La Modalità robot ora usa i dati ufficiali del Moulinex i-Companion Touch XL: nomi esatti degli accessori (ultrablade, miscelatore, sbattitore, lama per impastare), i 14 programmi coi loro valori e i limiti veri (sbattitore max velocità 9, sopra 135° solo col coperchio aperto)."
+    ]
+  },
+  {
     v: "8.21",
     d: "2026-06-24",
     items: [

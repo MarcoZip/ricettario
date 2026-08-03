@@ -125,13 +125,16 @@ export async function importFromVideo(url, text) {
 }
 
 // "Modalità robot": converte una ricetta in programma per Companion o Bimby.
-export async function robotProgram(recipe, device) {
+export async function robotProgram(recipe, device, appliance) {
   if (!WORKER_URL) throw new Error("Funzione non disponibile (worker non configurato).");
   let res;
   try {
     res = await fetch(`${WORKER_URL}/robot`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: recipe.title, ingredients: recipe.ingredients || [], steps: recipe.steps || [], device })
+      body: JSON.stringify({
+        title: recipe.title, ingredients: recipe.ingredients || [], steps: recipe.steps || [], device,
+        model: (appliance && appliance.model) || "", howto: (appliance && appliance.howto) || ""
+      })
     });
   } catch (e) { throw new Error("Servizio non raggiungibile. Controlla la connessione."); }
   const d = await res.json().catch(() => ({}));

@@ -3674,7 +3674,18 @@ function openRobotMode(r) {
     m.el.querySelector('[data-act="ok"]').onclick = m.close;
     const body = m.el.querySelector("#robotBody");
     try {
-      const prog = await robotProgram({ title: r.title, ingredients, steps: r.steps || [] }, device);
+      // Se fra i tuoi strumenti c'è il robot con il modello salvato, passiamo i
+      // dati verificati del manuale: nomi veri di programmi, accessori, velocità.
+      const rTool = store.getTools().find((t) => {
+        const k = applianceKB(t.model);
+        return k && k.family === "robot" && (device === "bimby" ? /bimby|thermomix/i.test(k.label) : /companion/i.test(k.label));
+      });
+      const rKb = rTool ? applianceKB(rTool.model) : null;
+      const prog = await robotProgram(
+        { title: r.title, ingredients, steps: r.steps || [] },
+        device,
+        { model: rTool ? rTool.model : "", howto: (rTool && (rTool.howto || "").trim()) || (rKb ? rKb.howto : "") }
+      );
       if (!body.isConnected) return;
       const note = prog.note ? `<div class="hint" style="margin-bottom:10px">${escapeHtml(prog.note)}</div>` : "";
       const list = prog.steps.map((s, i) => `<div class="robot-step"><span class="robot-step__n">${i + 1}</span><div class="robot-step__main"><div class="robot-step__a">${escapeHtml(s.azione)}</div>${s.impostazioni ? `<div class="robot-step__s">${iconHtml("sliders-horizontal")} ${escapeHtml(s.impostazioni)}</div>` : ""}</div></div>`).join("");

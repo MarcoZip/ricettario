@@ -44,6 +44,77 @@ export const APPLIANCE_KB = [
     ]
   },
   {
+    id: "moulinex-icompanion-touch-xl",
+    // Robot: non usa "Come lo imposto?" ma alimenta la Modalità robot.
+    match: /i-?companion|companion\s*(touch|xl)|hf9[0-9]{2}/i,
+    label: "Moulinex i-Companion Touch XL (serie HF93x)",
+    source: "Manuale utente ufficiale Groupe SEB/Moulinex (cod. 8020007193)",
+    family: "robot",
+    howto: [
+      "SPECIFICHE (dal manuale): potenza 1550 W, temperatura da 30 a 150 °C regolabile a passi di 5 °C, 13 velocità, durata da 5 secondi a 2 ore.",
+      "ACCESSORI con i nomi ufficiali: E1 lama tritatutto ultrablade (zuppe, tritare verdura/carne/pesce; NON per prodotti duri); E2 miscelatore (rosolatura, cottura a fuoco lento, risotti, senza rovinare gli ingredienti); E3 sbattitore (albumi a neve max 8, maionese, panna: MAI oltre velocità 9 e mai per impastare); E4 lama per impastare/macinare (pane, brioche, torte, frutta a guscio, prodotti duri, ghiaccio); E5 cestello a vapore.",
+      "PROGRAMMI AUTOMATICI (14) con i valori preimpostati: Salse V6 70 °C 8 min; Zuppa vellutata 100 °C 40 min; Zuppa densa 100 °C 45 min; Rosolatura V3 130 °C 5 min (temperatura non regolabile); Cottura lenta V1 95 °C 45 min; Risotto V2 95 °C 20 min; Vapore basso 100 °C 30 min; Vapore alto 100 °C 35 min; Pane V5 2 min 30; Brioche V5+V6 3 min 30; Torta V3+V9 3 min 40; Dessert V4 90 °C 15 min; Riscaldamento V2 90 °C 20 min; Risciacquo V8 80 °C 5 min.",
+      "PANNELLO: display touchscreen a colori con 5 tasti (Annullare, Bilancia, START/STOP centrale, Video, Impostazioni) e interruttore 0/I posteriore. In Modalità manuale si sceglie nell'ordine velocità, temperatura e durata con i tasti + e −, poi START.",
+      "VAPORE: servono 0,7 litri d'acqua (tacca dedicata) e il tappo in posizione Massimo.",
+      "TAPPO DI REGOLAZIONE DEL VAPORE: posizione Massimo per le cotture a vapore e per evitare schizzi; posizione Minimo per risotti, creme e salse, così la condensa esce e la consistenza è migliore."
+    ].join(" "),
+    quirks: [
+      "Sopra i 135 °C si cuoce SOLO col coperchio aperto e senza accessori (solo il perno), niente velocità, massimo 20 minuti.",
+      "Lo sbattitore E3 non supera la velocità 9 e non va usato per impastare: per quello serve la lama E4.",
+      "Versa prima i solidi e poi i liquidi, senza superare la tacca MAX incisa nel recipiente.",
+      "Con temperatura da 50 °C e velocità da 5 in su, il coperchio resta bloccato per 10 secondi (conto alla rovescia a display).",
+      "Nei programmi Pane e Brioche parte una lievitazione a 30 °C per 40 minuti: se apri il coperchio o togli il recipiente il programma si ferma.",
+      "La cottura senza coperchio non va usata per confetture e preparazioni a base di latte (fuoriescono)."
+    ]
+  },
+  {
+    id: "whirlpool-jt359",
+    // Microonde combinato: microonde + grill + aria ventilata + crisp + vapore
+    match: /jt\s?-?359|amw\s?-?359/i,
+    label: "Whirlpool JT 359",
+    source: "Manuale d'uso ufficiale Whirlpool in italiano (cod. 4619 694 50162)",
+    family: "microonde",
+    // Programmi automatici con le classi e i pesi dichiarati dal manuale.
+    table: [
+      // Lo scongelamento va riconosciuto PRIMA del tipo di alimento.
+      { rx: /scongel/i, temp: "Jet Defrost", time: "in base al peso", note: "classi: CARNE, POLLAME, PESCE, VERDURE, PANE · a metà chiede TURN (girare)" },
+      { rx: /pizza/i, temp: "6° Senso Crisp", time: "programma automatico", note: "classe PIZZA sottile 250-500 g o PIZZA ALTA 300-800 g · solo surgelati pronti · sul piatto Crisp" },
+      { rx: /patatin|patate fritte/i, temp: "6° Senso Crisp", time: "programma automatico", note: "classe PATATE FRITTE 250-600 g · surgelate · sul piatto Crisp" },
+      { rx: /ali di pollo|alette/i, temp: "6° Senso Crisp", time: "programma automatico", note: "classe ALI DI POLLO 250-600 g · sul piatto Crisp" },
+      { rx: /quiche|torta salata/i, temp: "6° Senso Crisp", time: "programma automatico", note: "classe QUICHE 400-800 g · sul piatto Crisp" },
+      { rx: /lasagn/i, temp: "Aria Ventilata Automatica", time: "programma automatico", note: "classe LASAGNE SURGELATE 400 g - 1 kg" },
+      { rx: /pollo(?! arrost)|pollo arrost/i, temp: "Aria Ventilata Automatica", time: "programma automatico", note: "classe POLLO 800 g - 1,5 kg" },
+      { rx: /biscott/i, temp: "Aria Ventilata Automatica", time: "programma automatico", note: "classe BISCOTTI · il forno preriscalda e poi chiede di inserire il cibo (Add food), teglia sulle guide laterali" },
+      { rx: /pane|panin/i, temp: "Aria Ventilata Automatica", time: "programma automatico", note: "classi PASTA PER IL PANE IN SCATOLA o PANINI SURGELATI" },
+      { rx: /patate al forno/i, temp: "6° Senso per la Cottura", time: "programma automatico", note: "classe PATATE AL FORNO 2-4 pezzi da circa 250 g" },
+      { rx: /patate less|patate bollit/i, temp: "6° Senso per la Cottura", time: "programma automatico", note: "classe PATATE BOLLITE 250 g - 1 kg" },
+      { rx: /verdur.*(surgelat|congelat)/i, temp: "6° Senso per la Cottura", time: "programma automatico", note: "classe VERDURE SURGELATE 250-750 g" },
+      { rx: /verdur/i, temp: "6° Senso Vapore", time: "2-3 min tenere · 4-5 min dure", note: "con 50-100 ml d'acqua sul fondo · pentola vapore SOLO con microonde" },
+      { rx: /riscalda|avanzi/i, temp: "6° Senso per Riscaldare", time: "automatico", note: "250-600 g · usa sempre il coperchio in dotazione (tranne per le zuppe)" },
+      { rx: /uovo|uova|pancett|salsicc|hamburger/i, temp: "Crisp", time: "in base al cibo", note: "la funzione Crisp è pensata anche per uova, pancetta, salsicce e hamburger · alimenti direttamente sul piatto Crisp" }
+    ],
+    howto: [
+      "PANNELLO (verificato dal manuale): SOLO tasti e display, NESSUNA manopola.",
+      "Tasti principali: MANUAL (sceglie la funzione), WATTS (livello di potenza microonde), FOOD (classe dell'alimento), tasto temperatura, tasti +/- (tempo o peso), Avvio, Arresto, Orologio. Ci sono poi tasti dedicati per Jet Defrost e per le funzioni 6° Senso.",
+      "SEQUENZA REALE microonde: premi MANUAL (ripetuto) per scegliere la funzione, poi +/- per il tempo, poi WATTS per la potenza, infine Avvio.",
+      "Varianti: Grill e Crisp = MANUAL, +/- tempo, Avvio (nessuna potenza). Grill Combinato = MANUAL, tempo, WATTS, Avvio. Aria Ventilata = MANUAL, tempo, tasto temperatura, Avvio. Aria Ventilata Combinata = MANUAL, tempo, temperatura, WATTS, Avvio. Riscaldamento Rapido = MANUAL, temperatura, Avvio a forno vuoto.",
+      "JET START: si preme solo Avvio e parte subito alla massima potenza per 30 secondi; ogni pressione aggiunge 30 secondi (anche durante la cottura).",
+      "FUNZIONI (nomi esatti): Jet Start, Grill, Grill Combinato, Crisp, Riscaldamento Rapido, Aria Ventilata, Aria Ventilata Combinata, Jet Defrost, Aria Ventilata Automatica, 6° Senso per Riscaldare, 6° Senso Crisp, 6° Senso per la Cottura a Vapore, 6° Senso per la Cottura. Ha 8 livelli di potenza microonde; per lo scongelamento manuale il manuale indica 160 W.",
+      "CRISP: usa SOLO il piatto Crisp in dotazione, sempre al centro del piatto rotante in vetro, con gli alimenti appoggiati direttamente sopra. Il preriscaldamento è facoltativo, massimo 3 minuti e va fatto con la funzione Crisp stessa. Si toglie con la maniglia Crisp o i guanti.",
+      "ACCESSORI: coperchio, maniglia per il piatto Crisp, piatto Crisp, guida e piatto rotante in vetro, piatto da forno, griglia di cottura (posizione alta o bassa), pentola per cottura a vapore."
+    ].join(" "),
+    quirks: [
+      "Il piatto da forno va usato SOLO con Aria Ventilata e Aria Ventilata Automatica: mai insieme alle microonde.",
+      "La pentola per cottura a vapore va usata ESCLUSIVAMENTE con la funzione microonde, mai con le altre.",
+      "Il piatto rotante deve restare sempre al suo posto: non far funzionare il forno senza.",
+      "Griglia in posizione alta per il grill, bassa per le cotture combinate e ventilate.",
+      "Non toccare il piatto Crisp a mani nude e non appoggiarci sopra contenitori o involucri: solo alimenti.",
+      "Mai far funzionare le microonde a vuoto e mai cuocere uova intere (esplodono).",
+      "Scritte sul display che sembrano errori ma sono normali: COOL (raffreddamento), door (sicurezza, apri e richiudi), PRE-HEAT, Add food (metti ora il cibo).",
+      "Se usi poco il grill, fallo girare da solo 10 minuti una volta al mese per bruciare i residui."
+    ]
+  },
+  {
     id: "moulinex-easyfry-mega",
     // Easy Fry Mega = famiglia EZ855 (verificato sul manuale ufficiale Moulinex)
     match: /easy\s?fry\s?mega|ez855/i,

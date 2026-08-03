@@ -972,7 +972,16 @@ async function handleRobot(request, env) {
     ? "Sei un esperto del Bimby (Thermomix TM6). Converti la ricetta in un programma passo-passo in stile Bimby da impostare A MANO. Per ogni passo indica nelle impostazioni, quando ha senso: velocità (da 1 a 10, oppure Turbo, oppure 'antiorario' per non sminuzzare), temperatura (da 37 a 160°C, oppure Varoma, oppure nessuna se a freddo) e tempo. Esempio impostazioni: \"Vel 2 · 100°C · 10 min\" oppure \"Vel 4 · 30 sec\". Usa valori realistici e prudenti. Rispondi SOLO con JSON valido: {\"note\": string, \"steps\": [{\"azione\": string, \"impostazioni\": string}]}. La nota ricorda all'utente di verificare i valori sul proprio Bimby. Tutto in italiano. Niente markdown."
     : "Sei un esperto del robot da cucina Moulinex i-Companion. Converti la ricetta in un programma passo-passo da impostare A MANO sul Companion. Per ogni passo indica nelle impostazioni, quando ha senso: l'accessorio (Ultrablade/lama, mescolatore, sbattitore a farfalla/frusta, lama impastatrice, cestello vapore), la velocità (da 1 a 12), la temperatura (da 30 a 130°C, o nessuna se a freddo) e il tempo. Esempio impostazioni: \"Mescolatore · Vel 5 · 100°C · 10 min\". Usa valori realistici e prudenti. Rispondi SOLO con JSON valido: {\"note\": string, \"steps\": [{\"azione\": string, \"impostazioni\": string}]}. La nota ricorda di verificare i valori sul proprio Companion. Tutto in italiano. Niente markdown.";
 
-  const userMsg = `Ricetta: ${title}\nIngredienti:\n${ingredients.join("\n")}\n\nPreparazione:\n${steps.join("\n")}`;
+  // Dati verificati del modello dell'utente (dal manuale): nomi veri di
+  // programmi, accessori e velocità. Se ci sono, l'AI deve usare QUELLI.
+  const rModel = String((body && body.model) || "").slice(0, 120);
+  const rHowto = String((body && body.howto) || "").slice(0, 2200);
+  const userMsg = [
+    rHowto ? `DATI UFFICIALI DEL MIO APPARECCHIO${rModel ? ` (${rModel})` : ""} — usa questi nomi di programmi, accessori e velocità, NON inventarne altri:\n${rHowto}\n` : "",
+    `Ricetta: ${title}`,
+    `Ingredienti:\n${ingredients.join("\n")}`,
+    `\nPreparazione:\n${steps.join("\n")}`
+  ].filter(Boolean).join("\n");
   try {
     const raw = await aiText(env, [{ role: "system", content: sys }, { role: "user", content: userMsg.slice(0, 3500) }], 900, ROBOT_SCHEMA);
     const r = extractJson(raw);
