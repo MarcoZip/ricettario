@@ -49,9 +49,10 @@ export const APPLIANCE_KB = [
     // L'utente lo legge come "83101-4-M": sulla targhetta la B sembra un 8.
     match: /\b8?3101-?4|b\s?3101/i,
     label: "AEG Competence B3101-4 (forno ventilato)",
-    source: "Manuale utente ufficiale AEG (edizione inglese)",
+    source: "Manuale ufficiale AEG (ed. inglese) + foto del pannello reale",
     // Da mostrare all'utente: qui la certezza è minore che sugli altri.
-    caveat: "Il manuale italiano di questo modello non è reperibile: i valori (livelli, temperature, orologio) vengono dall'edizione inglese, mentre i NOMI ITALIANI delle funzioni sulla manopola non sono verificati.",
+    caveat: "Sul pannello di questo forno le funzioni sono indicate SOLO da simboli, senza scritte: quindi la funzione va riconosciuta dal simbolo, non da un nome.",
+    limits: "Il termostato va da 50 a 275 °C. Lo scongelamento non usa temperatura (termostato su OFF). NON esiste un tasto di avvio: il forno parte da solo appena ruoti le due manopole.",
     levels: 5,
     racks: [
       { rx: /pizza/i, rack: "livello 1", temp: "180-200°C", note: "manuale AEG: pizza e ricette umide su UN SOLO livello", mode: "Ventilata (Ventitherm)" },
@@ -70,9 +71,10 @@ export const APPLIANCE_KB = [
       { rx: /scongel/i, rack: "livello 1", temp: "nessuna temperatura", note: "solo ventola, cibo scoperto, girare a metà", mode: "Scongelamento" }
     ],
     howto: [
-      "PANNELLO (dal manuale, edizione inglese): due manopole A SCOMPARSA (si premono per farle uscire) — una per le funzioni, una per la temperatura — più un display con l'ora e i tasti Selezione, + e −.",
+      "PANNELLO (verificato dalla foto reale): due manopole — a SINISTRA le funzioni, a DESTRA la temperatura (scala da 50 a 275 °C) — e al centro un display rosso con l'ora e TRE tasti sotto: meno (−), orologio (quello centrale, serve per scegliere la funzione dell'orologio) e più (+). Sopra il display ci sono le spie: due frecce per durata e fine cottura, una campanella per il contaminuti e un orologio per l'ora. Ai lati due spie rosse: accensione e temperatura raggiunta.",
+      "IMPORTANTE: sulla manopola delle funzioni NON ci sono scritte, solo SIMBOLI. Quindi indica la funzione descrivendo il simbolo da cercare, non un nome: ventola dentro un cerchio = cottura ventilata; ventola SENZA calore = scongelamento; barra in alto = grill; barra grande in alto = grill grande; barra in alto insieme alla ventola = grill ventilato (arrosti e gratin); lampadina = luce del forno.",
       "REGOLA FONDAMENTALE: il forno NON funziona se l'ora non è impostata. Dopo un blackout l'orologio lampeggia e il forno non scalda finché non si reimposta l'ora.",
-      "SEQUENZA: 1) controlla che l'ora sia impostata. 2) tira fuori le manopole premendole. 3) ruota la manopola funzioni sulla funzione. 4) ruota il termostato sulla temperatura. 5) volendo imposta durata o ora di fine con il tasto Selezione e i tasti +/−. 6) a fine cottura riporta ENTRAMBE le manopole su OFF.",
+      "SEQUENZA: 1) controlla che il display mostri l'ora (se lampeggia, il forno non scalda finché non la reimposti). 2) ruota la manopola di SINISTRA sul simbolo della funzione. 3) ruota la manopola di DESTRA sulla temperatura (50-275 °C). 4) volendo, imposta durata o fine cottura premendo il tasto centrale con l'orologio finché lampeggia la spia giusta, poi regola con − e +. 5) a fine cottura riporta ENTRAMBE le manopole su OFF.",
       "FUNZIONI (nomi originali del manuale inglese, l'equivalente italiano sulla manopola può essere scritto diversamente): Oven Light (luce); Ventitherm Fan Operated Cooking = cottura ventilata, fino a 3 livelli insieme; Fan Controlled Defrosting = scongelamento con sola ventola, senza temperatura; Single/Economy Grill = grill piccolo centrale; Full Width Dual Grill = grill grande; Rotitherm Roasting = grill ventilato per arrosti e gratin su un solo livello.",
       "IMPORTANTE: essendo un forno ventilato, le temperature delle ricette tradizionali vanno ABBASSATE di 20-40 °C.",
       "RIPIANI: numerati dal basso (almeno 5). Su più livelli con la ventilata: 2 teglie ai livelli 1 e 3, 3 teglie ai livelli 1, 3 e 5, aggiungendo 10-15 minuti.",
@@ -80,7 +82,7 @@ export const APPLIANCE_KB = [
     ].join(" "),
     quirks: [
       "Dopo un blackout il forno non scalda finché non reimposti l'ora: è il problema numero uno di questo modello.",
-      "Le manopole sono a scomparsa: vanno premute per farle uscire.",
+      "Sulla manopola non ci sono scritte, solo simboli: la funzione si riconosce dal disegno (ventola, barra del grill, lampadina).",
       "È un forno ventilato: usa 20-40 °C in meno rispetto alle temperature delle ricette classiche.",
       "Il grill va sempre usato a porta CHIUSA, dopo 5 minuti di preriscaldamento a vuoto.",
       "Lo scongelamento non vuole temperatura: il termostato resta su OFF (sembra un errore, ma è giusto).",

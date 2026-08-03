@@ -148,6 +148,12 @@ export async function robotProgram(recipe, device, appliance) {
 // sulla rotta generica /ask (risposta più breve, ma funziona subito).
 export async function applianceSetup(payload) {
   if (!WORKER_URL) throw new Error("Funzione non disponibile (worker non configurato).");
+  // Il testo sull'apparecchio non deve superare il limite del worker, altrimenti
+  // viene troncato a metà frase.
+  if (payload && payload.howto && payload.howto.length > 2100) {
+    payload = { ...payload, howto: payload.howto.slice(0, 2100) };
+  }
+  let routeMissing = false;
   try {
     const res = await fetch(`${WORKER_URL}/oven`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -156,11 +162,14 @@ export async function applianceSetup(payload) {
     const d = await res.json().catch(() => ({}));
     if (d && Array.isArray(d.steps) && d.steps.length) return d;
     if (d && d.error === "noai") throw new Error("La funzione non è ancora attiva sul worker (manca il collegamento all'AI).");
-    // "missing" = rotta /oven non ancora pubblicata sul worker → fallback
-    if (!(d && d.error === "missing")) throw new Error((d && d.message) || "Non sono riuscito a preparare la guida.");
+    // "missing" = rotta /oven non pubblicata sul worker → si ripiega su /ask.
+    // Ogni ALTRO errore va mostrato: meglio dirlo che dare di nascosto una guida ridotta.
+    if (d && d.error === "missing") routeMissing = true;
+    else throw new Error((d && d.message) || "Guida non riuscita. Riprova tra poco.");
   } catch (e) {
-    if (e && e.message && !/Failed to fetch|NetworkError/i.test(e.message) && !/^Non sono riuscito/.test(e.message)) {
-      if (!/missing/.test(e.message)) throw e;
+    if (!routeMissing) {
+      if (/Failed to fetch|NetworkError/i.test(e.message || "")) throw new Error("Servizio non raggiungibile. Controlla la connessione.");
+      throw e;
     }
   }
   // --- Fallback su /ask (worker non aggiornato) ---

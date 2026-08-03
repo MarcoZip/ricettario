@@ -6,6 +6,21 @@
 
 export const CHANGELOG = [
   {
+    v: "8.26",
+    d: "2026-06-24",
+    minor: true,
+    items: [
+      "Guida all'impostazione più pulita: niente passaggi ripetuti, non ti dice più di \"selezionare il ripiano\" dai comandi (la teglia si infila e basta) né di premere tasti di avvio che sul tuo forno non esistono. Se il servizio ha un problema ora te lo dice, invece di darti di nascosto una guida ridotta."
+    ]
+  },
+  {
+    v: "8.25",
+    d: "2026-06-24",
+    items: [
+      "Forno AEG corretto con la foto del pannello vero: le funzioni si scelgono per SIMBOLO (sulla manopola non ci sono scritte), il termostato arriva a 275 °C e i tre tasti sotto il display sono meno, orologio e più. Tolta l'indicazione sbagliata delle \"manopole a scomparsa\"."
+    ]
+  },
+  {
     v: "8.24",
     d: "2026-06-24",
     items: [

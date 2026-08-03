@@ -3474,7 +3474,9 @@ function applianceFacts(kb, tool) {
   const base = own || (kb ? kb.howto : "");
   if (!base) return "";
   const lim = kb && kb.limits ? `LIMITI INVALICABILI DI QUESTO APPARECCHIO (non proporre MAI valori fuori da questi): ${kb.limits}\n` : "";
-  return lim + base;
+  // Errore ricorrente dei modelli AI: far "selezionare il ripiano" dal pannello.
+  const rack = kb && kb.family !== "robot" ? "Il ripiano NON si imposta dai comandi: la teglia si infila fisicamente al livello indicato.\n" : "";
+  return lim + rack + base;
 }
 
 // I robot da cucina hanno già la loro "Modalità robot": qui non li trattiamo.
@@ -3653,7 +3655,14 @@ async function runApplianceSetup(recipe, tool, kind) {
         <div class="ov-warn">⚠️ Verifica sul tuo apparecchio: sono indicazioni generate dall'AI, non il manuale.</div>`;
       return;
     }
-    const list = d.steps.map((s, i) => `<div class="robot-step"><span class="robot-step__n">${i + 1}</span><div class="robot-step__main"><div class="robot-step__a">${escapeHtml(s.azione)}</div>${s.impostazioni ? `<div class="robot-step__s">${iconHtml("sliders-horizontal")} ${escapeHtml(s.impostazioni)}</div>` : ""}</div></div>`).join("");
+    // L'AI a volte ripete lo stesso passo: teniamo solo la prima occorrenza.
+    const seenSteps = new Set();
+    const steps2 = d.steps.filter((s) => {
+      const k = (s.azione || "").toLowerCase().replace(/[^a-zà-ù]/gi, "").slice(0, 40);
+      if (!k || seenSteps.has(k)) return false;
+      seenSteps.add(k); return true;
+    });
+    const list = steps2.map((s, i) => `<div class="robot-step"><span class="robot-step__n">${i + 1}</span><div class="robot-step__main"><div class="robot-step__a">${escapeHtml(s.azione)}</div>${s.impostazioni ? `<div class="robot-step__s">${iconHtml("sliders-horizontal")} ${escapeHtml(s.impostazioni)}</div>` : ""}</div></div>`).join("");
     body.innerHTML = `${d.note ? `<div class="hint" style="margin-bottom:10px">${escapeHtml(d.note)}</div>` : ""}
       <div class="robot-list">${list}</div>
       ${d.check ? `<div class="ov-check">✅ <b>Come capisci che è pronto:</b> ${escapeHtml(d.check)}</div>` : ""}
