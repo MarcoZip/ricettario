@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.20",
+    d: "2026-06-24",
+    minor: true,
+    items: [
+      "Correzione: la friggitrice ad aria non riceve più consigli da forno (ripiani, statico/ventilato) ma quelli giusti per il cestello: temperatura, durata, quanto riempirlo e quando scuoterlo."
+    ]
+  },
+  {
     v: "8.19",
     d: "2026-06-24",
     items: [

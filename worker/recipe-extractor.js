@@ -921,7 +921,9 @@ async function handleOven(request, env) {
   const sys = [
     `Sei un tecnico esperto di elettrodomestici da cucina e un cuoco. Devi spiegare passo-passo come impostare un ${applianceName}${model ? ` (modello dichiarato: ${model})` : ""} per cuocere una ricetta.`,
     "REGOLA FONDAMENTALE, NON VIOLARLA MAI: NON inventare nomi di tasti, manopole, voci di menu o simboli di questo modello. Se le 'note dell'utente' qui sotto contengono i nomi reali dei comandi, USA QUELLI alla lettera. Se NON li hai, NON descrivere quali tasti premere: indica invece QUALE FUNZIONE cercare (con i nomi generici comuni, es. \"cottura statica (sopra+sotto)\", \"ventilata\", \"grill\") e scrivi che si seleziona dal pannello del forno.",
-    /forno|friggitrice/i.test(applianceName)
+    /friggitrice|air ?fry/i.test(applianceName)
+      ? "È una friggitrice ad aria: concentrati su temperatura in °C, durata, quantità che sta nel cestello senza sovrapporsi, quando scuotere il cestello (di solito a metà) e se serve un filo d'olio. NON parlare di ripiani o di funzione statico/ventilato: nel cestello non esistono."
+      : /forno/i.test(applianceName)
       ? "Concentrati su: funzione di cottura giusta per il piatto, temperatura in °C, ripiano/livello consigliato (conta i ripiani dal basso), se preriscaldare, durata e cosa controllare a metà cottura. Dai anche l'equivalenza statico/ventilato (ventilato = circa 20°C in meno)."
       : /microonde/i.test(applianceName)
         ? "Concentrati su: potenza in Watt (o livello di potenza), durata, se coprire il contenitore, se e quando mescolare o girare a metà, e il tempo di riposo finale. NON parlare di ripiani, gradi centigradi o preriscaldamento: in un microonde non esistono. Ricorda i contenitori adatti (no metallo)."

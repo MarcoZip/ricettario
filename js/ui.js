@@ -3451,7 +3451,7 @@ function openConvertRecipe(r) {
 // friggitrice ad aria...). Se l'utente ha salvato un modello, vale comunque.
 const APPLIANCE_KINDS = [
   { rx: /microonde|micro-onde|combinato/i, label: "microonde", family: "microonde" },
-  { rx: /friggitrice|air ?fry|airfryer/i, label: "friggitrice ad aria", family: "forno" },
+  { rx: /friggitrice|air ?fry|airfryer/i, label: "friggitrice ad aria", family: "friggitrice" },
   { rx: /induzion|piano cottura|piano a gas|fornell|vetroceramic/i, label: "piano cottura", family: "piano" },
   { rx: /forno|fornetto|dual cook|pirolit/i, label: "forno", family: "forno" },
   { rx: /piastra|griglia|barbecue|bbq/i, label: "griglia", family: "piano" },
@@ -3530,6 +3530,10 @@ function ovenBasics(recipe, tool) {
     const w = txt.match(/\b(\d{3,4})\s*w(?:att)?\b/);
     return { family, watt: w ? parseInt(w[1], 10) : null, time: recipe.time || null, kb, temp: null, mode: null, rack: null, preheat: false, altMode: null, kbTemp: null };
   }
+  if (family === "friggitrice") {
+    // Cestello: contano temperatura e tempo, non i ripiani. Va scosso a metà.
+    return { family, temp, time: recipe.time || null, kb, mode: null, rack: null, preheat: false, altMode: null, kbTemp: null, shake: true };
+  }
   if (family === "piano" || family === "altro") {
     return { family, time: recipe.time || null, kb, temp: family === "altro" ? temp : null, mode: null, rack: null, preheat: false, altMode: null, kbTemp: null };
   }
@@ -3551,6 +3555,7 @@ function ovenBasicsHtml(b) {
   if (b.rack) rows.push(["Ripiano", `${escapeHtml(b.rack)}${b.rackWhy ? ` <span class="ovb__alt">— ${escapeHtml(b.rackWhy)}</span>` : ""}`]);
   if (b.preheat) rows.push(["Preriscaldamento", "Sì, prima di infornare"]);
   if (b.time) rows.push(["Durata", `${escapeHtml(String(b.time))} minuti`]);
+  if (b.shake) rows.push(["A metà cottura", "Scuoti il cestello (o gira il cibo)"]);
   if (!rows.length) return "";
   return `<div class="ovb">
     <div class="ovb__t">📋 I valori giusti per questo piatto</div>
