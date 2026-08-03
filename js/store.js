@@ -127,9 +127,14 @@ export function getRecipe(id) {
 }
 
 // ---- Scritture ----
-export async function addTool({ name, icon }) {
+export async function addTool({ name, icon, model, howto }) {
   const order = state.tools.length ? Math.max(...state.tools.map((t) => t.order ?? 0)) + 1 : 0;
-  await adapter.addTool({ id: newId(), name: name.trim(), icon: icon || "🍽️", order, createdAt: now() });
+  await adapter.addTool({
+    id: newId(), name: name.trim(), icon: icon || "🍽️", order,
+    model: (model || "").trim(),   // es. "Samsung Dual Cook NV7B5740TBS": chiesto una volta, resta salvato
+    howto: (howto || "").trim(),   // note dell'utente su come si imposta (dal manuale)
+    createdAt: now()
+  });
 }
 
 export async function updateTool(id, patch) {

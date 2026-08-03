@@ -140,6 +140,43 @@ export async function robotProgram(recipe, device) {
   throw new Error((d && d.message) || "Non sono riuscito a creare il programma. Riprova.");
 }
 
+// "Come lo imposto?": guida all'impostazione del forno/microonde per una ricetta.
+// Usa la rotta /oven se disponibile; se il worker non è ancora aggiornato, ripiega
+// sulla rotta generica /ask (risposta più breve, ma funziona subito).
+export async function applianceSetup(payload) {
+  if (!WORKER_URL) throw new Error("Funzione non disponibile (worker non configurato).");
+  try {
+    const res = await fetch(`${WORKER_URL}/oven`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const d = await res.json().catch(() => ({}));
+    if (d && Array.isArray(d.steps) && d.steps.length) return d;
+    if (d && d.error === "noai") throw new Error("La funzione non è ancora attiva sul worker (manca il collegamento all'AI).");
+    // "missing" = rotta /oven non ancora pubblicata sul worker → fallback
+    if (!(d && d.error === "missing")) throw new Error((d && d.message) || "Non sono riuscito a preparare la guida.");
+  } catch (e) {
+    if (e && e.message && !/Failed to fetch|NetworkError/i.test(e.message) && !/^Non sono riuscito/.test(e.message)) {
+      if (!/missing/.test(e.message)) throw e;
+    }
+  }
+  // --- Fallback su /ask (worker non aggiornato) ---
+  const q = [
+    `Ho un ${payload.applianceName || "forno"}${payload.model ? " " + payload.model : ""}. Preparo: ${payload.title || "una ricetta"}.`,
+    payload.fixed ? `Impostazioni GIÀ DECISE che devi usare senza cambiarle: ${payload.fixed}.` : "",
+    payload.howto ? `Comandi del mio apparecchio: ${String(payload.howto).slice(0, 260)}.` : "",
+    "Spiegami in 4 passi brevi come impostarlo con QUEI valori. NON inventare nomi di tasti che non ti ho dato: in quel caso di' solo quale funzione cercare."
+  ].filter(Boolean).join(" ").slice(0, 600);
+  const res2 = await fetch(`${WORKER_URL}/ask`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question: q, title: payload.title })
+  });
+  const d2 = await res2.json().catch(() => ({}));
+  if (d2 && d2.answer) return { fallback: true, answer: d2.answer };
+  if (d2 && d2.error === "noai") throw new Error("La funzione non è ancora attiva sul worker (manca il collegamento all'AI).");
+  throw new Error((d2 && d2.message) || "Non sono riuscito a preparare la guida. Riprova.");
+}
+
 // "Fotografa il frigo": l'AI elenca gli alimenti visibili in una foto.
 export async function fridgeIngredients(image) {
   if (!WORKER_URL) throw new Error("Funzione non disponibile (worker non configurato).");

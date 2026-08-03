@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.16",
+    d: "2026-06-24",
+    items: [
+      "Novità: \"Come lo imposto?\" — nelle ricette da forno, microonde o friggitrice ad aria l'app ti guida a impostare l'apparecchio: funzione di cottura, temperatura, ripiano, preriscaldamento e come capire che è pronto.",
+      "Il modello (es. \"Samsung Dual Cook NV7B5740TBS\") si scrive UNA volta sola nello strumento e resta salvato. Nello strumento puoi anche incollare le note del manuale: in quel caso la guida usa i nomi esatti dei comandi del tuo apparecchio."
+    ]
+  },
+  {
     v: "8.15",
     d: "2026-06-24",
     items: [

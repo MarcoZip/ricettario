@@ -432,6 +432,7 @@ export default {
     if (url.pathname === "/generate") return handleGenerate(request, env);
     if (url.pathname === "/importvideo") return handleImportVideo(request, env);
     if (url.pathname === "/robot") return handleRobot(request, env);
+    if (url.pathname === "/oven") return handleOven(request, env);
     if (url.pathname === "/fridge") return handleFridge(request, env);
     if (url.pathname === "/receipt") return handleReceipt(request, env);
     if (url.pathname === "/structure") return handleStructure(request, env);
@@ -880,6 +881,72 @@ async function handleImportVideo(request, env) {
       sourceUrl: url || ""
     }, 200);
   } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova tra poco." + (e && (e.detail || e.message) ? " (" + String(e.detail || e.message).slice(0, 140) + ")" : "") }, 200); }
+}
+
+// "Come lo imposto?": guida all'impostazione di forno / microonde / friggitrice ad
+// aria per una ricetta. POST { applianceName, model?, howto?, title, steps[], time?, cookingHint? }
+// → { note, steps:[{azione, impostazioni}], check }.
+// REGOLA CHIAVE (anti-invenzione): i nomi di tasti/menu si possono citare SOLO se
+// arrivano dalle note dell'utente (howto). Altrimenti si descrive la FUNZIONE da
+// cercare, senza inventare l'interfaccia del modello.
+const OVEN_SCHEMA = {
+  type: "object",
+  properties: {
+    note: { type: "string" },
+    check: { type: "string" },
+    steps: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { azione: { type: "string" }, impostazioni: { type: "string" } },
+        required: ["azione", "impostazioni"]
+      }
+    }
+  },
+  required: ["steps"]
+};
+async function handleOven(request, env) {
+  if (request.method !== "POST") return json({ error: "method", message: "Usa POST" }, 405);
+  if (!env || !env.AI) return json({ error: "noai", message: "Workers AI non collegato (binding AI mancante)." }, 200);
+  let body;
+  try { body = await request.json(); } catch (e) { return json({ error: "badreq" }, 400); }
+  const applianceName = String((body && body.applianceName) || "forno").slice(0, 60);
+  const model = String((body && body.model) || "").slice(0, 120);
+  const howto = String((body && body.howto) || "").slice(0, 1200);
+  const title = String((body && body.title) || "").slice(0, 140);
+  const steps = Array.isArray(body.steps) ? body.steps.map((x) => String(x)).slice(0, 30) : [];
+  const time = String((body && body.time) || "").slice(0, 40);
+  if (!title && !steps.length) return json({ error: "norecipe", message: "Ricetta insufficiente" }, 400);
+
+  const sys = [
+    `Sei un tecnico esperto di elettrodomestici da cucina e un cuoco. Devi spiegare passo-passo come impostare un ${applianceName}${model ? ` (modello dichiarato: ${model})` : ""} per cuocere una ricetta.`,
+    "REGOLA FONDAMENTALE, NON VIOLARLA MAI: NON inventare nomi di tasti, manopole, voci di menu o simboli di questo modello. Se le 'note dell'utente' qui sotto contengono i nomi reali dei comandi, USA QUELLI alla lettera. Se NON li hai, NON descrivere quali tasti premere: indica invece QUALE FUNZIONE cercare (con i nomi generici comuni, es. \"cottura statica (sopra+sotto)\", \"ventilata\", \"grill\") e scrivi che si seleziona dal pannello del forno.",
+    "Concentrati su ciò che sai davvero e che è utile: funzione di cottura giusta per il piatto, temperatura in °C, ripiano/livello consigliato (e conta i ripiani dal basso), se preriscaldare, durata indicativa e a metà cottura cosa controllare.",
+    "Se il piatto e l'apparecchio lo consentono, dai anche l'equivalenza statico/ventilato (ventilato = circa 20°C in meno).",
+    "Rispondi SOLO con JSON valido: {\"note\": string, \"steps\": [{\"azione\": string, \"impostazioni\": string}], \"check\": string}. 'note' = una riga di contesto (max 20 parole). 'steps' = 3-7 passi in ordine. 'impostazioni' = i valori concreti (es. \"Statico · 180°C · 2° ripiano dal basso\"). 'check' = come capire che è cotto. Tutto in italiano, niente markdown."
+  ].join(" ");
+
+  const fixed = String((body && body.fixed) || "").slice(0, 300);
+  const userMsg = [
+    `Ricetta: ${title}`,
+    fixed ? `IMPOSTAZIONI GIÀ DECISE (usale ESATTAMENTE così, non ricalcolarle e non contraddirle): ${fixed}.` : "",
+    time ? `Tempo indicato nella ricetta: ${time} minuti.` : "",
+    steps.length ? `Passi della ricetta:\n${steps.join("\n").slice(0, 1500)}` : "",
+    body.cookingHint ? `Indicazioni di cottura trovate nella ricetta: ${String(body.cookingHint).slice(0, 300)}` : "",
+    howto ? `\nNOTE DELL'UTENTE SUL SUO ${applianceName.toUpperCase()} (fonte attendibile, usale alla lettera per i nomi dei comandi):\n${howto}` : `\n(Nessuna nota sull'apparecchio: NON citare tasti o menu specifici, descrivi solo le funzioni da cercare.)`
+  ].filter(Boolean).join("\n");
+
+  try {
+    const raw = await aiText(env, [{ role: "system", content: sys }, { role: "user", content: userMsg.slice(0, 3500) }], 900, OVEN_SCHEMA);
+    const r = extractJson(raw);
+    if (!r || !Array.isArray(r.steps) || !r.steps.length) return json({ error: "parse", message: "Non sono riuscito a creare la guida. Riprova." }, 200);
+    return json({
+      note: String(r.note || "").slice(0, 200),
+      check: String(r.check || "").slice(0, 300),
+      hasHowto: Boolean(howto),
+      steps: r.steps.slice(0, 10).map((s) => ({ azione: String(s.azione || "").slice(0, 300), impostazioni: String(s.impostazioni || "").slice(0, 160) }))
+    }, 200);
+  } catch (e) { return json({ error: "aifail", message: "Servizio AI non disponibile ora. Riprova tra poco." }, 200); }
 }
 
 // "Modalità robot": converte la ricetta in un programma per Moulinex Companion o

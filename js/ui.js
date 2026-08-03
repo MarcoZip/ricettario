@@ -7,7 +7,7 @@ import { parseList, ingredientText, formatQty, categorize, CATEGORY_ORDER } from
 import { estimateNutrition, enrichWithOFF } from "./nutrition.js";
 import { notifySupported, notifyEnabled, getNotifyPrefs, setNotifyPref, enableNotify, disableNotify, sendTestNotification, isIosNotInstalled } from "./notify.js";
 import { pushReady, isPushSubscribed, registerPush, refreshReminders, unregisterPush } from "./push.js";
-import { importFromUrl, searchGz, searchBlogGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo, robotProgram, fridgeIngredients, receiptItems, parseReceiptText, planWeekAI, convertRecipe, appHelp, structureRecipeText, dishNameFromPhoto } from "./import-recipe.js";
+import { importFromUrl, searchGz, searchBlogGz, searchMisya, searchCookist, searchRicettenonna, searchMoulinex, searchMoulinexFull, searchBimby, searchBimbyFull, searchEdamam, searchSpoon, spoonInfo, winePairing, analyzeDishPhoto, askChef, generateRecipe, importFromVideo, robotProgram, applianceSetup, fridgeIngredients, receiptItems, parseReceiptText, planWeekAI, convertRecipe, appHelp, structureRecipeText, dishNameFromPhoto } from "./import-recipe.js";
 import { HELP_TOPICS, findHelpTopics } from "./app-help.js";
 import { translateRecipe, translateList, translateToEnglish, translateText } from "./translate.js";
 import { shareRecipeImage, shareMenuImage } from "./share-image.js";
@@ -2452,6 +2452,7 @@ function renderRecipeDetail() {
     <button class="btn btn--block" id="checkPhotoBtn" style="margin-bottom:10px">📷 Com'è venuto? Controlla con una foto</button>
     <input type="file" id="checkPhotoFile" accept="image/*" capture="environment" hidden />
     ${isImportConfigured() ? `<button class="btn btn--block" id="askChefBtn" style="margin-bottom:10px">💬 Chiedi allo chef (AI)</button>` : ""}
+    ${isImportConfigured() && tool && applianceKind(tool) ? `<button class="btn btn--block" id="ovenBtn" style="margin-bottom:10px">🎛️ Come lo imposto?${tool.model ? ` · ${escapeHtml(tool.model.slice(0, 26))}` : ""}</button>` : ""}
     ${isImportConfigured() && (steps.length || ingredients.length) ? `<button class="btn btn--block" id="robotBtn" style="margin-bottom:10px">🤖 Modalità robot (Companion / Bimby)</button>` : ""}
     ${isImportConfigured() && ingredients.length ? `<button class="btn btn--block" id="convertBtn" style="margin-bottom:10px">🥗 Adatta la ricetta (vegano, leggero…)</button>` : ""}
     <button class="btn btn--block" id="collectionsBtn" style="margin-bottom:10px">${iconHtml("book-bookmark")} Aggiungi a una raccolta</button>
@@ -2588,6 +2589,8 @@ function renderRecipeDetail() {
   if (watchVideo) watchVideo.addEventListener("click", () => openVideoPlayer(videoInfo(r.videoUrl) ? r.videoUrl : r.url));
   const robotBtn = root.querySelector("#robotBtn");
   if (robotBtn) robotBtn.addEventListener("click", () => openRobotMode(r));
+  const ovenBtn = root.querySelector("#ovenBtn");
+  if (ovenBtn) ovenBtn.addEventListener("click", () => openApplianceSetup(r, tool));
   const convertBtn = root.querySelector("#convertBtn");
   if (convertBtn) convertBtn.addEventListener("click", () => openConvertRecipe(r));
 
@@ -3443,6 +3446,161 @@ function openConvertRecipe(r) {
   m.el.querySelectorAll("[data-diet]").forEach((b) => b.onclick = () => { const label = b.textContent.trim(); m.close(); run(b.dataset.diet, label); });
 }
 
+// Riconosce se uno strumento è un apparecchio "da impostare" (forno, microonde,
+// friggitrice ad aria...). Se l'utente ha salvato un modello, vale comunque.
+const APPLIANCE_KINDS = [
+  { rx: /microonde|micro-onde|combinato/i, label: "microonde" },
+  { rx: /friggitrice|air ?fry|airfryer/i, label: "friggitrice ad aria" },
+  { rx: /forno|fornetto|dual cook|pirolit/i, label: "forno" },
+  { rx: /piastra|griglia|barbecue|bbq/i, label: "griglia" },
+  { rx: /vapore|steam/i, label: "forno a vapore" }
+];
+function applianceKind(tool) {
+  if (!tool) return null;
+  const hay = `${tool.name || ""} ${tool.model || ""}`;
+  const hit = APPLIANCE_KINDS.find((k) => k.rx.test(hay));
+  if (hit) return hit.label;
+  return (tool.model || "").trim() ? (tool.name || "apparecchio").toLowerCase() : null;
+}
+// Estrae dai passi le indicazioni di cottura già scritte nella ricetta
+// (temperature, ventilato/statico, gradi): è il dato più affidabile che abbiamo.
+function cookingHintOf(steps) {
+  const out = [];
+  (steps || []).forEach((s) => {
+    const t = String(s || "");
+    const deg = t.match(/\b\d{2,3}\s*°?\s*(?:°|gradi|c\b)/gi);
+    if (deg) out.push(...deg.map((x) => x.trim()));
+    const mode = t.match(/ventilat\w+|statico|grill|griglia|vapore|forno caldo|preriscalda\w*/gi);
+    if (mode) out.push(...mode.map((x) => x.toLowerCase()));
+  });
+  return [...new Set(out)].slice(0, 8).join(", ");
+}
+// Ripiano consigliato per tipo di piatto: regole standard di cottura (NON generate
+// dall'AI). I ripiani si contano dal basso, su un forno da 5 livelli.
+const RACK_RULES = [
+  { rx: /pizza|focacc|pane|schiacciat/i, rack: "1°-2° dal basso (parte bassa)", why: "fondo croccante" },
+  { rx: /lasagn|cannellon|pasta al forno|parmigian|gratin|sformat|timball/i, rack: "2° dal basso (medio-basso)", why: "cuoce dentro senza bruciare sopra" },
+  { rx: /arrost|pollo|tacchin|coscia|stinco|brasat|agnello|maial/i, rack: "2° dal basso (medio-basso)", why: "calore uniforme sui pezzi grossi" },
+  { rx: /torta|ciambell|plumcake|crostat|muffin|cheesecake|pan di spagna/i, rack: "2°-3° (centro)", why: "lievita e dora in modo uniforme" },
+  { rx: /biscott|frollin|meringh|paste secche/i, rack: "3° (centro-alto)", why: "dorano senza scurirsi sotto" },
+  { rx: /gratinat|gratin di|crosta|crocchett|verdure al forno|patate/i, rack: "3° (centro-alto)", why: "doratura in superficie" },
+  { rx: /grill|griglia|spiedin|toast/i, rack: "4°-5° (vicino al grill)", why: "vicino alla resistenza del grill" }
+];
+// Estrae in modo deterministico i parametri di cottura DALLA RICETTA (nessuna AI):
+// temperatura e modalità scritte nei passi, tempo del campo, ripiano da regole.
+function ovenBasics(recipe) {
+  const txt = ((recipe.steps || []).join(" ") + " " + (recipe.title || "")).toLowerCase();
+  const degMatch = txt.match(/\b(\d{2,3})\s*(?:°\s*c?|gradi)/);
+  const temp = degMatch ? parseInt(degMatch[1], 10) : null;
+  let mode = null;
+  if (/ventilat/.test(txt)) mode = "Ventilato";
+  else if (/statico|sopra e sotto|tradizional/.test(txt)) mode = "Statico (sopra+sotto)";
+  else if (/\bgrill\b|gratina/.test(txt)) mode = "Grill";
+  else if (/vapore/.test(txt)) mode = "Vapore";
+  const hay = `${recipe.title || ""} ${txt}`;
+  let rule = RACK_RULES.find((r) => r.rx.test(hay));
+  // Col grill comanda il grill: si sta vicino alla resistenza, qualunque sia il piatto.
+  if (mode === "Grill") rule = RACK_RULES[RACK_RULES.length - 1];
+  const preheat = /preriscald|forno (?:ben |molto |gi[àa] )?caldo/.test(txt);
+  return {
+    temp, mode, preheat,
+    time: recipe.time || null,
+    rack: rule ? rule.rack : null,
+    rackWhy: rule ? rule.why : null,
+    // Equivalenza standard statico↔ventilato: -20°C in ventilato.
+    altMode: temp && mode === "Statico (sopra+sotto)" ? `Ventilato: ${temp - 20}°C` : (temp && mode === "Ventilato" ? `Statico: ${temp + 20}°C` : null)
+  };
+}
+function ovenBasicsHtml(b) {
+  const rows = [];
+  if (b.mode) rows.push(["Funzione", b.mode + (b.altMode ? ` <span class="ovb__alt">(${b.altMode})</span>` : "")]);
+  if (b.temp) rows.push(["Temperatura", `${b.temp}°C`]);
+  if (b.rack) rows.push(["Ripiano", `${b.rack}${b.rackWhy ? ` <span class="ovb__alt">— ${b.rackWhy}</span>` : ""}`]);
+  if (b.preheat) rows.push(["Preriscaldamento", "Sì, prima di infornare"]);
+  if (b.time) rows.push(["Durata", `${b.time} minuti`]);
+  if (!rows.length) return "";
+  return `<div class="ovb">
+    <div class="ovb__t">📋 I valori giusti per questo piatto</div>
+    ${rows.map(([k, v]) => `<div class="ovb__r"><span class="ovb__k">${k}</span><span class="ovb__v">${v}</span></div>`).join("")}
+    <div class="ovb__src">Presi dalla tua ricetta e dalle regole standard di cottura (non generati dall'AI).</div>
+  </div>`;
+}
+
+// "Come lo imposto?": guida passo-passo a impostare il forno/microonde per questa
+// ricetta. Il modello si chiede UNA volta sola e resta salvato sullo strumento.
+function openApplianceSetup(recipe, tool) {
+  if (!tool) { toast("Ricetta senza strumento", "error"); return; }
+  const kind = applianceKind(tool) || "apparecchio";
+  // Primo utilizzo: chiedo marca e modello, poi non lo chiedo più.
+  if (!(tool.model || "").trim()) {
+    const m0 = openModal(`
+      <h3 class="modal__title">🎛️ Che ${escapeHtml(kind)} hai?</h3>
+      <p class="hint" style="margin-top:-6px">Scrivilo una volta sola: resta salvato su "${escapeHtml(tool.name)}" e non te lo chiederò più.</p>
+      <div class="field"><input type="text" id="apModel" placeholder="Es. Samsung Dual Cook NV7B5740TBS" /></div>
+      <div class="modal__actions"><button class="btn" data-act="skip">Salta</button><button class="btn btn--primary" data-act="ok">Salva e continua</button></div>
+    `);
+    setTimeout(() => { const i = m0.el.querySelector("#apModel"); if (i) i.focus(); }, 50);
+    const go = async (mod) => {
+      if (mod) { await store.updateTool(tool.id, { model: mod }); tool.model = mod; }
+      m0.close();
+      runApplianceSetup(recipe, tool, kind);
+    };
+    m0.el.querySelector('[data-act="skip"]').onclick = () => go("");
+    m0.el.querySelector('[data-act="ok"]').onclick = () => go((m0.el.querySelector("#apModel").value || "").trim());
+    return;
+  }
+  runApplianceSetup(recipe, tool, kind);
+}
+async function runApplianceSetup(recipe, tool, kind) {
+  const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
+  const basics = ovenBasics(recipe);
+  const m = openModal(`
+    <h3 class="modal__title">🎛️ Come lo imposto?</h3>
+    <p class="hint" style="margin-top:-6px">${escapeHtml(tool.model || tool.name)} · ${escapeHtml(recipe.title)}</p>
+    ${ovenBasicsHtml(basics)}
+    <div id="apBody"><div style="text-align:center;padding:8px 0"><div class="ai-load"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div><div class="sk sk--line"></div></div><div class="hint">Preparo i passaggi sul tuo apparecchio…</div></div></div>
+    <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
+  `);
+  m.el.querySelector('[data-act="ok"]').onclick = m.close;
+  const body = m.el.querySelector("#apBody");
+  try {
+    // I valori già certi (dalla ricetta + regole standard) vengono passati come
+    // VINCOLI: l'AI deve usarli, non ricalcolarli a modo suo.
+    const fixed = [
+      basics.mode ? `funzione ${basics.mode}` : "",
+      basics.temp ? `${basics.temp}°C` : "",
+      basics.rack ? `ripiano ${basics.rack}` : "",
+      basics.preheat ? "con preriscaldamento" : "",
+      basics.time ? `durata ${basics.time} minuti` : ""
+    ].filter(Boolean).join(", ");
+    const d = await applianceSetup({
+      applianceName: kind, model: tool.model || "", howto: tool.howto || "",
+      title: recipe.title, steps, time: recipe.time || "",
+      cookingHint: cookingHintOf(steps),
+      fixed
+    });
+    if (!body.isConnected) return;
+    if (d.fallback) {
+      body.innerHTML = `<div class="ov-answer">${escapeHtml(d.answer).replace(/\n/g, "<br>")}</div>
+        <div class="ov-warn">⚠️ Verifica sul tuo apparecchio: sono indicazioni generate dall'AI, non il manuale.</div>`;
+      return;
+    }
+    const list = d.steps.map((s, i) => `<div class="robot-step"><span class="robot-step__n">${i + 1}</span><div class="robot-step__main"><div class="robot-step__a">${escapeHtml(s.azione)}</div>${s.impostazioni ? `<div class="robot-step__s">${iconHtml("sliders-horizontal")} ${escapeHtml(s.impostazioni)}</div>` : ""}</div></div>`).join("");
+    body.innerHTML = `${d.note ? `<div class="hint" style="margin-bottom:10px">${escapeHtml(d.note)}</div>` : ""}
+      <div class="robot-list">${list}</div>
+      ${d.check ? `<div class="ov-check">✅ <b>Come capisci che è pronto:</b> ${escapeHtml(d.check)}</div>` : ""}
+      <div class="ov-warn">⚠️ ${d.hasHowto
+        ? "Guida basata sulle note del tuo apparecchio: controlla comunque i valori."
+        : "Attenzione: i nomi esatti dei tasti del tuo modello non sono verificati. Qui trovi <b>funzione, temperatura e ripiano</b> giusti; per la sequenza precisa dei comandi aggiungi le note dal manuale."}</div>
+      ${d.hasHowto ? "" : `<button class="btn btn--ghost btn--block" id="apAddHowto" style="margin-top:10px">${iconHtml("note-pencil")} Aggiungi le note del manuale</button>`}`;
+    const addBtn = body.querySelector("#apAddHowto");
+    if (addBtn) addBtn.onclick = () => { m.close(); openToolForm(store.getTool(tool.id)); };
+  } catch (e) {
+    if (!body.isConnected) return;
+    body.innerHTML = `<div class="hint" style="color:var(--danger)">${escapeHtml(e.message || "Non riuscito.")}</div>`;
+  }
+}
+
 // "Modalità robot": converte la ricetta in comandi per Companion o Bimby (AI).
 function openRobotMode(r) {
   const run = async (device) => {
@@ -4242,6 +4400,16 @@ function openToolForm(tool = null) {
       <label>Icona</label>
       <div class="icon-picker" id="iconPicker">${iconBtns}${emojiBtns}</div>
     </div>
+    <div class="field">
+      <label>Marca e modello <span style="font-weight:400;color:var(--text-soft)">(facoltativo)</span></label>
+      <input type="text" id="toolModel" placeholder="Es. Samsung Dual Cook NV7B5740TBS" value="${escapeHtml(tool && tool.model ? tool.model : "")}" />
+      <div class="hint" style="margin-top:4px">Si scrive una volta sola: resta salvato e serve per la guida "Come lo imposto?" nelle ricette.</div>
+    </div>
+    <details class="tool-howto">
+      <summary>Note su come si imposta (opzionale, migliora molto la guida)</summary>
+      <textarea id="toolHowto" rows="4" placeholder="Copia dal manuale o scrivi tu: nomi esatti delle funzioni, come si sceglie la zona, quanti ripiani...">${escapeHtml(tool && tool.howto ? tool.howto : "")}</textarea>
+      <div class="hint">Quello che scrivi qui viene usato alla lettera: è il modo più sicuro per avere istruzioni giuste per il TUO apparecchio.</div>
+    </details>
     <div class="modal__actions">
       <button class="btn" data-act="cancel">Annulla</button>
       <button class="btn btn--primary" data-act="save">${editing ? "Salva" : "Aggiungi"}</button>
@@ -4263,9 +4431,11 @@ function openToolForm(tool = null) {
   m.el.querySelector('[data-act="save"]').onclick = async () => {
     const name = nameInput.value.trim();
     if (!name) { toast("Inserisci un nome", "error"); return; }
+    const model = (m.el.querySelector("#toolModel").value || "").trim();
+    const howto = (m.el.querySelector("#toolHowto").value || "").trim();
     try {
-      if (editing) await store.updateTool(tool.id, { name, icon: selected });
-      else await store.addTool({ name, icon: selected });
+      if (editing) await store.updateTool(tool.id, { name, icon: selected, model, howto });
+      else await store.addTool({ name, icon: selected, model, howto });
       m.close();
       toast(editing ? "Strumento aggiornato" : "Strumento aggiunto", "success");
       render();
