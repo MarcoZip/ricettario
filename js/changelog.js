@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.30",
+    d: "2026-06-24",
+    minor: true,
+    items: [
+      "Forno AEG: aggiunte le posizioni dei comandi lette dalla foto (spegnimento in alto, lampadina in alto a destra, scongelamento in basso a sinistra) e il promemoria che il forno parte da solo girando le manopole, senza tasto avvio."
+    ]
+  },
+  {
     v: "8.29",
     d: "2026-06-24",
     items: [

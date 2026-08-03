@@ -1,7 +1,7 @@
 // Service worker: mette in cache l'app per l'uso offline e l'installazione.
 // I dati (Firestore/TheMealDB) NON passano da qui: vanno sempre in rete / cache propria.
 
-const CACHE = "ricettario-v219";
+const CACHE = "ricettario-v220";
 const APP_SHELL = [
   "./",
   "./index.html",
