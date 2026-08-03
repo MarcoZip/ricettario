@@ -3567,12 +3567,14 @@ async function runApplianceSetup(recipe, tool, kind) {
   const basics = ovenBasics(recipe, tool);
   const m = openModal(`
     <h3 class="modal__title">🎛️ Come lo imposto?</h3>
-    <p class="hint" style="margin-top:-6px">${escapeHtml(tool.model || tool.name)} · ${escapeHtml(recipe.title)}</p>
+    <p class="hint" style="margin-top:-6px">${escapeHtml(tool.model || tool.name)} · ${escapeHtml(recipe.title)} · <a href="#" id="apChange">cambia apparecchio</a></p>
     ${ovenBasicsHtml(basics)}
     <div id="apBody"><div style="text-align:center;padding:8px 0"><div class="ai-load"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div><div class="sk sk--line"></div></div><div class="hint">Preparo i passaggi sul tuo apparecchio…</div></div></div>
     <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
   `);
   m.el.querySelector('[data-act="ok"]').onclick = m.close;
+  const chg = m.el.querySelector("#apChange");
+  if (chg) chg.onclick = (e) => { e.preventDefault(); m.close(); openToolForm(store.getTool(tool.id)); };
   const body = m.el.querySelector("#apBody");
   try {
     // I valori già certi (dalla ricetta + regole standard) vengono passati come
@@ -4449,7 +4451,17 @@ function openToolForm(tool = null) {
     const name = nameInput.value.trim();
     if (!name) { toast("Inserisci un nome", "error"); return; }
     const model = (m.el.querySelector("#toolModel").value || "").trim();
-    const howto = (m.el.querySelector("#toolHowto").value || "").trim();
+    let howto = (m.el.querySelector("#toolHowto").value || "").trim();
+    // Cambio apparecchio: le note del manuale VECCHIO non valgono più per il nuovo.
+    // Meglio chiederlo che dare istruzioni sbagliate davanti al forno.
+    if (editing && howto && (tool.model || "") !== model && (tool.howto || "") === howto) {
+      const keep = await confirmDialog({
+        title: "Hai cambiato apparecchio",
+        message: `Le note salvate si riferiscono a "${tool.model || tool.name}". Vuoi cancellarle? Se le tieni, la guida userà le istruzioni dell'apparecchio vecchio.`,
+        confirmText: "Cancella le note"
+      });
+      if (keep) howto = "";
+    }
     try {
       if (editing) await store.updateTool(tool.id, { name, icon: selected, model, howto });
       else await store.addTool({ name, icon: selected, model, howto });

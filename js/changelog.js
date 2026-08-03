@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.18",
+    d: "2026-06-24",
+    minor: true,
+    items: [
+      "Se cambi forno: basta aggiornare il modello nello strumento (o toccare \"cambia apparecchio\" dalla guida). Se avevi salvato le note del manuale vecchio, l'app ti chiede se cancellarle, così non ti dà più le istruzioni dell'apparecchio precedente."
+    ]
+  },
+  {
     v: "8.17",
     d: "2026-06-24",
     items: [
