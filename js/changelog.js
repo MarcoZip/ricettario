@@ -6,6 +6,20 @@
 
 export const CHANGELOG = [
   {
+    v: "8.28",
+    d: "2026-06-24",
+    items: [
+      "Nella guida compare ora il riquadro \"Sul tuo pannello\" con la sequenza REALE dei comandi del tuo apparecchio (ruota il Selettore e premi sul Samsung, le due manopole sull'AEG, MANUAL e WATTS sul microonde…). Questo testo è preso dai manuali e dalle foto, non generato dall'AI: è sempre lo stesso e sempre giusto."
+    ]
+  },
+  {
+    v: "8.27",
+    d: "2026-06-24",
+    items: [
+      "Forno Samsung: dalla foto del pannello è emerso che il display chiama \"Tradizionale\" la funzione che il manuale chiama \"Convenzionale\". Ora l'app usa il nome che leggi davvero sul forno, e conosce la disposizione reale dei tasti (riga in alto = zona superiore, riga in basso = zona inferiore, manopola a destra)."
+    ]
+  },
+  {
     v: "8.26",
     d: "2026-06-24",
     minor: true,

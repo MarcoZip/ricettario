@@ -3663,7 +3663,8 @@ async function runApplianceSetup(recipe, tool, kind) {
       seenSteps.add(k); return true;
     });
     const list = steps2.map((s, i) => `<div class="robot-step"><span class="robot-step__n">${i + 1}</span><div class="robot-step__main"><div class="robot-step__a">${escapeHtml(s.azione)}</div>${s.impostazioni ? `<div class="robot-step__s">${iconHtml("sliders-horizontal")} ${escapeHtml(s.impostazioni)}</div>` : ""}</div></div>`).join("");
-    body.innerHTML = `${d.note ? `<div class="hint" style="margin-bottom:10px">${escapeHtml(d.note)}</div>` : ""}
+    body.innerHTML = `${kb && kb.sequence ? `<div class="ov-seq"><div class="ov-seq__t">🎛️ Sul tuo pannello</div>${escapeHtml(kb.sequence)}</div>` : ""}
+      ${d.note ? `<div class="hint" style="margin-bottom:10px">${escapeHtml(d.note)}</div>` : ""}
       <div class="robot-list">${list}</div>
       ${d.check ? `<div class="ov-check">✅ <b>Come capisci che è pronto:</b> ${escapeHtml(d.check)}</div>` : ""}
       ${kb && kb.quirks && kb.quirks.length ? `<div class="ov-quirks"><div class="ov-quirks__t">💡 Del tuo ${escapeHtml(kb.label)}</div><ul>${kb.quirks.slice(0, 3).map((q) => `<li>${escapeHtml(q)}</li>`).join("")}</ul></div>` : ""}

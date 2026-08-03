@@ -9,7 +9,10 @@ export const APPLIANCE_KB = [
     // Serie NV7B5xxx Dual Cook Flex (verificato sul manuale del NV7B5740TBS)
     match: /nv7b5\d{3}|dual\s?cook/i,
     label: "Samsung Dual Cook Flex (serie NV7B5)",
-    source: "Manuale utente ufficiale Samsung in italiano",
+    source: "Manuale ufficiale Samsung in italiano + foto del pannello reale",
+    caveat: "Sul display di questo forno la cottura sopra+sotto si chiama \"Tradizionale\", mentre il manuale la chiama \"Convenzionale\": qualche altro nome potrebbe differire, fidati di quello che leggi sul display.",
+    // Sequenza reale del pannello, mostrata così com'è (non passa dall'AI).
+    sequence: "Accendi · RUOTA il Selettore (manopola a destra) per scegliere la modalità e PREMILO per confermare · ruota per la temperatura e premi · imposta la durata col tasto “Tempo di cottura” · parte il preriscaldamento e un segnale avvisa quando puoi infornare.",
     limits: "In cottura singola la temperatura arriva a 250 °C; in doppia cottura ogni zona sta tra 40 e 250 °C e le due zone si limitano a vicenda. Air Fry richiede il divisorio e va da 150 a 250 °C.",
     levels: 5,
     // Livelli e temperature dalle tabelle di cottura Samsung: hanno priorità
@@ -27,10 +30,10 @@ export const APPLIANCE_KB = [
     ],
     // Testo compatto passato all'AI come fonte attendibile sui comandi reali.
     howto: [
-      "PANNELLO (verificato dal manuale): display + UNA manopola chiamata 'Selettore' + tasti touch.",
-      "Tasti: Accensione, Selettore zona alta/bassa, Avvio/Arresto, Tempo di cottura, Luce, Smart Control, Opzioni, Indietro.",
+      "PANNELLO (verificato dalla foto reale): display al centro con il nome della modalità e la temperatura, tasti touch al centro-destra su DUE RIGHE e la manopola 'Selettore' a DESTRA. La riga di tasti in alto comanda la zona superiore, quella in basso la zona inferiore (zona e avvio). Ci sono poi orologio, Smart Control, luce, Opzioni (☰), Indietro (↩) e un tasto info (ⓘ) a sinistra del display.",
       "SEQUENZA REALE: 1) premi Accensione. 2) RUOTA il Selettore per scegliere la modalità e PREMI il Selettore per confermare. 3) RUOTA il Selettore per la temperatura e PREMI per confermare. 4) per la durata tocca il tasto 'Tempo di cottura' (oppure ruota fino a 'Impostazione tempo di cottura'), imposta e conferma. 5) parte il preriscaldamento: un segnale acustico avvisa quando è pronto per infornare.",
-      "NOMI ESATTI DELLE MODALITÀ (con temperatura suggerita da Samsung): Convezione (160°C, ventilata, più livelli insieme); Convenzionale (180°C, sopra+sotto, cottura standard); Convezione Eco (160°C, NON va preriscaldata); Grill grande (220°C, per rosolare la superficie di carne, lasagne o gratin); Grill Eco (220°C, porzioni piccole); Grill ventilato (180°C); Riscaldamento superiore + Convezione (180°C, per doratura in superficie); Riscaldamento inferiore + Convezione (200°C, consigliata per pizza, pane e torte); Riscaldamento inferiore (150°C, per dorare il fondo a fine cottura); Rosolatura (160°C); Sottovuoto ad aria (60°C); Air Fry (220°C).",
+      "ATTENZIONE AI NOMI: sul display di QUESTO forno la cottura sopra+sotto si chiama 'Tradizionale' (verificato dalla foto del pannello), anche se il manuale la chiama 'Convenzionale'. Se un nome non corrisponde, fai riferimento alla descrizione della funzione.",
+      "NOMI DELLE MODALITÀ (con temperatura suggerita da Samsung): Convezione (160°C, ventilata, più livelli insieme); Tradizionale, detta Convenzionale sul manuale (180°C, sopra+sotto, cottura standard); Convezione Eco (160°C, NON va preriscaldata); Grill grande (220°C, per rosolare la superficie di carne, lasagne o gratin); Grill Eco (220°C, porzioni piccole); Grill ventilato (180°C); Riscaldamento superiore + Convezione (180°C, per doratura in superficie); Riscaldamento inferiore + Convezione (200°C, consigliata per pizza, pane e torte); Riscaldamento inferiore (150°C, per dorare il fondo a fine cottura); Rosolatura (160°C); Sottovuoto ad aria (60°C); Air Fry (220°C).",
       "RIPIANI: 5 livelli numerati DAL BASSO (1 = più basso, 5 = più alto).",
       "DUAL COOK: il divisorio va inserito al LIVELLO 3; il forno lo rileva da solo e attiva la doppia cottura preselezionando la zona superiore. Le zone si scelgono con i tasti 'Selettore zona alta/bassa', attivi solo col divisorio inserito. Avvio: il tasto Avvio superiore per la zona alta, quello inferiore per la zona bassa.",
       "Air Fry: richiede il divisorio, va nella zona superiore con la teglia al livello 4, non serve preriscaldare e blocca l'uso della zona inferiore."
@@ -53,6 +56,7 @@ export const APPLIANCE_KB = [
     // Da mostrare all'utente: qui la certezza è minore che sugli altri.
     caveat: "Sul pannello di questo forno le funzioni sono indicate SOLO da simboli, senza scritte: quindi la funzione va riconosciuta dal simbolo, non da un nome.",
     limits: "Il termostato va da 50 a 275 °C. Lo scongelamento non usa temperatura (termostato su OFF). NON esiste un tasto di avvio: il forno parte da solo appena ruoti le due manopole.",
+    sequence: "Controlla che il display mostri l'ora (se lampeggia il forno non scalda) · ruota la manopola di SINISTRA sul simbolo della funzione · ruota quella di DESTRA sulla temperatura: il forno parte da solo · per la durata premi il tasto centrale con l'orologio finché lampeggia la spia giusta, poi regola con − e + · a fine cottura riporta entrambe le manopole su OFF.",
     levels: 5,
     racks: [
       { rx: /pizza/i, rack: "livello 1", temp: "180-200°C", note: "manuale AEG: pizza e ricette umide su UN SOLO livello", mode: "Ventilata (Ventitherm)" },
@@ -125,6 +129,7 @@ export const APPLIANCE_KB = [
     label: "Whirlpool JT 359",
     source: "Manuale d'uso ufficiale Whirlpool in italiano (cod. 4619 694 50162)",
     family: "microonde",
+    sequence: "Premi MANUAL (anche più volte) per scegliere la funzione · imposta il tempo coi tasti + e − · premi WATTS per la potenza · premi Avvio. Per i programmi automatici: tasto della funzione, poi FOOD per la classe dell'alimento (e +/− per il peso se richiesto), poi Avvio.",
     // Programmi automatici con le classi e i pesi dichiarati dal manuale.
     table: [
       // Lo scongelamento va riconosciuto PRIMA del tipo di alimento.
@@ -174,6 +179,7 @@ export const APPLIANCE_KB = [
     family: "friggitrice",
     ranges: { temp: "80-200 °C", time: "1-60 minuti" },
     limits: "La temperatura va da 80 a 200 °C e il tempo da 1 a 60 minuti: non proporre valori fuori da questi limiti. Non esiste il preriscaldamento.",
+    sequence: "Metti il cibo nel cestello e reinseriscilo · premi per accendere (parte “Manuale” 200 °C / 15 min) · per un programma premi il tasto programma e scegli RUOTANDO la manopola · premi il tasto temperatura e regola con la manopola, poi il tasto timer per il tempo · premi per avviare. Ricorda di scuotere a metà.",
     // Tabella di cottura del manuale: temperature e tempi ufficiali per cibo.
     table: [
       { rx: /patatin.*(surgelat|congelat)|patate fritte surgelate/i, temp: "180 °C", time: "22-40 min", note: "500 g – 1,5 kg · scuoti · resa migliore con 1,5 kg" },
