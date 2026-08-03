@@ -44,6 +44,51 @@ export const APPLIANCE_KB = [
     ]
   },
   {
+    id: "aeg-b3101-4",
+    // L'utente lo legge come "83101-4-M": sulla targhetta la B sembra un 8.
+    match: /\b8?3101-?4|b\s?3101/i,
+    label: "AEG Competence B3101-4 (forno ventilato)",
+    source: "Manuale utente ufficiale AEG (edizione inglese)",
+    // Da mostrare all'utente: qui la certezza è minore che sugli altri.
+    caveat: "Il manuale italiano di questo modello non è reperibile: i valori (livelli, temperature, orologio) vengono dall'edizione inglese, mentre i NOMI ITALIANI delle funzioni sulla manopola non sono verificati.",
+    levels: 5,
+    racks: [
+      { rx: /pizza/i, rack: "livello 1", temp: "180-200°C", note: "manuale AEG: pizza e ricette umide su UN SOLO livello", mode: "Ventilata (Ventitherm)" },
+      { rx: /pane|focacc/i, rack: "livello 1", temp: "180-200°C", note: "preriscalda", mode: "Ventilata (Ventitherm)" },
+      { rx: /lasagn|gratin|sformat|timball|parmigian/i, rack: "livello 3", temp: "180-190°C", note: "voce 'gratin' del manuale · funzione Rotitherm", mode: "Rotitherm (grill ventilato)" },
+      { rx: /crostat|quiche|torta salata/i, rack: "livello 3 (o 2)", temp: "170-180°C", note: "30-50 min", mode: "Ventilata (Ventitherm)" },
+      { rx: /torta|ciambell|plumcake|pan di spagna/i, rack: "livello 1", temp: "150-170°C", note: "torte in stampo · le torte molto ricche 130-140°C più a lungo", mode: "Ventilata (Ventitherm)" },
+      { rx: /biscott|frollin/i, rack: "livello 3", temp: "150-170°C", note: "15-25 min · frolla 140-150°C", mode: "Ventilata (Ventitherm)" },
+      { rx: /meringh/i, rack: "livello 3", temp: "75°C", note: "3h30-4h30", mode: "Ventilata (Ventitherm)" },
+      { rx: /arrost.*maial|maial/i, rack: "livello 2", temp: "170-180°C", note: "manuale AEG", mode: "Rotitherm (grill ventilato)" },
+      { rx: /manzo|roast beef|vitell/i, rack: "livello 3 (o 2)", temp: "150-170°C", note: "tagli pregiati 150-160°C", mode: "Rotitherm (grill ventilato)" },
+      { rx: /agnell/i, rack: "livello 2", temp: "150-160°C", note: "manuale AEG", mode: "Rotitherm (grill ventilato)" },
+      { rx: /pollo|pollame|tacchin/i, rack: "livelli 1-3", temp: "140-220°C", note: "secondo il peso", mode: "Rotitherm (grill ventilato)" },
+      { rx: /hamburger|salsicc|bistecc|braciol/i, rack: "livello 4", temp: "grill al massimo", note: "8-12 min il primo lato, 5-10 il secondo · porta CHIUSA", mode: "Grill" },
+      { rx: /toast/i, rack: "livello 3", temp: "grill al massimo", note: "2-3 min per lato", mode: "Grill" },
+      { rx: /scongel/i, rack: "livello 1", temp: "nessuna temperatura", note: "solo ventola, cibo scoperto, girare a metà", mode: "Scongelamento" }
+    ],
+    howto: [
+      "PANNELLO (dal manuale, edizione inglese): due manopole A SCOMPARSA (si premono per farle uscire) — una per le funzioni, una per la temperatura — più un display con l'ora e i tasti Selezione, + e −.",
+      "REGOLA FONDAMENTALE: il forno NON funziona se l'ora non è impostata. Dopo un blackout l'orologio lampeggia e il forno non scalda finché non si reimposta l'ora.",
+      "SEQUENZA: 1) controlla che l'ora sia impostata. 2) tira fuori le manopole premendole. 3) ruota la manopola funzioni sulla funzione. 4) ruota il termostato sulla temperatura. 5) volendo imposta durata o ora di fine con il tasto Selezione e i tasti +/−. 6) a fine cottura riporta ENTRAMBE le manopole su OFF.",
+      "FUNZIONI (nomi originali del manuale inglese, l'equivalente italiano sulla manopola può essere scritto diversamente): Oven Light (luce); Ventitherm Fan Operated Cooking = cottura ventilata, fino a 3 livelli insieme; Fan Controlled Defrosting = scongelamento con sola ventola, senza temperatura; Single/Economy Grill = grill piccolo centrale; Full Width Dual Grill = grill grande; Rotitherm Roasting = grill ventilato per arrosti e gratin su un solo livello.",
+      "IMPORTANTE: essendo un forno ventilato, le temperature delle ricette tradizionali vanno ABBASSATE di 20-40 °C.",
+      "RIPIANI: numerati dal basso (almeno 5). Su più livelli con la ventilata: 2 teglie ai livelli 1 e 3, 3 teglie ai livelli 1, 3 e 5, aggiungendo 10-15 minuti.",
+      "OROLOGIO: si preme ripetutamente il tasto Selezione finché lampeggia la funzione voluta (Ora, Contaminuti, Durata, Fine), poi si regola con + e − entro pochi secondi. La Durata spegne il forno da sola; il Contaminuti (max 2h30) no."
+    ].join(" "),
+    quirks: [
+      "Dopo un blackout il forno non scalda finché non reimposti l'ora: è il problema numero uno di questo modello.",
+      "Le manopole sono a scomparsa: vanno premute per farle uscire.",
+      "È un forno ventilato: usa 20-40 °C in meno rispetto alle temperature delle ricette classiche.",
+      "Il grill va sempre usato a porta CHIUSA, dopo 5 minuti di preriscaldamento a vuoto.",
+      "Lo scongelamento non vuole temperatura: il termostato resta su OFF (sembra un errore, ma è giusto).",
+      "L'ora non si cambia se sono attive Durata o Fine cottura: prima vanno annullate.",
+      "Il display dell'ora si può spegnere tenendo premuti due tasti per 10 secondi (chi non lo sa pensa che sia rotto).",
+      "Pareti catalitiche autopulenti (niente pirolisi): per pulirle si imposta 250 °C per un'ora, mai spray o abrasivi."
+    ]
+  },
+  {
     id: "moulinex-icompanion-touch-xl",
     // Robot: non usa "Come lo imposto?" ma alimenta la Modalità robot.
     match: /i-?companion|companion\s*(touch|xl)|hf9[0-9]{2}/i,

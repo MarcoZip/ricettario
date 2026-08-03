@@ -3649,7 +3649,7 @@ async function runApplianceSetup(recipe, tool, kind) {
       ${kb && kb.quirks && kb.quirks.length ? `<div class="ov-quirks"><div class="ov-quirks__t">💡 Del tuo ${escapeHtml(kb.label)}</div><ul>${kb.quirks.slice(0, 3).map((q) => `<li>${escapeHtml(q)}</li>`).join("")}</ul></div>` : ""}
       <div class="ov-warn">⚠️ ${(tool.howto || "").trim()
         ? "Guida basata sulle note che hai salvato sul tuo apparecchio: controlla comunque i valori."
-        : (kb ? `Comandi e livelli dal <b>${escapeHtml(kb.source)}</b>. Verifica sempre sul tuo forno: le versioni possono differire.`
+        : (kb ? `Comandi e livelli dal <b>${escapeHtml(kb.source)}</b>. Verifica sempre sul tuo forno: le versioni possono differire.${kb.caveat ? `<br><b>Nota:</b> ${escapeHtml(kb.caveat)}` : ""}`
               : "Attenzione: i nomi esatti dei tasti del tuo modello non sono verificati. Qui trovi <b>funzione, temperatura e ripiano</b> giusti; per la sequenza precisa dei comandi aggiungi le note dal manuale.")}</div>
       ${(tool.howto || "").trim() || kb ? "" : `<button class="btn btn--ghost btn--block" id="apAddHowto" style="margin-top:10px">${iconHtml("note-pencil")} Aggiungi le note del manuale</button>`}`;
     const addBtn = body.querySelector("#apAddHowto");

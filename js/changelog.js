@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.23",
+    d: "2026-06-24",
+    items: [
+      "Aggiunto anche il forno AEG Competence B3101-4: livelli e temperature dalle tabelle del manuale (pizza al livello 1, gratin al 3, arrosti al 2), l'avviso che è ventilato (20-40 °C in meno delle ricette classiche) e le sue stranezze (dopo un blackout non scalda finché non reimposti l'ora, manopole a scomparsa, grill a porta chiusa).",
+      "Quando i dati di un apparecchio sono meno certi, ora l'app te lo dice apertamente invece di far finta di sapere."
+    ]
+  },
+  {
     v: "8.22",
     d: "2026-06-24",
     items: [
