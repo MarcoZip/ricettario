@@ -912,7 +912,7 @@ async function handleOven(request, env) {
   try { body = await request.json(); } catch (e) { return json({ error: "badreq" }, 400); }
   const applianceName = String((body && body.applianceName) || "forno").slice(0, 60);
   const model = String((body && body.model) || "").slice(0, 120);
-  const howto = String((body && body.howto) || "").slice(0, 1200);
+  const howto = String((body && body.howto) || "").slice(0, 2200);
   const title = String((body && body.title) || "").slice(0, 140);
   const steps = Array.isArray(body.steps) ? body.steps.map((x) => String(x)).slice(0, 30) : [];
   const time = String((body && body.time) || "").slice(0, 40);

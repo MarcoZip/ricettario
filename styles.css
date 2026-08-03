@@ -1031,6 +1031,10 @@ html.theme-switching::view-transition-new(root) { z-index: 2147483646; }
 .ovb__v { flex: 1; font-weight: 700; font-size: 0.9rem; }
 .ovb__alt { font-weight: 400; color: var(--text-soft); font-size: 0.82rem; }
 .ovb__src { margin-top: 8px; font-size: 0.74rem; color: var(--text-soft); }
+.ov-quirks { margin-top: 12px; background: rgba(var(--primary-rgb, 255,140,60), 0.10); border-radius: 12px; padding: 10px 12px; }
+.ov-quirks__t { font-weight: 800; font-size: 0.85rem; margin-bottom: 4px; }
+.ov-quirks ul { margin: 0; padding-left: 18px; }
+.ov-quirks li { font-size: 0.8rem; color: var(--text-soft); margin: 3px 0; }
 .ov-check { margin-top: 12px; background: rgba(47, 158, 111, 0.14); border-radius: 12px; padding: 10px 12px; font-size: 0.86rem; }
 .ov-warn { margin-top: 10px; background: rgba(255, 159, 67, 0.14); border: 1px solid rgba(255, 159, 67, 0.3); border-radius: 12px; padding: 10px 12px; font-size: 0.82rem; color: var(--text-soft); }
 .tool-howto { margin-bottom: 14px; }

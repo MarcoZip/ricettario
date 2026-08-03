@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "8.17",
+    d: "2026-06-24",
+    items: [
+      "Il tuo forno Samsung Dual Cook è ora \"conosciuto\" dall'app: nomi veri delle funzioni (Convezione, Convenzionale, Grill grande…), la sequenza reale della manopola Selettore, i livelli consigliati da Samsung per ogni piatto (lasagne al 3, torte al 2, pizza al 2…) e i trucchi da sapere (il menu si riordina da solo, il divisorio va al livello 3, il touch non risponde coi guanti). Dati presi dal manuale ufficiale, non inventati."
+    ]
+  },
+  {
     v: "8.16",
     d: "2026-06-24",
     items: [

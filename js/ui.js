@@ -16,6 +16,7 @@ import { GUEST_ALLERGENS, GUEST_DIETS, checkRecipeForGuests, guestsSummary, CUST
 import { estimateCost } from "./cost.js";
 import { estimateImpact } from "./co2.js";
 import { restockDue, forgetRestock } from "./restock.js";
+import { applianceKB, kbRackFor } from "./appliances.js";
 import { seasonalProduce, recipeSeasonalMatches, monthName, currentMonth } from "./seasonal.js";
 import { convertMeasures } from "./measures.js";
 import { getNickname, setNickname, getCover, setCover } from "./profile.js";
@@ -3488,7 +3489,7 @@ const RACK_RULES = [
 ];
 // Estrae in modo deterministico i parametri di cottura DALLA RICETTA (nessuna AI):
 // temperatura e modalità scritte nei passi, tempo del campo, ripiano da regole.
-function ovenBasics(recipe) {
+function ovenBasics(recipe, tool) {
   const txt = ((recipe.steps || []).join(" ") + " " + (recipe.title || "")).toLowerCase();
   const degMatch = txt.match(/\b(\d{2,3})\s*(?:°\s*c?|gradi)/);
   const temp = degMatch ? parseInt(degMatch[1], 10) : null;
@@ -3502,8 +3503,15 @@ function ovenBasics(recipe) {
   // Col grill comanda il grill: si sta vicino alla resistenza, qualunque sia il piatto.
   if (mode === "Grill") rule = RACK_RULES[RACK_RULES.length - 1];
   const preheat = /preriscald|forno (?:ben |molto |gi[àa] )?caldo/.test(txt);
+  // Se conosciamo il modello, le tabelle del costruttore battono le regole generiche.
+  const kb = applianceKB(tool && tool.model);
+  const kbRack = kbRackFor(kb, hay);
+  if (kbRack) {
+    rule = { rack: kbRack.rack, why: kbRack.note || (kb ? kb.label : "") };
+    if (!mode && kbRack.mode) mode = kbRack.mode;
+  }
   return {
-    temp, mode, preheat,
+    temp, mode, preheat, kb, kbTemp: kbRack && kbRack.temp ? kbRack.temp : null,
     time: recipe.time || null,
     rack: rule ? rule.rack : null,
     rackWhy: rule ? rule.why : null,
@@ -3513,16 +3521,19 @@ function ovenBasics(recipe) {
 }
 function ovenBasicsHtml(b) {
   const rows = [];
-  if (b.mode) rows.push(["Funzione", b.mode + (b.altMode ? ` <span class="ovb__alt">(${b.altMode})</span>` : "")]);
-  if (b.temp) rows.push(["Temperatura", `${b.temp}°C`]);
-  if (b.rack) rows.push(["Ripiano", `${b.rack}${b.rackWhy ? ` <span class="ovb__alt">— ${b.rackWhy}</span>` : ""}`]);
+  if (b.mode) rows.push(["Funzione", escapeHtml(b.mode) + (b.altMode ? ` <span class="ovb__alt">(${escapeHtml(b.altMode)})</span>` : "")]);
+  if (b.temp) rows.push(["Temperatura", `${b.temp}°C${b.kbTemp ? ` <span class="ovb__alt">(manuale: ${escapeHtml(b.kbTemp)})</span>` : ""}`]);
+  else if (b.kbTemp) rows.push(["Temperatura", `${escapeHtml(b.kbTemp)} <span class="ovb__alt">(dal manuale)</span>`]);
+  if (b.rack) rows.push(["Ripiano", `${escapeHtml(b.rack)}${b.rackWhy ? ` <span class="ovb__alt">— ${escapeHtml(b.rackWhy)}</span>` : ""}`]);
   if (b.preheat) rows.push(["Preriscaldamento", "Sì, prima di infornare"]);
-  if (b.time) rows.push(["Durata", `${b.time} minuti`]);
+  if (b.time) rows.push(["Durata", `${escapeHtml(String(b.time))} minuti`]);
   if (!rows.length) return "";
   return `<div class="ovb">
     <div class="ovb__t">📋 I valori giusti per questo piatto</div>
     ${rows.map(([k, v]) => `<div class="ovb__r"><span class="ovb__k">${k}</span><span class="ovb__v">${v}</span></div>`).join("")}
-    <div class="ovb__src">Presi dalla tua ricetta e dalle regole standard di cottura (non generati dall'AI).</div>
+    <div class="ovb__src">${b.kb
+      ? `Dalla tua ricetta e dalle tabelle del <b>${escapeHtml(b.kb.source)}</b> — non generati dall'AI.`
+      : "Presi dalla tua ricetta e dalle regole standard di cottura (non generati dall'AI)."}</div>
   </div>`;
 }
 
@@ -3553,7 +3564,7 @@ function openApplianceSetup(recipe, tool) {
 }
 async function runApplianceSetup(recipe, tool, kind) {
   const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
-  const basics = ovenBasics(recipe);
+  const basics = ovenBasics(recipe, tool);
   const m = openModal(`
     <h3 class="modal__title">🎛️ Come lo imposto?</h3>
     <p class="hint" style="margin-top:-6px">${escapeHtml(tool.model || tool.name)} · ${escapeHtml(recipe.title)}</p>
@@ -3573,8 +3584,12 @@ async function runApplianceSetup(recipe, tool, kind) {
       basics.preheat ? "con preriscaldamento" : "",
       basics.time ? `durata ${basics.time} minuti` : ""
     ].filter(Boolean).join(", ");
+    // Fonte sui comandi: prima le note dell'utente, altrimenti i dati verificati
+    // del manuale (se il modello è nella base di conoscenza).
+    const kb = basics.kb;
+    const howto = (tool.howto || "").trim() || (kb ? kb.howto : "");
     const d = await applianceSetup({
-      applianceName: kind, model: tool.model || "", howto: tool.howto || "",
+      applianceName: kind, model: tool.model || "", howto,
       title: recipe.title, steps, time: recipe.time || "",
       cookingHint: cookingHintOf(steps),
       fixed
@@ -3589,10 +3604,12 @@ async function runApplianceSetup(recipe, tool, kind) {
     body.innerHTML = `${d.note ? `<div class="hint" style="margin-bottom:10px">${escapeHtml(d.note)}</div>` : ""}
       <div class="robot-list">${list}</div>
       ${d.check ? `<div class="ov-check">✅ <b>Come capisci che è pronto:</b> ${escapeHtml(d.check)}</div>` : ""}
-      <div class="ov-warn">⚠️ ${d.hasHowto
-        ? "Guida basata sulle note del tuo apparecchio: controlla comunque i valori."
-        : "Attenzione: i nomi esatti dei tasti del tuo modello non sono verificati. Qui trovi <b>funzione, temperatura e ripiano</b> giusti; per la sequenza precisa dei comandi aggiungi le note dal manuale."}</div>
-      ${d.hasHowto ? "" : `<button class="btn btn--ghost btn--block" id="apAddHowto" style="margin-top:10px">${iconHtml("note-pencil")} Aggiungi le note del manuale</button>`}`;
+      ${kb && kb.quirks && kb.quirks.length ? `<div class="ov-quirks"><div class="ov-quirks__t">💡 Del tuo ${escapeHtml(kb.label)}</div><ul>${kb.quirks.slice(0, 3).map((q) => `<li>${escapeHtml(q)}</li>`).join("")}</ul></div>` : ""}
+      <div class="ov-warn">⚠️ ${(tool.howto || "").trim()
+        ? "Guida basata sulle note che hai salvato sul tuo apparecchio: controlla comunque i valori."
+        : (kb ? `Comandi e livelli dal <b>${escapeHtml(kb.source)}</b>. Verifica sempre sul tuo forno: le versioni possono differire.`
+              : "Attenzione: i nomi esatti dei tasti del tuo modello non sono verificati. Qui trovi <b>funzione, temperatura e ripiano</b> giusti; per la sequenza precisa dei comandi aggiungi le note dal manuale.")}</div>
+      ${(tool.howto || "").trim() || kb ? "" : `<button class="btn btn--ghost btn--block" id="apAddHowto" style="margin-top:10px">${iconHtml("note-pencil")} Aggiungi le note del manuale</button>`}`;
     const addBtn = body.querySelector("#apAddHowto");
     if (addBtn) addBtn.onclick = () => { m.close(); openToolForm(store.getTool(tool.id)); };
   } catch (e) {
