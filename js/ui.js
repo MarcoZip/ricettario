@@ -3466,6 +3466,17 @@ function applianceFamily(tool) {
   // Apparecchio non riconosciuto: prudenza, niente ripiani o funzioni da forno.
   return hit ? hit.family : "altro";
 }
+// Testo da dare all'AI come fonte sull'apparecchio: prima i LIMITI FISICI (regola
+// assoluta: senza, l'AI propone valori che la macchina non può impostare), poi le
+// note dell'utente se ci sono, altrimenti i dati verificati del manuale.
+function applianceFacts(kb, tool) {
+  const own = (tool && (tool.howto || "").trim()) || "";
+  const base = own || (kb ? kb.howto : "");
+  if (!base) return "";
+  const lim = kb && kb.limits ? `LIMITI INVALICABILI DI QUESTO APPARECCHIO (non proporre MAI valori fuori da questi): ${kb.limits}\n` : "";
+  return lim + base;
+}
+
 // I robot da cucina hanno già la loro "Modalità robot": qui non li trattiamo.
 const ROBOT_RX = /bimby|thermomix|\btm\s?[56]\b|companion|monsieur cuisine|cooking chef|cookeo|multicooker/i;
 function applianceKind(tool) {
@@ -3629,7 +3640,7 @@ async function runApplianceSetup(recipe, tool, kind) {
     // Fonte sui comandi: prima le note dell'utente, altrimenti i dati verificati
     // del manuale (se il modello è nella base di conoscenza).
     const kb = basics.kb;
-    const howto = (tool.howto || "").trim() || (kb ? kb.howto : "");
+    const howto = applianceFacts(kb, tool);
     const d = await applianceSetup({
       applianceName: kind, model: tool.model || "", howto,
       title: recipe.title, steps, time: recipe.time || "",
@@ -3684,7 +3695,7 @@ function openRobotMode(r) {
       const prog = await robotProgram(
         { title: r.title, ingredients, steps: r.steps || [] },
         device,
-        { model: rTool ? rTool.model : "", howto: (rTool && (rTool.howto || "").trim()) || (rKb ? rKb.howto : "") }
+        { model: rTool ? rTool.model : "", howto: applianceFacts(rKb, rTool) }
       );
       if (!body.isConnected) return;
       const note = prog.note ? `<div class="hint" style="margin-bottom:10px">${escapeHtml(prog.note)}</div>` : "";

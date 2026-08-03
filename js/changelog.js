@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "8.24",
+    d: "2026-06-24",
+    items: [
+      "Correzione importante: l'app non ti propone più impostazioni che il tuo apparecchio non può nemmeno fare. Prima, per il risotto, il Companion riceveva \"180 °C\" quando il suo massimo è 150 °C. Ora i limiti veri di ogni apparecchio (temperature, velocità, durate) sono una regola invalicabile."
+    ]
+  },
+  {
     v: "8.23",
     d: "2026-06-24",
     items: [

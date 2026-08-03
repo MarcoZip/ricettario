@@ -10,6 +10,7 @@ export const APPLIANCE_KB = [
     match: /nv7b5\d{3}|dual\s?cook/i,
     label: "Samsung Dual Cook Flex (serie NV7B5)",
     source: "Manuale utente ufficiale Samsung in italiano",
+    limits: "In cottura singola la temperatura arriva a 250 °C; in doppia cottura ogni zona sta tra 40 e 250 °C e le due zone si limitano a vicenda. Air Fry richiede il divisorio e va da 150 a 250 °C.",
     levels: 5,
     // Livelli e temperature dalle tabelle di cottura Samsung: hanno priorità
     // sulle regole generiche perché sono del costruttore per QUESTO forno.
@@ -95,6 +96,9 @@ export const APPLIANCE_KB = [
     label: "Moulinex i-Companion Touch XL (serie HF93x)",
     source: "Manuale utente ufficiale Groupe SEB/Moulinex (cod. 8020007193)",
     family: "robot",
+    // Limiti fisici dell'apparecchio: vanno imposti come regola assoluta, altrimenti
+    // l'AI propone valori che la macchina non può nemmeno impostare.
+    limits: "La temperatura NON può superare i 150 °C (range 30-150 °C, a passi di 5). Le velocità vanno da 1 a 13. Lo sbattitore E3 non supera la velocità 9. La durata massima è 2 ore. Sopra i 135 °C si lavora solo senza accessori e col coperchio aperto, per massimo 20 minuti.",
     howto: [
       "SPECIFICHE (dal manuale): potenza 1550 W, temperatura da 30 a 150 °C regolabile a passi di 5 °C, 13 velocità, durata da 5 secondi a 2 ore.",
       "ACCESSORI con i nomi ufficiali: E1 lama tritatutto ultrablade (zuppe, tritare verdura/carne/pesce; NON per prodotti duri); E2 miscelatore (rosolatura, cottura a fuoco lento, risotti, senza rovinare gli ingredienti); E3 sbattitore (albumi a neve max 8, maionese, panna: MAI oltre velocità 9 e mai per impastare); E4 lama per impastare/macinare (pane, brioche, torte, frutta a guscio, prodotti duri, ghiaccio); E5 cestello a vapore.",
@@ -167,6 +171,7 @@ export const APPLIANCE_KB = [
     source: "Manuale utente ufficiale Moulinex (rif. 1820012985)",
     family: "friggitrice",
     ranges: { temp: "80-200 °C", time: "1-60 minuti" },
+    limits: "La temperatura va da 80 a 200 °C e il tempo da 1 a 60 minuti: non proporre valori fuori da questi limiti. Non esiste il preriscaldamento.",
     // Tabella di cottura del manuale: temperature e tempi ufficiali per cibo.
     table: [
       { rx: /patatin.*(surgelat|congelat)|patate fritte surgelate/i, temp: "180 °C", time: "22-40 min", note: "500 g – 1,5 kg · scuoti · resa migliore con 1,5 kg" },
