@@ -42,6 +42,54 @@ export const APPLIANCE_KB = [
       "La 'Convezione Eco' è l'unica che non va preriscaldata.",
       "Vapore naturale: acqua nella teglia a forno FREDDO e solo insieme alla modalità Convezione."
     ]
+  },
+  {
+    id: "moulinex-easyfry-mega",
+    // Easy Fry Mega = famiglia EZ855 (verificato sul manuale ufficiale Moulinex)
+    match: /easy\s?fry\s?mega|ez855/i,
+    label: "Moulinex Easy Fry Mega (EZ855)",
+    source: "Manuale utente ufficiale Moulinex (rif. 1820012985)",
+    family: "friggitrice",
+    ranges: { temp: "80-200 °C", time: "1-60 minuti" },
+    // Tabella di cottura del manuale: temperature e tempi ufficiali per cibo.
+    table: [
+      { rx: /patatin.*(surgelat|congelat)|patate fritte surgelate/i, temp: "180 °C", time: "22-40 min", note: "500 g – 1,5 kg · scuoti · resa migliore con 1,5 kg" },
+      { rx: /patatin|patate fritte/i, temp: "180 °C", time: "28-37 min", note: "fatte in casa 8x8 mm · +1 cucchiaio d'olio · scuoti" },
+      { rx: /patate arrost|patate al forno/i, temp: "180 °C", time: "45 min", note: "+1 cucchiaio d'olio · scuoti" },
+      { rx: /bistecc/i, temp: "180 °C", time: "12 min", note: "100-600 g (1-4 pezzi)" },
+      { rx: /pollo arrost|pollo intero/i, temp: "200 °C", time: "45-60 min", note: "fino a 2 kg" },
+      { rx: /cosce di pollo|fusi di pollo|alette/i, temp: "200 °C", time: "40 min", note: "500 g – 1,5 kg" },
+      { rx: /petto di pollo|pollo/i, temp: "180 °C", time: "30-40 min", note: "200-900 g" },
+      { rx: /agnello|costolett/i, temp: "200 °C", time: "33 min", note: "200 g – 1 kg" },
+      { rx: /salsicc|wurstel/i, temp: "200 °C", time: "15-20 min", note: "300 g – 1 kg" },
+      { rx: /salmone|filetto di pesce|pesce/i, temp: "160 °C", time: "12-18 min", note: "100-700 g" },
+      { rx: /gamber/i, temp: "190 °C", time: "6-14 min", note: "300-600 g · scuoti" },
+      { rx: /crocchett|nugget/i, temp: "200 °C", time: "10-15 min", note: "surgelate · gira a metà" },
+      { rx: /anelli di cipolla/i, temp: "200 °C", time: "5-7 min", note: "congelati · scuoti" },
+      { rx: /involtini primavera/i, temp: "200 °C", time: "10 min", note: "scuoti" },
+      { rx: /pizza/i, temp: "190 °C", time: "5-15 min", note: "una pizza da 24 cm (surgelata 5-15 min, fresca 5-10)" },
+      { rx: /zucchin/i, temp: "180 °C", time: "15-18 min", note: "200-400 g" },
+      { rx: /cavolfior|broccol/i, temp: "180 °C", time: "14-16 min", note: "300-600 g" },
+      { rx: /muffin/i, temp: "180 °C", time: "18 min", note: "4-9 pezzi · usa una teglia, riempila a metà" },
+      { rx: /torta|dolce|ciambell/i, temp: "180 °C", time: "18 min", note: "150-400 g · usa una teglia, riempila a metà" },
+      { rx: /riscalda|avanzi/i, temp: "160 °C", time: "max 10 min", note: "per riscaldare gli avanzi" }
+    ],
+    howto: [
+      "PANNELLO (verificato dal manuale): touch screen digitale + una manopola centrale che si preme (integra Avvio/Pausa).",
+      "SEQUENZA REALE: 1) metti il cibo nel cestello con la griglia e reinserisci il cestello. 2) premi per accendere: parte il programma 'Manuale' a 200 °C / 15 minuti. 3) per un programma preimpostato premi il pulsante programma (inizia a lampeggiare 'Patatine fritte') e scegli RUOTANDO la manopola. 4) per la temperatura premi il pulsante temperatura e regola con la manopola (lampeggia 6 secondi, poi è confermata). 5) stessa cosa per il tempo col pulsante timer. 6) premi il pulsante per avviare: il display mostra il tempo rimanente. Per spegnere prima, tieni premuto 2 secondi.",
+      "PROGRAMMI PREIMPOSTATI (8, nomi esatti): Patatine fritte, Carne, Pollo, Gamberetti, Pesce, Pizza, Verdure, Dolce. Moulinex non pubblica temperatura e tempo di ciascuno.",
+      "RANGE: temperatura da 80 a 200 °C, tempo da 1 a 60 minuti.",
+      "NON esiste una funzione di preriscaldamento: il cibo si mette dentro prima di accendere.",
+      "A META' COTTURA: metti in pausa premendo la manopola, estrai il cestello dalla maniglia, scuoti, reinserisci e riprendi. Non c'è promemoria automatico."
+    ].join(" "),
+    quirks: [
+      "Non c'è il preriscaldamento: si mette il cibo dentro e si accende.",
+      "Se togli il cestello va in pausa: rimettilo entro 10 minuti o perdi programma, tempo e temperatura.",
+      "Nessun avviso automatico per scuotere: il manuale consiglia di scuotere 2-3 volte durante la cottura.",
+      "Non superare le quantità massime della tabella e non mettere olio o liquidi nel cestello (solo 1 cucchiaio d'olio mescolato alle patate).",
+      "Per torte e muffin usa una teglia dentro il cestello e riempila non oltre metà.",
+      "Il cestello pieno è pesante e bollente: prendilo dalla maniglia con due mani."
+    ]
   }
 ];
 
@@ -56,4 +104,12 @@ export function kbRackFor(kb, text) {
   if (!kb || !kb.racks) return null;
   const hay = String(text || "");
   return kb.racks.find((r) => r.rx.test(hay)) || null;
+}
+
+// Riga della tabella di cottura ufficiale (friggitrici, microonde): temperatura,
+// tempo e quantità consigliate dal costruttore per questo cibo.
+export function kbTableFor(kb, text) {
+  if (!kb || !kb.table) return null;
+  const hay = String(text || "");
+  return kb.table.find((r) => r.rx.test(hay)) || null;
 }

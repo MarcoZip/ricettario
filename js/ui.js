@@ -16,7 +16,7 @@ import { GUEST_ALLERGENS, GUEST_DIETS, checkRecipeForGuests, guestsSummary, CUST
 import { estimateCost } from "./cost.js";
 import { estimateImpact } from "./co2.js";
 import { restockDue, forgetRestock } from "./restock.js";
-import { applianceKB, kbRackFor } from "./appliances.js";
+import { applianceKB, kbRackFor, kbTableFor } from "./appliances.js";
 import { seasonalProduce, recipeSeasonalMatches, monthName, currentMonth } from "./seasonal.js";
 import { convertMeasures } from "./measures.js";
 import { getNickname, setNickname, getCover, setCover } from "./profile.js";
@@ -3532,7 +3532,16 @@ function ovenBasics(recipe, tool) {
   }
   if (family === "friggitrice") {
     // Cestello: contano temperatura e tempo, non i ripiani. Va scosso a metà.
-    return { family, temp, time: recipe.time || null, kb, mode: null, rack: null, preheat: false, altMode: null, kbTemp: null, shake: true };
+    // Se il modello è noto, valgono le tabelle ufficiali del costruttore.
+    const row = kbTableFor(kb, hay);
+    return {
+      family, kb, shake: true, mode: null, rack: null, preheat: false, altMode: null,
+      temp: temp || null,
+      kbTemp: row ? row.temp : null,
+      kbTime: row ? row.time : null,
+      kbNote: row ? row.note : null,
+      time: recipe.time || null
+    };
   }
   if (family === "piano" || family === "altro") {
     return { family, time: recipe.time || null, kb, temp: family === "altro" ? temp : null, mode: null, rack: null, preheat: false, altMode: null, kbTemp: null };
@@ -3554,7 +3563,9 @@ function ovenBasicsHtml(b) {
   else if (b.kbTemp) rows.push(["Temperatura", `${escapeHtml(b.kbTemp)} <span class="ovb__alt">(dal manuale)</span>`]);
   if (b.rack) rows.push(["Ripiano", `${escapeHtml(b.rack)}${b.rackWhy ? ` <span class="ovb__alt">— ${escapeHtml(b.rackWhy)}</span>` : ""}`]);
   if (b.preheat) rows.push(["Preriscaldamento", "Sì, prima di infornare"]);
-  if (b.time) rows.push(["Durata", `${escapeHtml(String(b.time))} minuti`]);
+  if (b.kbTime) rows.push(["Durata", `${escapeHtml(b.kbTime)} <span class="ovb__alt">(dal manuale)</span>${b.time ? ` · ricetta: ${escapeHtml(String(b.time))} min` : ""}`]);
+  else if (b.time) rows.push(["Durata", `${escapeHtml(String(b.time))} minuti`]);
+  if (b.kbNote) rows.push(["Dose e consigli", escapeHtml(b.kbNote)]);
   if (b.shake) rows.push(["A metà cottura", "Scuoti il cestello (o gira il cibo)"]);
   if (!rows.length) return "";
   return `<div class="ovb">

@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "8.21",
+    d: "2026-06-24",
+    items: [
+      "Anche la friggitrice ad aria Moulinex Easy Fry Mega è ora \"conosciuta\" dall'app: temperature, tempi e dosi presi dalle tabelle del manuale ufficiale (patatine 180°, pollo arrosto 200°, gamberetti 190°…), i nomi veri degli 8 programmi e i trucchi da sapere (niente preriscaldamento, se togli il cestello va in pausa, scuoti 2-3 volte)."
+    ]
+  },
+  {
     v: "8.20",
     d: "2026-06-24",
     minor: true,
