@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.39",
+    d: "2026-08-09",
+    minor: true,
+    items: [
+      "Il pulsante \"Come lo imposto?\" andava a capo su due righe quando il nome dell'apparecchio era lungo (es. Samsung Dual Cook NV7B5740TBS). Ora il nome viene accorciato tagliando fra una parola e l'altra, e il pulsante è alto come tutti gli altri."
+    ]
+  },
+  {
     v: "8.38",
     d: "2026-08-09",
     items: [

@@ -92,6 +92,19 @@ function celebrateSave(title) {
   setTimeout(() => el.remove(), reduceMotion ? 900 : 1800);
 }
 
+// Accorcia il nome di un apparecchio per farlo stare su UNA riga del pulsante:
+// "Samsung Dual Cook NV7B5740TBS" lo mandava su due. Si taglia fra una parola e
+// l'altra, perché un taglio secco a metà ("Samsung Dual Coo") si legge peggio
+// del nome intero. Misurato sul telefono: oltre i 14 caratteri il pulsante va a
+// capo comunque, quindi allargare il limite non servirebbe a niente.
+function shortModel(m, max = 14) {
+  const s = String(m || "").trim();
+  if (s.length <= max) return s;
+  const tagliato = s.slice(0, max + 1);
+  const spazio = tagliato.lastIndexOf(" ");
+  return (spazio > 3 ? tagliato.slice(0, spazio) : s.slice(0, max)) + "…";
+}
+
 // Numero positivo da un campo, con tetto massimo: fuori range → null (campo vuoto).
 // Evita porzioni negative, tempi assurdi e quantità che rompono i calcoli.
 function posNum(v, max) {
@@ -2532,7 +2545,7 @@ function renderRecipeDetail() {
          scorre cercando il gruppo, non leggendo diciassette etichette. -->
     <div class="act-group__t">🔥 Mentre cucini</div>
     <button class="btn btn--block" id="timelineBtn" style="margin-bottom:10px">🕐 Quando inizio? (per servire in orario)</button>
-    ${isImportConfigured() && tool && applianceKind(tool) ? `<button class="btn btn--block" id="ovenBtn" style="margin-bottom:10px">🎛️ Come lo imposto?${tool.model ? ` · ${escapeHtml(tool.model.slice(0, 26))}` : ""}</button>` : ""}
+    ${isImportConfigured() && tool && applianceKind(tool) ? `<button class="btn btn--block" id="ovenBtn" style="margin-bottom:10px">🎛️ Come lo imposto?${tool.model ? ` · ${escapeHtml(shortModel(tool.model))}` : ""}</button>` : ""}
     ${isImportConfigured() ? `<button class="btn btn--block" id="askChefBtn" style="margin-bottom:10px">💬 Chiedi allo chef (AI)</button>` : ""}
     ${steps.length ? `<button class="btn btn--block" id="chefBtn" style="margin-bottom:10px">🍳 Leggi la ricetta</button>` : ""}
     ${(videoInfo(r.videoUrl) || videoInfo(r.url)) ? `<button class="btn btn--block" id="watchVideo" style="margin-bottom:10px">▶ Guarda il video</button>` : ""}
