@@ -207,19 +207,22 @@ export function getByTag(tag) {
 }
 
 // Statistiche cucina.
+// Ritorna true se la cottura è stata contata, false se era un doppione scartato:
+// chi chiama deve dirlo all'utente, altrimenti il tocco sembra riuscito ma non lo è.
 export async function markCooked(id) {
   const r = getRecipe(id);
-  if (!r) return;
+  if (!r) return false;
   // Finendo la Modalità cucina la ricetta viene già segnata: se subito dopo si
   // tocca anche "Segna come cucinata" la stessa cena verrebbe contata due volte
   // (falsando statistiche, diario e sfide). Ignoriamo il doppione ravvicinato.
   if (r.lastCooked) {
     const passati = Date.now() - new Date(r.lastCooked).getTime();
-    if (isFinite(passati) && passati >= 0 && passati < 30 * 60 * 1000) return;
+    if (isFinite(passati) && passati >= 0 && passati < 30 * 60 * 1000) return false;
   }
   const log = Array.isArray(r.cookLog) ? r.cookLog.slice(-99) : [];
   log.push(now());
   await adapter.updateRecipe(id, { cookCount: (r.cookCount || 0) + 1, lastCooked: now(), cookLog: log });
+  return true;
 }
 
 // Diario: tutte le volte che hai cucinato, con data, dalla più recente.

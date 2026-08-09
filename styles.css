@@ -669,7 +669,9 @@ a { color: var(--primary-2); }
   bottom: calc(var(--nav-h) + var(--safe-bottom) + 18px);
   left: 0; right: 0;
   display: flex; flex-direction: column; align-items: center; gap: 8px;
-  z-index: 200; pointer-events: none;
+  /* Sopra la Modalità cucina (300) e la celebrazione (360): gli avvisi durante
+     la cottura e in modalità supermercato erano nel DOM ma invisibili. */
+  z-index: 400; pointer-events: none;
 }
 .toast {
   background: var(--surface-3); color: var(--text);

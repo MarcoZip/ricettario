@@ -6,6 +6,24 @@
 
 export const CHANGELOG = [
   {
+    v: "8.35",
+    d: "2026-08-09",
+    items: [
+      "I timer ora sono veri orologi: prima contavano un secondo per ogni battito dell'app, così mettendo il telefono in tasca o cambiando applicazione il conto si fermava e la pasta scuoceva. Ora tengono il tempo giusto anche a schermo bloccato.",
+      "I timer non si perdono più: restano attivi anche se chiudi l'app o se arriva un aggiornamento mentre il forno è acceso.",
+      "Corretto: gli avvisi durante la Modalità cucina e la Modalità supermercato erano nascosti dietro la schermata — c'erano ma non si vedevano, compreso \"⏰ timer finito\".",
+      "Al supermercato la lista non torna più in cima a ogni spunta: resta dov'eri.",
+      "Ricerca migliorata sui plurali corti: \"torta mela\" ora trova anche \"Torta di mele\" (come uovo/uova, fico/fichi, pera/pere), e \"pasta all'uovo\" non nasconde più i risultati giusti.",
+      "Il ripiano del forno viene deciso dal piatto e non da una parola qualsiasi dei passi: le polpette non finiscono più sul ripiano del pane solo perché il pane si ammolla nel latte.",
+      "Il microonde ora mostra anche i suoi programmi automatici presi dal manuale: c'erano già in memoria ma non venivano mai letti.",
+      "Corretto: in casa condivisa, a ogni apertura dell'app compariva \"X ha aggiunto...\" per articoli vecchi di giorni.",
+      "Il budget della spesa ora è impostabile subito: prima la riga per impostarlo appariva solo dopo aver già speso.",
+      "Corretto: finita la Modalità cucina lo schermo restava acceso, e chiudendola mentre l'assistente rispondeva il telefono continuava a parlare.",
+      "\"Segna come cucinata\" ora dice la verità: se la cena era già stata contata poco prima te lo dice, invece di far finta di averla contata.",
+      "Corretto un errore che, usando l'app senza account (solo su questo telefono), impediva alla schermata Home di comparire."
+    ]
+  },
+  {
     v: "8.34",
     d: "2026-08-09",
     minor: true,

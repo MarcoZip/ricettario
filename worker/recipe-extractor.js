@@ -28,14 +28,95 @@ const CORS = {
 
 // Indirizzi che non devono MAI essere raggiunti: rete locale, loopback, servizi
 // interni dei cloud provider. Evita che il worker faccia da ponte verso l'interno.
-const PRIVATE_HOST = /^(localhost|.*\.local|.*\.internal|0\.0\.0\.0|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?|\[?fc|\[?fd)/i;
+const PRIVATE_NAME = /^(localhost|.*\.local|.*\.internal|.*\.localhost)$/i;
+
+// Un indirizzo IPv4 si può scrivere in tanti modi che sembrano diversi ma
+// puntano allo stesso posto: 127.0.0.1, 2130706433, 0x7f000001, 0177.0.0.1.
+// Qui li riportiamo tutti alla forma a 4 numeri, altrimenti il controllo sulla
+// rete interna si aggira semplicemente cambiando notazione.
+function toIPv4(host) {
+  const parts = host.split(".");
+  if (parts.length > 4 || parts.some((p) => p === "")) return null;
+  const nums = parts.map((p) => {
+    if (/^0[xX][0-9a-fA-F]+$/.test(p)) return parseInt(p, 16);
+    if (/^0[0-7]+$/.test(p)) return parseInt(p, 8);
+    if (/^\d+$/.test(p)) return parseInt(p, 10);
+    return NaN;
+  });
+  if (nums.some((n) => !isFinite(n) || n < 0)) return null;
+  // Le forme accorciate (1 o 2 pezzi) impacchettano il resto nell'ultimo numero.
+  let v;
+  if (nums.length === 1) v = nums[0];
+  else if (nums.length === 2) v = nums[0] * 0x1000000 + nums[1];
+  else if (nums.length === 3) v = nums[0] * 0x1000000 + nums[1] * 0x10000 + nums[2];
+  else v = nums[0] * 0x1000000 + nums[1] * 0x10000 + nums[2] * 0x100 + nums[3];
+  if (!isFinite(v) || v < 0 || v > 0xffffffff) return null;
+  return [(v >>> 24) & 255, (v >>> 16) & 255, (v >>> 8) & 255, v & 255];
+}
+
+function isPrivateHost(hostname) {
+  let h = String(hostname || "").toLowerCase().replace(/\.$/, "");
+  if (!h) return true;
+  if (PRIVATE_NAME.test(h)) return true;
+  if (h.startsWith("[")) h = h.slice(1, -1);                    // IPv6 fra parentesi quadre
+  if (h.includes(":")) {                                        // IPv6
+    if (h === "::" || h === "::1") return true;
+    if (/^(fc|fd|fe8|fe9|fea|feb)/.test(h)) return true;         // unique-local / link-local
+    // Indirizzi IPv4 travestiti da IPv6. Attenzione: "::ffff:127.0.0.1" viene
+    // riscritto dal parser URL in "::ffff:7f00:1", quindi non basta cercare la
+    // forma coi punti: va convertita anche quella esadecimale.
+    const mapped = h.match(/^::(?:ffff:)?(.+)$/);
+    if (mapped) {
+      const t = mapped[1];
+      if (t.includes(".")) return isPrivateHost(t);
+      const hx = t.split(":");
+      if (hx.length <= 2) {
+        const hi = hx.length === 2 ? parseInt(hx[0], 16) : 0;
+        const lo = parseInt(hx[hx.length - 1], 16);
+        if (isFinite(hi) && isFinite(lo)) {
+          return isPrivateHost(`${(hi >>> 8) & 255}.${hi & 255}.${(lo >>> 8) & 255}.${lo & 255}`);
+        }
+      }
+      return true;                                               // forma strana: meglio bloccare
+    }
+    return false;
+  }
+  const ip = toIPv4(h);
+  if (!ip) return false;                                        // è un nome di dominio normale
+  const [a, b] = ip;
+  return a === 0 || a === 10 || a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 100 && b >= 64 && b <= 127) ||                        // CGNAT
+    a >= 224;                                                    // multicast e riservati
+}
+
 function safeTarget(raw) {
   let u;
   try { u = new URL(String(raw || "")); } catch (e) { return null; }
   if (u.protocol !== "http:" && u.protocol !== "https:") return null; // no file:, data:, gopher:
   if (u.username || u.password) return null;                           // no credenziali nell'URL
-  if (PRIVATE_HOST.test(u.hostname)) return null;                      // no rete interna
+  if (isPrivateHost(u.hostname)) return null;                          // no rete interna
   return u.toString();
+}
+
+// Fetch che NON si fida dei redirect: un indirizzo pubblico può rispondere
+// "302 verso 127.0.0.1" e scavalcare così il controllo fatto sull'URL di
+// partenza. Qui ogni tappa viene ricontrollata con safeTarget.
+async function safeFetch(target, init, maxHops = 4) {
+  let cur = safeTarget(target);
+  if (!cur) return null;
+  for (let i = 0; i < maxHops; i++) {
+    const res = await fetch(cur, { ...init, redirect: "manual" });
+    if (res.status < 300 || res.status > 399) return res;
+    const loc = res.headers.get("Location");
+    if (!loc) return res;
+    const next = safeTarget(new URL(loc, cur).toString());
+    if (!next) return null;               // il redirect punta dove non si può andare
+    cur = next;
+  }
+  return null;                            // troppi salti: rinuncio
 }
 
 // Limite di chiamate per indirizzo IP. È volutamente semplice (memoria della
@@ -467,8 +548,12 @@ export default {
 
     // Le rotte AI costano (quota Workers AI, chiavi Spoonacular/Edamam/jina):
     // limite più stretto. Le altre hanno comunque un tetto ragionevole.
-    const AI_ROUTES = /^\/(vision|ask|generate|importvideo|robot|oven|fridge|receipt|structure|dishname|planweek|convert|apphelp)$/;
-    if (rateLimited(request, AI_ROUTES.test(url.pathname) ? 20 : 60)) return tooMany();
+    // Attenzione: anche /searchblog (chiave jina) e la rotta di lettura pagina
+    // ?url= (che ricade su Workers AI + jina) consumano quota, quindi vanno nel
+    // gruppo stretto: altrimenti bastava usare quelle per bruciarla a 60/min.
+    const AI_ROUTES = /^\/(vision|ask|generate|importvideo|robot|oven|fridge|receipt|structure|dishname|planweek|convert|apphelp|searchblog)$/;
+    const costosa = AI_ROUTES.test(url.pathname) || url.searchParams.has("url");
+    if (rateLimited(request, costosa ? 20 : 60)) return tooMany();
 
     if (url.pathname === "/vision") return handleVision(request, env);
     if (url.pathname === "/ask") return handleAsk(request, env);
@@ -505,8 +590,7 @@ export default {
     let res, html;
     try {
       const origin = new URL(target).origin + "/";
-      res = await fetch(target, {
-        redirect: "follow",
+      res = await safeFetch(target, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
           Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -519,6 +603,8 @@ export default {
     } catch (e) {
       return json({ error: "unreachable", message: "Lettura pagina fallita" }, 502);
     }
+    // null = il sito rimandava a un indirizzo non ammesso (o troppi rimbalzi).
+    if (!res) return json({ error: "badurl", message: "Indirizzo non ammesso." }, 400);
 
     // Siti dietro una "sfida" anti-bot (Cloudflare, ecc.): rispondono con un
     // codice di errore. NB: la sola presenza di script Cloudflare in una pagina
@@ -888,8 +974,8 @@ async function fetchCaption(rawUrl) {
   // Fallback generico: leggi og:description / description / og:title dalla pagina.
   if (caption.length < 40) {
     try {
-      const r = await fetch(rawUrl, { headers: BROWSER_HEADERS, redirect: "follow", cf: { cacheTtl: 600 } });
-      if (r.ok) {
+      const r = await safeFetch(rawUrl, { headers: BROWSER_HEADERS, cf: { cacheTtl: 600 } });
+      if (r && r.ok) {
         const html = await r.text();
         const grab = (re) => { const m = html.match(re); return m ? clean(decodeEntities(m[1])) : ""; };
         const ogd = grab(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i)

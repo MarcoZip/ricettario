@@ -572,7 +572,14 @@ export function mount(rootEl) {
   store.subscribe((st) => {
     const items = st.shopping || [];
     const ids = new Set(items.map((i) => i.id));
-    if (shopSeenIds === null) { shopSeenIds = ids; return; } // primo carico: nessun avviso
+    if (shopSeenIds === null) {
+      // In cloud la primissima emissione arriva PRIMA dello snapshot Firestore,
+      // quindi è vuota: prendendo quella come riferimento, a ogni apertura
+      // dell'app ogni articolo già in lista sembrava appena aggiunto dall'altra
+      // persona ("👥 Federica ha aggiunto: pane, latte" tutte le volte).
+      if (!items.length && store.getMode() === "cloud") return;
+      shopSeenIds = ids; return; // primo carico: nessun avviso
+    }
     if (getHousehold() && store.getMode() === "cloud") {
       const me = (getNickname() || "").trim();
       const added = items.filter((i) => !shopSeenIds.has(i.id) && i.by && i.by !== me && !i.checked);
@@ -583,6 +590,12 @@ export function mount(rootEl) {
       }
     }
     shopSeenIds = ids;
+  });
+  // Timer lasciati in corso: si riprendono col tempo giusto (vedi syncTimer),
+  // e tornando in primo piano si riallineano all'orologio.
+  restoreGTimers();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && gTimers.some((t) => t.running)) gTick();
   });
   document.querySelectorAll(".bottom-nav__btn").forEach((btn) => {
     btn.addEventListener("click", () => navigate(btn.dataset.route));
@@ -1897,6 +1910,11 @@ function renderStrumenti() {
   const allTags = store.getAllTags();
   const voiceOK = ("webkitSpeechRecognition" in window) || ("SpeechRecognition" in window);
 
+  // Va dichiarato PRIMA del promemoria backup, che lo legge: dichiarandolo dopo,
+  // in modalità locale (dove `!info.configured` è vero e la condizione viene
+  // valutata davvero) la home non renderizzava affatto.
+  const allR = store.getAllRecipes();
+
   // Promemoria backup: solo in modalità locale (dati solo sul telefono), se non
   // esporti da oltre 30 giorni e hai qualche ricetta. Posticipabile di 7 giorni.
   let backupBanner = "";
@@ -1909,7 +1927,6 @@ function renderStrumenti() {
   }
 
   // Ricetta del giorno: stabile nell'arco della giornata (cambia ogni giorno).
-  const allR = store.getAllRecipes();
   let rotdCard = "";
   if (allR.length && prefBool("homeRotd", true)) {
     const n = new Date();
@@ -2571,7 +2588,13 @@ function renderRecipeDetail() {
   const cookBtn = root.querySelector("#cookBtn");
   if (cookBtn) cookBtn.addEventListener("click", () => openCookingMode(r));
 
-  root.querySelector("#cookedBtn").addEventListener("click", async (e) => { haptic(25); fxBurstFrom(e.currentTarget); await store.markCooked(r.id); toast("Segnata come cucinata 🔥", "success"); });
+  root.querySelector("#cookedBtn").addEventListener("click", async (e) => {
+    haptic(25); fxBurstFrom(e.currentTarget);
+    // Se era un doppione ravvicinato non è stata contata: dirlo, altrimenti il
+    // tocco sembra riuscito e una seconda infornata vera sparisce in silenzio.
+    const contata = await store.markCooked(r.id);
+    toast(contata ? "Segnata come cucinata 🔥" : "L'avevi già segnata poco fa: non l'ho contata due volte", contata ? "success" : "info");
+  });
   root.querySelector("#freezeBtn").addEventListener("click", () => openFreezeDialog(r));
 
   const reviewBtn = root.querySelector("#reviewBtn");
@@ -3197,6 +3220,38 @@ function playBeep() {
 }
 function vibrateAlarm() { try { navigator.vibrate && navigator.vibrate([300, 120, 300]); } catch (e) {} }
 function fmtClock(s) { const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, "0")}`; }
+
+// Un timer deve essere un OROLOGIO, non un contatore di battiti. Prima si faceva
+// `remaining--` a ogni setInterval: quando il telefono sospende la pagina (schermo
+// bloccato, cambio app) i setInterval si fermano o rallentano, e il conto restava
+// indietro di tutto il tempo passato fuori — la pasta scuoceva. Ora si salva
+// l'istante di fine e il residuo si ricalcola sempre dall'orologio vero.
+function syncTimer(t) {
+  if (t.running && t.endsAt) t.remaining = Math.max(0, Math.round((t.endsAt - Date.now()) / 1000));
+  return t.remaining;
+}
+// I timer sopravvivono alla chiusura dell'app e all'aggiornamento automatico:
+// senza questo, pubblicare una versione nuova spegneva il timer del forno.
+const GTIMERS_KEY = "ricettario.timers";
+function saveGTimers() {
+  try { localStorage.setItem(GTIMERS_KEY, JSON.stringify({ seq: gSeq, list: gTimers })); } catch (e) {}
+}
+function restoreGTimers() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(GTIMERS_KEY) || "null"); } catch (e) { return; }
+  if (!d || !Array.isArray(d.list)) return;
+  gSeq = parseInt(d.seq, 10) || 0;
+  gTimers = d.list.filter((t) => t && typeof t === "object");
+  for (const t of gTimers) {
+    syncTimer(t);
+    if (t.running && t.remaining <= 0) { t.running = false; t.alarming = true; }
+  }
+  // Un timer scaduto da più di due ore non deve mettersi a suonare all'apertura.
+  gTimers = gTimers.filter((t) => t.running || t.remaining > 0 ||
+    (t.alarming && t.endsAt && Date.now() - t.endsAt < 2 * 3600000));
+  ensureGlobalTicker(); ensureGlobalAlarm(); paintTimerWidget();
+  saveGTimers();
+}
 function ensureGlobalTicker() {
   const any = gTimers.some((t) => t.running);
   if (any && !gTicker) gTicker = setInterval(gTick, 1000);
@@ -3204,21 +3259,25 @@ function ensureGlobalTicker() {
 }
 function ensureGlobalAlarm() {
   const any = gTimers.some((t) => t.alarming);
-  if (any && !gAlarm) gAlarm = setInterval(() => { playBeep(); vibrateAlarm(); }, 1700);
+  // Il ridisegno del chip va fatto anche qui: quando l'ULTIMO timer finisce, il
+  // ticker si ferma e nessuno ridisegna più. Chiudendo il pannello toccando lo
+  // sfondo il chip non tornava, e l'allarme suonava senza modo di zittirlo.
+  if (any && !gAlarm) gAlarm = setInterval(() => { playBeep(); vibrateAlarm(); paintTimerWidget(); }, 1700);
   else if (!any && gAlarm) { clearInterval(gAlarm); gAlarm = null; }
 }
 function gTick() {
   for (const t of gTimers) {
     if (!t.running) continue;
-    t.remaining--;
+    syncTimer(t);
     if (t.remaining <= 0) { t.remaining = 0; t.running = false; t.alarming = true; playBeep(); vibrateAlarm(); toast(`⏰ ${t.label} finito!`, "success"); }
   }
   ensureGlobalTicker(); ensureGlobalAlarm(); paintTimerWidget(); paintTimersPanel();
+  saveGTimers();
 }
 function addGlobalTimer(mins, secs, label) {
   const total = Math.max(1, (parseInt(mins, 10) || 0) * 60 + (parseInt(secs, 10) || 0));
-  gTimers.push({ id: ++gSeq, label: (label || "").trim() || `Timer ${gTimers.length + 1}`, remaining: total, running: true });
-  ensureGlobalTicker(); paintTimerWidget(); paintTimersPanel();
+  gTimers.push({ id: ++gSeq, label: (label || "").trim() || `Timer ${gTimers.length + 1}`, remaining: total, total, endsAt: Date.now() + total * 1000, running: true });
+  ensureGlobalTicker(); paintTimerWidget(); paintTimersPanel(); saveGTimers();
 }
 // Indicatore fluttuante mostrato quando c'è almeno un timer attivo.
 function paintTimerWidget() {
@@ -3249,8 +3308,16 @@ function paintTimersPanel() {
   box.querySelectorAll(".ctimer").forEach((row) => {
     const id = parseInt(row.dataset.id, 10);
     const t = gTimers.find((x) => x.id === id);
-    row.querySelector('[data-act="toggle"]').onclick = () => { if (t.alarming) { t.alarming = false; ensureGlobalAlarm(); } else if (t.remaining > 0) { t.running = !t.running; ensureGlobalTicker(); } paintTimersPanel(); paintTimerWidget(); };
-    row.querySelector('[data-act="del"]').onclick = () => { gTimers = gTimers.filter((x) => x.id !== id); ensureGlobalTicker(); ensureGlobalAlarm(); paintTimersPanel(); paintTimerWidget(); };
+    row.querySelector('[data-act="toggle"]').onclick = () => {
+      if (t.alarming) { t.alarming = false; ensureGlobalAlarm(); }
+      else if (t.remaining > 0) {
+        if (t.running) { syncTimer(t); t.running = false; }        // in pausa congelo il residuo
+        else { t.running = true; t.endsAt = Date.now() + t.remaining * 1000; } // riparto da adesso
+        ensureGlobalTicker();
+      }
+      paintTimersPanel(); paintTimerWidget(); saveGTimers();
+    };
+    row.querySelector('[data-act="del"]').onclick = () => { gTimers = gTimers.filter((x) => x.id !== id); ensureGlobalTicker(); ensureGlobalAlarm(); paintTimersPanel(); paintTimerWidget(); saveGTimers(); };
   });
 }
 function openTimersTool() {
@@ -3535,13 +3602,18 @@ function ovenBasics(recipe, tool) {
   else if (/\bgrill\b|gratina/.test(txt)) mode = "Grill";
   else if (/vapore/.test(txt)) mode = "Vapore";
   const hay = `${recipe.title || ""} ${txt}`;
-  let rule = RACK_RULES.find((r) => r.rx.test(hay));
+  // Il ripiano dipende dal PIATTO, non da una parola qualsiasi dei passi: in
+  // "ammolla il pane raffermo nel latte" (polpette) vinceva la regola del pane,
+  // e le lasagne finivano al livello del pane per via del "servi con del pane".
+  // Quindi si cerca prima nel titolo; i passi restano solo un ripiego.
+  const titolo = (recipe.title || "").toLowerCase();
+  let rule = RACK_RULES.find((r) => r.rx.test(titolo)) || RACK_RULES.find((r) => r.rx.test(txt));
   // Col grill comanda il grill: si sta vicino alla resistenza, qualunque sia il piatto.
   if (mode === "Grill") rule = RACK_RULES[RACK_RULES.length - 1];
   const preheat = /preriscald|forno (?:ben |molto |gi[àa] )?caldo/.test(txt);
   // Se conosciamo il modello, le tabelle del costruttore battono le regole generiche.
   const kb = applianceKB(tool && tool.model);
-  const kbRack = kbRackFor(kb, hay);
+  const kbRack = kbRackFor(kb, titolo) || kbRackFor(kb, hay);
   if (kbRack) {
     rule = { rack: kbRack.rack, why: kbRack.note || (kb ? kb.label : "") };
     if (!mode && kbRack.mode) mode = kbRack.mode;
@@ -3551,12 +3623,21 @@ function ovenBasics(recipe, tool) {
   if (family !== "forno") { rule = null; mode = null; }
   if (family === "microonde") {
     const w = txt.match(/\b(\d{3,4})\s*w(?:att)?\b/);
-    return { family, watt: w ? parseInt(w[1], 10) : null, time: recipe.time || null, kb, temp: null, mode: null, rack: null, preheat: false, altMode: null, kbTemp: null };
+    // Anche il microonde ha le sue tabelle ufficiali (i programmi automatici):
+    // erano scritte in appliances.js ma non venivano mai lette.
+    const row = kbTableFor(kb, titolo) || kbTableFor(kb, hay);
+    return {
+      family, watt: w ? parseInt(w[1], 10) : null, time: recipe.time || null, kb,
+      temp: null, mode: null, rack: null, preheat: false, altMode: null,
+      kbTemp: row ? row.temp : null,
+      kbTime: row ? row.time : null,
+      kbNote: row ? row.note : null
+    };
   }
   if (family === "friggitrice") {
     // Cestello: contano temperatura e tempo, non i ripiani. Va scosso a metà.
     // Se il modello è noto, valgono le tabelle ufficiali del costruttore.
-    const row = kbTableFor(kb, hay);
+    const row = kbTableFor(kb, titolo) || kbTableFor(kb, hay);
     return {
       family, kb, shake: true, mode: null, rack: null, preheat: false, altMode: null,
       temp: temp || null,
@@ -4216,6 +4297,11 @@ function openCookingMode(recipe) {
     if (ticker) { clearInterval(ticker); ticker = null; }
     if (alarmTicker) { clearInterval(alarmTicker); alarmTicker = null; }
     stopSpeak(); stopVoice();
+    // La cottura è finita: lo schermo può spegnersi. Senza questo, restando
+    // sulla schermata "Piatto pronto!" il telefono non si spegneva più, e
+    // rientrando dall'app onVis riprendeva perfino un nuovo wake lock.
+    release();
+    document.removeEventListener("visibilitychange", onVis);
     haptic(30); playPling();
     el.classList.add("cook--done");
     el.innerHTML = `
@@ -4280,9 +4366,12 @@ function openCookingMode(recipe) {
       const ctx = { title: recipe.title, ingredients: (recipe.ingredients || []).map((i) => ingredientText(i)).filter(Boolean) };
       const q = `${text} (Sto cucinando "${recipe.title}", passo ${idx + 1} di ${steps.length}: "${steps[idx]}".)`;
       const ans = await askChef(q, ctx);
+      // Se nel frattempo la Modalità cucina è stata chiusa, tacere: altrimenti
+      // il telefono si metteva a leggere la risposta a schermata già chiusa.
+      if (!el.isConnected) { asking = false; speaking = false; return; }
       toast("💬 " + ans.slice(0, 90), "success");
       await speakAndWait(ans);
-    } catch (e) { await speakAndWait("Scusa, non riesco a rispondere ora."); }
+    } catch (e) { if (el.isConnected) await speakAndWait("Scusa, non riesco a rispondere ora."); }
     asking = false; speaking = false;
     if (voiceOn) { try { startVoice(); } catch (e) {} } // riprende l'ascolto
   }
@@ -4327,7 +4416,13 @@ function openCookingMode(recipe) {
     try { if (wakeLock) { wakeLock.release(); wakeLock = null; } } catch {}
   }
   document.addEventListener("visibilitychange", onVis);
-  function onVis() { if (document.visibilityState === "visible" && !wakeLock) lock(); }
+  // Tornando in primo piano i setInterval possono aver perso battiti: si
+  // riallinea subito all'orologio, così l'allarme scatta anche "in ritardo".
+  function onVis() {
+    if (document.visibilityState !== "visible") return;
+    if (!wakeLock) lock();
+    if (timers.some((t) => t.running)) tickAll();
+  }
   lock();
 
   function fmt(s) { const m = Math.floor(s / 60); const ss = s % 60; return `${m}:${String(ss).padStart(2, "0")}`; }
@@ -4339,7 +4434,7 @@ function openCookingMode(recipe) {
   function tickAll() {
     for (const t of timers) {
       if (!t.running) continue;
-      t.remaining--;
+      syncTimer(t); // dall'orologio, non un battito alla volta (vedi syncTimer)
       if (t.remaining <= 0) { t.remaining = 0; t.running = false; t.alarming = true; if (getSoundOn()) playChime(); else beep(); try { navigator.vibrate && navigator.vibrate([300, 120, 300]); } catch (e) {} toast(`⏰ ${t.label} finito!`, "success"); }
     }
     ensureTicker();
@@ -4374,7 +4469,7 @@ function openCookingMode(recipe) {
   }
   function addTimer(mins, label) {
     const m = Math.max(1, parseInt(mins, 10) || 0);
-    timers.push({ id: ++tseq, label: (label || "").trim() || `Timer ${timers.length + 1}`, remaining: m * 60, total: m * 60, running: true });
+    timers.push({ id: ++tseq, label: (label || "").trim() || `Timer ${timers.length + 1}`, remaining: m * 60, total: m * 60, endsAt: Date.now() + m * 60000, running: true });
     ensureTicker();
     paintTimers();
   }
@@ -4400,7 +4495,13 @@ function openCookingMode(recipe) {
     box.querySelectorAll(".ctimer").forEach((row) => {
       const id = parseInt(row.dataset.id, 10);
       const t = timers.find((x) => x.id === id);
-      row.querySelector('[data-act="toggle"]').onclick = () => { if (t.alarming) { t.alarming = false; ensureAlarm(); paintTimers(); return; } if (t.remaining <= 0) return; t.running = !t.running; ensureTicker(); paintTimers(); };
+      row.querySelector('[data-act="toggle"]').onclick = () => {
+        if (t.alarming) { t.alarming = false; ensureAlarm(); paintTimers(); return; }
+        if (t.remaining <= 0) return;
+        if (t.running) { syncTimer(t); t.running = false; }                     // pausa: congelo il residuo
+        else { t.running = true; t.endsAt = Date.now() + t.remaining * 1000; }  // ripresa: riparto da adesso
+        ensureTicker(); paintTimers();
+      };
       row.querySelector('[data-act="del"]').onclick = () => { timers = timers.filter((x) => x.id !== id); ensureTicker(); ensureAlarm(); paintTimers(); };
     });
   }
@@ -4917,7 +5018,10 @@ const mapSpoon = (r) => ({ source: "spoon", id: r.id || null, title: r.title, im
 // I motori di ricerca dei siti sono "larghi": cercando "risotto peperoni"
 // rispondono anche con "risotto alla zucca" (hanno solo la prima parola). Qui
 // teniamo davanti i risultati che contengono TUTTE le parole cercate.
-const SEARCH_STOPWORDS = new Set(["con", "senza", "alla", "allo", "alle", "agli", "ai", "al", "di", "da", "del", "della", "dello", "delle", "dei", "degli", "in", "per", "e", "ed", "la", "il", "lo", "le", "gli", "un", "una", "uno"]);
+// Le elisioni ("pasta all'uovo") perdono l'apostrofo e diventano parole finte
+// ("all"), che poi vengono pretese in ogni risultato: vanno scartate anch'esse.
+const SEARCH_STOPWORDS = new Set(["con", "senza", "alla", "allo", "alle", "agli", "ai", "al", "di", "da", "del", "della", "dello", "delle", "dei", "degli", "in", "per", "e", "ed", "la", "il", "lo", "le", "gli", "un", "una", "uno",
+  "all", "dell", "nell", "sull", "dall", "coll", "quell", "l", "d", "un"]);
 function searchNorm(s) {
   return String(s || "").toLowerCase()
     .replace(/[àáâä]/g, "a").replace(/[èéêë]/g, "e").replace(/[ìíîï]/g, "i")
@@ -4925,14 +5029,23 @@ function searchNorm(s) {
     .replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 // "peperoni" e "peperone" devono valere uguale: confronto senza l'ultima lettera.
-function termStem(t) { return t.length >= 5 ? t.slice(0, -1) : t; }
+// La soglia è 4 e non 5 perché in italiano moltissimi plurali di cucina sono
+// corti — uovo/uova, mela/mele, pera/pere, noce/noci, fico/fichi — e con la
+// soglia a 5 restavano parole diverse: "torta mela" nascondeva "Torta di mele".
+function termStem(t) { return t.length >= 4 ? t.slice(0, -1) : t; }
+// Il confronto va fatto nei due sensi: a volte è il termine cercato a essere la
+// forma lunga (cerco "uova", la ricetta dice "uovo").
+function hayHasTerm(hay, t) {
+  const s = termStem(t);
+  return hay.includes(s) || hay.split(" ").some((w) => termStem(w) === s);
+}
 function filterByRelevance(list, q) {
   if (!Array.isArray(list) || list.length < 2) return list;
   const terms = searchNorm(q).split(" ").filter((t) => t.length >= 3 && !SEARCH_STOPWORDS.has(t));
   if (terms.length < 2) return list; // con una parola sola non c'è nulla da restringere
   const scored = list.map((r, i) => {
     const hay = searchNorm(`${r.title || ""} ${r.title_it || ""} ${(r.ingredients || []).join(" ")}`);
-    const hits = terms.filter((t) => hay.includes(termStem(t))).length;
+    const hits = terms.filter((t) => hayHasTerm(hay, t)).length;
     return { r, i, hits };
   });
   const full = scored.filter((x) => x.hits === terms.length);
@@ -5727,6 +5840,10 @@ function openSupermarketMode() {
     const groupHtml = orderedCats.map((cat) => `<div class="super__group"><div class="super__cat">${escapeHtml(cat)}</div>${groups[cat].map(superRow).join("")}</div>`).join("");
     const doneHtml = done.length ? `<div class="super__group super__group--done"><div class="super__cat">Presi (${done.length})</div>${done.map(superRow).join("")}</div>` : "";
     const pct = total ? Math.round(checked / total * 100) : 0;
+    // La lista si ridisegna tutta a ogni spunta (e a ogni aggiunta dell'altra
+    // persona): senza ricordare il punto in cui si era, a metà di una lista
+    // lunga ogni tocco rimandava in cima. Al supermercato è insopportabile.
+    const prevScroll = (el.querySelector(".super__body") || {}).scrollTop || 0;
     el.innerHTML = `
       <div class="super__bar">
         <button class="super__close" id="suClose">${iconHtml("x")}</button>
@@ -5734,6 +5851,8 @@ function openSupermarketMode() {
       </div>
       <div class="super__track"><div class="super__fill" style="width:${pct}%"></div></div>
       <div class="super__body">${total ? (groupHtml || `<div class="super__alldone">🎉 Tutto preso!</div>`) + doneHtml : `<div class="super__alldone">La lista è vuota.</div>`}</div>`;
+    const bodyEl = el.querySelector(".super__body");
+    if (bodyEl && prevScroll) bodyEl.scrollTop = prevScroll;
     el.querySelector("#suClose").onclick = close;
     el.querySelectorAll(".super__item").forEach((row) => {
       row.onclick = () => {
@@ -5768,7 +5887,8 @@ let shopManual = false; // modalità "ordina a mano" (lista piatta riordinabile)
 function budgetLineHtml() {
   const spent = currentMonthSpend();
   const budget = getBudget();
-  if (spent <= 0 && !budget) return "";
+  // Niente scorciatoia: questa riga è l'UNICA porta per impostare il budget, e
+  // nascondendola finché non si è già speso il budget era irraggiungibile.
   if (!budget) {
     return `<button class="shop-cost" id="spendLine" style="width:100%;text-align:left;cursor:pointer">${iconHtml("calendar-dots")} Spesa di questo mese (stima): <b>€ ${spent.toFixed(2)}</b><span class="shop-cost__note"> · tocca per budget e storico</span></button>`;
   }
@@ -7094,7 +7214,7 @@ function openEventSheet(eventId) {
     </div>
   `);
   m.el.querySelector("#evWhen").addEventListener("change", (e) => store.updateEvent(eventId, { servingAt: e.target.value || null }));
-  m.el.querySelector("#evGuests").addEventListener("change", (e) => store.updateEvent(eventId, { guests: parseInt(e.target.value, 10) || null }));
+  m.el.querySelector("#evGuests").addEventListener("change", (e) => store.updateEvent(eventId, { guests: posNum(e.target.value, 200) }));
   m.el.querySelectorAll("[data-dish]").forEach((row) => row.addEventListener("click", () => { m.close(); openEventDishEditor(eventId, dishes.find((d) => d.id === row.dataset.dish)); }));
   m.el.querySelector("#evDiets").addEventListener("click", () => { m.close(); openEventGuests(eventId); });
   m.el.querySelector("#evAdd").addEventListener("click", () => { m.close(); openEventAddChooser(eventId); });
@@ -7179,7 +7299,7 @@ function openEventDishEditor(eventId, dish) {
       prepDay: reheat ? 0 : (parseInt(m.el.querySelector("#dPrep").value, 10) || 0),
       servedTemp: m.el.querySelector("#dTemp").value,
       usesOven: ovenChk.checked,
-      ovenTemp: ovenChk.checked && ovenTempVal !== "" ? (parseInt(ovenTempVal, 10) || null) : null,
+      ovenTemp: ovenChk.checked && ovenTempVal !== "" ? posNum(ovenTempVal, 300) : null,
       reheatOnly: reheat,
       broughtByGuest: !!dish.broughtByGuest,
       guestName: isGuest && m.el.querySelector("#dGuest") ? m.el.querySelector("#dGuest").value.trim() : "",
