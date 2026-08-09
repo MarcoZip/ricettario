@@ -609,12 +609,16 @@ export default {
     // Siti dietro una "sfida" anti-bot (Cloudflare, ecc.): rispondono con un
     // codice di errore. NB: la sola presenza di script Cloudflare in una pagina
     // valida non è un blocco, quindi prima si prova comunque a estrarre.
-    if (res.status === 403 || res.status === 503 || res.status === 429) {
+    // Qualunque risposta non valida, non solo 403/503/429: i siti rispondono
+    // alle letture automatiche con codici molto diversi fra loro. Le pagine
+    // ricetta di GialloZafferano e Cookist ne restituiscono uno che finiva
+    // dritto in "Pagina non raggiungibile", senza nemmeno provare il lettore
+    // alternativo — che invece su quei siti funziona.
+    if (!res.ok) {
       const viaReader = await readerFallback(target, env);
       if (viaReader) return json(viaReader, 200);
-      return json({ error: "blocked", message: "Questo sito blocca la lettura automatica." }, 200);
+      return json({ error: "blocked", message: `Questo sito blocca la lettura automatica (codice ${res.status}).` }, 200);
     }
-    if (!res.ok) return json({ error: "unreachable", message: "Pagina non raggiungibile" }, 502);
 
     html = await res.text();
     const recipe = extractRecipe(html) || extractMicrodata(html) || extractHeuristic(html);
