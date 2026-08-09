@@ -4902,6 +4902,34 @@ const mapBimby = (r) => ({ source: "bimby", title: r.title, title_it: r.title, i
 const mapEdamam = (r) => ({ source: "edamam", title: r.title, image: r.image || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], servings: r.servings || null, time: r.time || null, meta: [r.time ? r.time + " min" : "", r.servings ? "per " + r.servings : ""].filter(Boolean).join(" · ") });
 const mapSpoon = (r) => ({ source: "spoon", id: r.id || null, title: r.title, image: r.image || "", link: r.link, ingredients: r.ingredients || [], steps: r.steps || [], servings: r.servings || null, time: r.time || null, meta: [r.time ? r.time + " min" : "", r.servings ? "per " + r.servings : ""].filter(Boolean).join(" · ") });
 
+// I motori di ricerca dei siti sono "larghi": cercando "risotto peperoni"
+// rispondono anche con "risotto alla zucca" (hanno solo la prima parola). Qui
+// teniamo davanti i risultati che contengono TUTTE le parole cercate.
+const SEARCH_STOPWORDS = new Set(["con", "senza", "alla", "allo", "alle", "agli", "ai", "al", "di", "da", "del", "della", "dello", "delle", "dei", "degli", "in", "per", "e", "ed", "la", "il", "lo", "le", "gli", "un", "una", "uno"]);
+function searchNorm(s) {
+  return String(s || "").toLowerCase()
+    .replace(/[àáâä]/g, "a").replace(/[èéêë]/g, "e").replace(/[ìíîï]/g, "i")
+    .replace(/[òóôö]/g, "o").replace(/[ùúûü]/g, "u")
+    .replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+// "peperoni" e "peperone" devono valere uguale: confronto senza l'ultima lettera.
+function termStem(t) { return t.length >= 5 ? t.slice(0, -1) : t; }
+function filterByRelevance(list, q) {
+  if (!Array.isArray(list) || list.length < 2) return list;
+  const terms = searchNorm(q).split(" ").filter((t) => t.length >= 3 && !SEARCH_STOPWORDS.has(t));
+  if (terms.length < 2) return list; // con una parola sola non c'è nulla da restringere
+  const scored = list.map((r, i) => {
+    const hay = searchNorm(`${r.title || ""} ${r.title_it || ""} ${(r.ingredients || []).join(" ")}`);
+    const hits = terms.filter((t) => hay.includes(termStem(t))).length;
+    return { r, i, hits };
+  });
+  const full = scored.filter((x) => x.hits === terms.length);
+  // Se nessun risultato ha tutte le parole non lasciamo la schermata vuota:
+  // mostriamo tutto, ma coi più pertinenti in cima.
+  const keep = full.length ? full : scored;
+  return keep.sort((a, b) => b.hits - a.hits || a.i - b.i).map((x) => x.r);
+}
+
 // Alterna i risultati delle varie fonti per non mostrarli tutti raggruppati.
 function interleave(arrays) {
   const out = [];
@@ -5042,7 +5070,7 @@ async function performMealSearch(q, keepPage = false) {
   mealQuery = q; mealLoading = true; mealError = ""; mealTotal = null; mealElapsedMs = 0; renderOnlineTab();
   const t0 = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
   try {
-    mealResults = await runMealSearch(q);
+    mealResults = filterByRelevance(await runMealSearch(q), q);
   } catch (e) {
     mealError = e && e.code === "nokey" ? "Questa fonte non è configurata (vedi README)." : "Servizio non raggiungibile o troppo lento. Riprova.";
     mealResults = null;

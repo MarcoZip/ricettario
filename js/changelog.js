@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "8.31",
+    d: "2026-06-24",
+    items: [
+      "Ricerca online più precisa: cercando due parole (es. \"risotto peperoni\") non compaiono più ricette che ne contengono solo una, come \"risotto alla zucca\". Singolare e plurale valgono uguale (\"peperone\" trova \"peperoni\"), e se nessuna ricetta ha tutte le parole vedi comunque i risultati, ordinati dal più pertinente."
+    ]
+  },
+  {
     v: "8.30",
     d: "2026-06-24",
     minor: true,
