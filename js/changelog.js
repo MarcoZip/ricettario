@@ -6,6 +6,19 @@
 
 export const CHANGELOG = [
   {
+    v: "8.38",
+    d: "2026-08-09",
+    items: [
+      "Aprendo una ricetta ora trovi in basso una barra sempre visibile con le tre cose che si fanno davvero: <b>Cucina</b>, <b>Alla spesa</b>, <b>Fatta</b>. Prima \"Modalità cucina\" era in fondo alla preparazione, a tre o quattro schermate di distanza, da cercare con le mani sporche.",
+      "I pulsanti sotto la ricetta erano una colonna di diciassette, tutti uguali: ora sono divisi in tre gruppi con un titolo — \"Mentre cucini\", \"Quando hai finito\", \"Salva e condividi\". Ci sono tutti, sono solo più facili da trovare.",
+      "Nuovo tasto ⏱ in alto: il timer è sempre a un tocco, con le durate pronte (3, 5, 10, 15, 30 minuti) per non dover digitare i minuti.",
+      "Piano → Settimana: al posto di tre pulsanti che sembravano la stessa cosa (\"Menù AI\", \"Menù settimana\", \"Riempi le cene\") ora c'è <b>Crea il menù</b>, che ti fa scegliere fra le tre strade spiegandole — compreso quale prepara anche la lista della spesa.",
+      "In Dispensa un solo pulsante \"Cosa posso cucinare con questi?\": la scelta degli avanzi è dentro, dove serve. E in Scopri il vecchio \"Svuota frigo\" si chiama ora \"Cerca online con quello che hai\", che è ciò che fa davvero.",
+      "Impostazioni: dieci sezioni diventano quattro, con i nomi di prima conservati come sotto-titoli. Niente è stato tolto né spostato altrove.",
+      "Nuovo in Impostazioni → Dati: \"Cosa usi davvero\", il conteggio di quante volte hai toccato ciascun pulsante. Resta su questo telefono, non viene inviato a nessuno e non entra nel backup: serve a capire cosa vale la pena semplificare, invece di indovinare."
+    ]
+  },
+  {
     v: "8.37",
     d: "2026-08-09",
     items: [

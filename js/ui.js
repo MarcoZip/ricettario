@@ -471,6 +471,51 @@ export function toast(message, type = "") {
   }, 2600);
 }
 
+// ---------------- Contatore d'uso (solo su questo telefono) ----------------
+// Fornelli ha molte funzioni e nessun dato su quali vengano davvero usate: ogni
+// decisione di togliere o spostare qualcosa è finora stata una scommessa. Qui
+// contiamo i tocchi sui pulsanti, in locale, senza mandare niente a nessuno:
+// serve a noi per decidere con i fatti cosa vale la pena semplificare.
+// Non è analytics: nessuna rete, nessun identificativo, si azzera con un tocco.
+const USAGE_KEY = "ricettario.usage";
+let usageCache = null;
+function usageData() {
+  if (usageCache) return usageCache;
+  try { usageCache = JSON.parse(localStorage.getItem(USAGE_KEY) || "{}") || {}; } catch (e) { usageCache = {}; }
+  return usageCache;
+}
+function trackUse(id) {
+  if (!id) return;
+  const d = usageData();
+  const e = d[id] || { n: 0, last: null };
+  e.n++; e.last = new Date().toISOString().slice(0, 10);
+  d[id] = e;
+  // Scrittura differita: un tocco non deve pagare una serializzazione.
+  clearTimeout(trackUse._t);
+  trackUse._t = setTimeout(() => {
+    try { localStorage.setItem(USAGE_KEY, JSON.stringify(d)); } catch (e2) { /* memoria piena: pazienza */ }
+  }, 800);
+}
+function usageTop() {
+  const d = usageData();
+  return Object.entries(d)
+    .map(([id, v]) => ({ id, n: v.n || 0, last: v.last || null }))
+    .sort((a, b) => b.n - a.n);
+}
+function resetUsage() {
+  usageCache = {};
+  try { localStorage.removeItem(USAGE_KEY); } catch (e) {}
+}
+// Un solo ascoltatore su tutto il documento: registra l'id di qualunque
+// pulsante toccato, senza dover modificare le decine di gestori esistenti.
+function initUsageTracking() {
+  document.addEventListener("click", (ev) => {
+    const b = ev.target && ev.target.closest ? ev.target.closest("button[id], .bottom-nav__btn") : null;
+    if (!b) return;
+    trackUse(b.id || (b.dataset && b.dataset.route ? "nav:" + b.dataset.route : ""));
+  }, true);
+}
+
 function openModal(innerHtml) {
   const host = document.getElementById("modalRoot");
   const backdrop = document.createElement("div");
@@ -591,6 +636,7 @@ export function mount(rootEl) {
     }
     shopSeenIds = ids;
   });
+  initUsageTracking();
   // Timer lasciati in corso: si riprendono col tempo giusto (vedi syncTimer),
   // e tornando in primo piano si riallineano all'orologio.
   restoreGTimers();
@@ -600,6 +646,10 @@ export function mount(rootEl) {
   document.querySelectorAll(".bottom-nav__btn").forEach((btn) => {
     btn.addEventListener("click", () => navigate(btn.dataset.route));
   });
+  // Il timer era in fondo all'ottava sezione di Impostazioni: tre tocchi e una
+  // caccia, mentre l'acqua bolle. Da qui è sempre a un tocco.
+  const tHdr = document.getElementById("timerHdrBtn");
+  if (tHdr) tHdr.addEventListener("click", openTimersTool);
   const help = document.getElementById("helpBtn");
   if (help) {
     try { if (!localStorage.getItem("ricettario.help.seen")) help.classList.add("hot-dot"); } catch (e) {}
@@ -2477,28 +2527,48 @@ function renderRecipeDetail() {
       <input type="file" id="galFile" accept="image/*" capture="environment" hidden />
     </div>
 
-    <button class="btn btn--block" id="cookedBtn" style="margin-bottom:10px">${iconHtml("fire")} Segna come cucinata${r.cookCount ? ` · ${r.cookCount} ${r.cookCount === 1 ? "volta" : "volte"}` : ""}</button>
-    <button class="btn btn--block" id="reviewBtn" style="margin-bottom:10px">📝 Com'è venuta? (voto, foto, nota)</button>
+    <!-- I 17 pulsanti erano una colonna unica indistinguibile. Stessi pulsanti,
+         stesso ordine di importanza, ma divisi in tre gruppi con un titolo: si
+         scorre cercando il gruppo, non leggendo diciassette etichette. -->
+    <div class="act-group__t">🔥 Mentre cucini</div>
     <button class="btn btn--block" id="timelineBtn" style="margin-bottom:10px">🕐 Quando inizio? (per servire in orario)</button>
-    <button class="btn btn--block" id="completeMealBtn" style="margin-bottom:10px">🍽️ Completa il pasto (abbinamenti)</button>
-    <button class="btn btn--block" id="freezeBtn" style="margin-bottom:10px">🧊 Porziona e congela</button>
-    ${(videoInfo(r.videoUrl) || videoInfo(r.url)) ? `<button class="btn btn--block" id="watchVideo" style="margin-bottom:10px">▶ Guarda il video</button>` : ""}
-    <button class="btn btn--block" id="checkPhotoBtn" style="margin-bottom:10px">📷 Com'è venuto? Controlla con una foto</button>
-    <input type="file" id="checkPhotoFile" accept="image/*" capture="environment" hidden />
-    ${isImportConfigured() ? `<button class="btn btn--block" id="askChefBtn" style="margin-bottom:10px">💬 Chiedi allo chef (AI)</button>` : ""}
     ${isImportConfigured() && tool && applianceKind(tool) ? `<button class="btn btn--block" id="ovenBtn" style="margin-bottom:10px">🎛️ Come lo imposto?${tool.model ? ` · ${escapeHtml(tool.model.slice(0, 26))}` : ""}</button>` : ""}
+    ${isImportConfigured() ? `<button class="btn btn--block" id="askChefBtn" style="margin-bottom:10px">💬 Chiedi allo chef (AI)</button>` : ""}
+    ${steps.length ? `<button class="btn btn--block" id="chefBtn" style="margin-bottom:10px">🍳 Leggi la ricetta</button>` : ""}
+    ${(videoInfo(r.videoUrl) || videoInfo(r.url)) ? `<button class="btn btn--block" id="watchVideo" style="margin-bottom:10px">▶ Guarda il video</button>` : ""}
     ${isImportConfigured() && (steps.length || ingredients.length) ? `<button class="btn btn--block" id="robotBtn" style="margin-bottom:10px">🤖 Modalità robot (Companion / Bimby)</button>` : ""}
     ${isImportConfigured() && ingredients.length ? `<button class="btn btn--block" id="convertBtn" style="margin-bottom:10px">🥗 Adatta la ricetta (vegano, leggero…)</button>` : ""}
+    <button class="btn btn--block" id="completeMealBtn" style="margin-bottom:10px">🍽️ Completa il pasto (abbinamenti)</button>
+
+    <div class="act-group__t">✅ Quando hai finito</div>
+    <button class="btn btn--block" id="cookedBtn" style="margin-bottom:10px">${iconHtml("fire")} Segna come cucinata${r.cookCount ? ` · ${r.cookCount} ${r.cookCount === 1 ? "volta" : "volte"}` : ""}</button>
+    <button class="btn btn--block" id="reviewBtn" style="margin-bottom:10px">📝 Com'è venuta? (voto, foto, nota)</button>
+    <button class="btn btn--block" id="checkPhotoBtn" style="margin-bottom:10px">📷 Com'è venuto? Controlla con una foto</button>
+    <input type="file" id="checkPhotoFile" accept="image/*" capture="environment" hidden />
+    <button class="btn btn--block" id="freezeBtn" style="margin-bottom:10px">🧊 Porziona e congela</button>
+
+    <div class="act-group__t">📤 Salva e condividi</div>
     <button class="btn btn--block" id="collectionsBtn" style="margin-bottom:10px">${iconHtml("book-bookmark")} Aggiungi a una raccolta</button>
     <button class="btn btn--block" id="shareImg" style="margin-bottom:10px">${iconHtml("image")} Condividi come immagine</button>
-    <button class="btn btn--block" id="qrBtn" style="margin-bottom:10px">${iconHtml("qr-code")} Mostra codice QR</button>
-    ${steps.length ? `<button class="btn btn--block" id="chefBtn" style="margin-bottom:10px">🍳 Leggi la ricetta</button>` : ""}
-    <button class="btn btn--block" id="pdfRecipeBtn" style="margin-bottom:10px">${iconHtml("download-simple")} Esporta in PDF</button>
     <button class="btn btn--block" id="shareLinkBtn" style="margin-bottom:10px">${iconHtml("link-simple")} Condividi come link (Fornelli)</button>
+    <button class="btn btn--block" id="qrBtn" style="margin-bottom:10px">${iconHtml("qr-code")} Mostra codice QR</button>
+    <button class="btn btn--block" id="pdfRecipeBtn" style="margin-bottom:10px">${iconHtml("download-simple")} Esporta in PDF</button>
     <div style="display:flex;gap:8px;margin-top:4px">
       <button class="btn btn--ghost" id="editRecipe">${iconHtml("pencil-simple")} Modifica</button>
       <button class="btn btn--ghost" id="shareRecipe">${iconHtml("arrow-square-out")} Condividi</button>
       <button class="btn btn--ghost" id="delRecipe" style="color:var(--danger)">${iconHtml("trash")} Elimina</button>
+    </div>
+
+    <!-- Le tre cose che si fanno DAVVERO con una ricetta aperta, sempre a
+         portata di pollice: il pulsante "Modalità cucina" vive in fondo alla
+         card Preparazione, cioè a tre o quattro schermate di scorrimento, da
+         cercare con le mani sporche. Sta dentro il blocco della ricetta, così
+         cambiando schermata sparisce da sé senza pulizie manuali. -->
+    <div class="rbar-spacer"></div>
+    <div class="rbar">
+      ${steps.length ? `<button class="rbar__b rbar__b--go" id="rbarCook">${iconHtml("fire")} Cucina</button>` : ""}
+      <button class="rbar__b" id="rbarShop">${iconHtml("shopping-cart-simple")} Alla spesa</button>
+      <button class="rbar__b" id="rbarDone">${iconHtml("fire")} Fatta</button>
     </div>
   `;
 
@@ -2594,13 +2664,24 @@ function renderRecipeDetail() {
   const cookBtn = root.querySelector("#cookBtn");
   if (cookBtn) cookBtn.addEventListener("click", () => openCookingMode(r));
 
-  root.querySelector("#cookedBtn").addEventListener("click", async (e) => {
-    haptic(25); fxBurstFrom(e.currentTarget);
+  // Usata sia dal pulsante in fondo alla pagina sia da quello della barra fissa:
+  // stessa logica, effetto che parte dal pulsante davvero toccato.
+  const segnaCucinata = async (el) => {
+    haptic(25); fxBurstFrom(el);
     // Se era un doppione ravvicinato non è stata contata: dirlo, altrimenti il
     // tocco sembra riuscito e una seconda infornata vera sparisce in silenzio.
     const contata = await store.markCooked(r.id);
     toast(contata ? "Segnata come cucinata 🔥" : "L'avevi già segnata poco fa: non l'ho contata due volte", contata ? "success" : "info");
-  });
+  };
+  root.querySelector("#cookedBtn").addEventListener("click", (e) => segnaCucinata(e.currentTarget));
+
+  // Barra fissa in basso: le tre azioni vere, senza scorrere fino in fondo.
+  const rbCook = root.querySelector("#rbarCook");
+  if (rbCook) rbCook.addEventListener("click", () => openCookingMode(r));
+  const rbShop = root.querySelector("#rbarShop");
+  if (rbShop) rbShop.addEventListener("click", () => { const b = root.querySelector("#addToCart"); if (b) b.click(); else toast("Questa ricetta non ha ingredienti salvati", "error"); });
+  const rbDone = root.querySelector("#rbarDone");
+  if (rbDone) rbDone.addEventListener("click", (e) => segnaCucinata(e.currentTarget));
   root.querySelector("#freezeBtn").addEventListener("click", () => openFreezeDialog(r));
 
   const reviewBtn = root.querySelector("#reviewBtn");
@@ -3331,6 +3412,12 @@ function openTimersTool() {
     <h3 class="modal__title">⏱ Timer da cucina</h3>
     <p class="hint" style="margin-top:-8px;margin-bottom:12px">Avvia più timer con nome: continuano a contare mentre usi l'app e suonano alla fine.</p>
     <div id="timersList"></div>
+    <!-- Scorciatoie: il caso più comune è "un timer tondo, adesso", e digitare
+         i minuti sulla tastiera numerica con le mani bagnate è il passaggio che
+         faceva rinunciare. -->
+    <div class="timer-quick" id="ntQuick">
+      ${[3, 5, 10, 15, 30].map((n) => `<button class="chip" data-min="${n}">${n} min</button>`).join("")}
+    </div>
     <div class="timer-add">
       <input type="text" id="ntName" placeholder="Nome (es. Pasta)" />
       <label class="timer-unit">min<input type="number" id="ntMin" min="0" inputmode="numeric" value="10" /></label>
@@ -3343,6 +3430,9 @@ function openTimersTool() {
   m.el.querySelector('[data-act="ok"]').onclick = () => { timersPanelEl = null; m.close(); paintTimerWidget(); };
   const add = () => { addGlobalTimer(m.el.querySelector("#ntMin").value, m.el.querySelector("#ntSec").value, m.el.querySelector("#ntName").value); m.el.querySelector("#ntName").value = ""; };
   m.el.querySelector("#ntAdd").onclick = add;
+  m.el.querySelectorAll("#ntQuick .chip").forEach((c) => {
+    c.onclick = () => { addGlobalTimer(c.dataset.min, 0, (m.el.querySelector("#ntName").value || "").trim()); m.el.querySelector("#ntName").value = ""; };
+  });
   paintTimersPanel();
 }
 
@@ -5385,10 +5475,10 @@ async function recognizeDishPhoto(file) {
   }
 }
 
-// Svuota frigo: cerca online ricette che usano gli ingredienti che hai.
+// Cerca online con quello che hai: cerca online ricette che usano gli ingredienti che hai.
 function openFridgeSearch() {
   const m = openModal(`
-    <h3 class="modal__title">🧊 Svuota frigo</h3>
+    <h3 class="modal__title">🧊 Cerca online con quello che hai</h3>
     <p class="hint" style="margin-top:-8px;margin-bottom:12px">Scrivi gli ingredienti che hai (separati da virgola): cerco ricette che li usano. Funziona meglio con la fonte <b>Moulinex</b>.</p>
     <div class="field"><input type="text" id="fridgeIn" placeholder="es. zucchine, pollo, limone" /></div>
     <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button><button class="btn btn--primary" data-act="ok">Cerca</button></div>
@@ -5500,7 +5590,7 @@ function renderOnlineTab() {
         </div>
       </div>` : ""}
       <div class="field" style="margin-bottom:10px"><label class="mini-lbl">Fonte</label><select id="mealSource">${srcOpts}</select></div>
-      ${searchable ? `<button class="btn btn--ghost btn--block" id="fridgeBtn" style="margin-bottom:12px">🧊 Svuota frigo (cerca per ingredienti)</button>` : ""}
+      ${searchable ? `<button class="btn btn--ghost btn--block" id="fridgeBtn" style="margin-bottom:12px">🧊 Cerca online con quello che hai</button>` : ""}
       ${searchable && isImportConfigured() ? `<button class="btn btn--ghost btn--block" id="dishPhotoBtn" style="margin-bottom:12px">📸 Riconosci un piatto da una foto</button><input type="file" id="dishPhotoFile" accept="image/*" capture="environment" hidden />` : ""}
       ${(() => { const n = getToTry().length; return n ? `<button class="btn btn--ghost btn--block" id="toTryBtn" style="margin-bottom:12px">🔖 Da provare (${n})</button>` : ""; })()}
       ${mealSource === "moulinex" ? `<button class="btn btn--ghost btn--block" id="companionRandom" style="margin-bottom:12px">🎲 Sorprendimi col Companion</button>` : ""}
@@ -5640,14 +5730,14 @@ const GUIDE_SECTIONS = [
   { icon: "cooking-pot", title: "Le tue ricette", text: "Organizza le ricette per strumento di cottura. Crea uno strumento (forno, friggitrice ad aria…) e salva sotto le ricette con foto, link, ingredienti, porzioni, passi e categorie." },
   { icon: "calendar-dots", title: "Oggi si mangia", text: "In cima alla schermata Ricette trovi le ricette che hai pianificato per oggi: toccale per aprirle al volo." },
   { icon: "image", title: "Aggiungi senza fatica", text: "Nel form ricetta: incolla un link e tocca \"Importa\", \"Scansiona da una foto\" per leggere da un libro o quaderno, \"Importa da video social\" per TikTok/Instagram/YouTube, oppure \"Inventa una ricetta (AI)\" dagli ingredienti che hai. O salvale da \"Scopri\"." },
-  { icon: "sparkle", title: "Aiuto AI", text: "Aiuti intelligenti (gratis): \"Inventa una ricetta\" dagli ingredienti, \"Chiedi allo chef\" per dubbi e sostituzioni, \"Com'è venuto?\" che giudica la foto del piatto, \"Adatta la ricetta\" (vegano/leggero…), \"Modalità robot\" per Companion/Bimby, \"Fotografa il frigo\" e il \"Menù AI\" della settimana. Sono un aiuto, non infallibili." },
+  { icon: "sparkle", title: "Aiuto AI", text: "Aiuti intelligenti (gratis): \"Inventa una ricetta\" dagli ingredienti, \"Chiedi allo chef\" per dubbi e sostituzioni, \"Com'è venuto?\" che giudica la foto del piatto, \"Adatta la ricetta\" (vegano/leggero…), \"Modalità robot\" per Companion/Bimby, \"Fotografa il frigo\" e il menù della settimana. Sono un aiuto, non infallibili." },
   { icon: "book-open", title: "Scopri", text: "Cerca idee online o tra i siti italiani; tocca \"Salva\" per aggiungerle a uno dei tuoi strumenti. Le ricette online sono in inglese: al salvataggio vengono tradotte in italiano in automatico." },
   { icon: "fork-knife", title: "Porzioni su misura", text: "Apri una ricetta e cambia il numero di persone con + e −: le quantità degli ingredienti si ricalcolano da sole." },
   { icon: "carrot", title: "Valori nutrizionali", text: "In una ricetta tocca \"Calcola\" sotto gli ingredienti: l'app stima calorie e macronutrienti (proteine, carboidrati, grassi) per porzione e totali. Per ciò che non conosce cerca online su Open Food Facts e ti mostra anche cosa non ha conteggiato. È una stima: cambia con il numero di porzioni." },
   { icon: "heart", title: "Trova al volo", text: "Dalla schermata Ricette cerca per nome o ingrediente e usa i filtri: Preferiti, Più cucinate, Di recente, per tempo (≤15 e ≤30 min) e le categorie. Indica il tempo di preparazione nella ricetta (modifica) per usare i filtri rapidi. Dai un voto a stelle e \"Segna come cucinata\" per il conto." },
   { icon: "shopping-cart-simple", title: "Spesa & Dispensa", text: "Aggiungi gli ingredienti alla lista della spesa (uniti e per reparto). Tocca il nome per spuntare un articolo e la quantità per modificarla. Con \"Spesa fatta\" passa tutto in dispensa. In Dispensa tieni ciò che hai già — con la scadenza, e l'app ti avvisa quando qualcosa sta per scadere — e \"Cosa posso cucinare\" suggerisce le ricette con quello che hai." },
   { icon: "fire", title: "Modalità cucina", text: "Nelle ricette con i passi, tocca \"Modalità cucina\": istruzioni passo-passo, più timer con nome (pasta, forno…), lettura vocale (🔊) e schermo sempre acceso. Tocca un ingrediente nel passo per vedere la quantità. Col microfono 🎤 vai avanti/indietro a voce, avvii timer e puoi anche fare domande (\"posso sostituire il burro?\") con risposta a voce." },
-  { icon: "calendar-blank", title: "Pianificazione", text: "Nel calendario (vista Mese o Settimana) assegna le ricette ai giorni in pranzo o cena, usa \"Riempi le cene\" per riempire la settimana e genera la spesa del mese o della settimana." },
+  { icon: "calendar-blank", title: "Pianificazione", text: "Nel calendario (vista Mese o Settimana) assegna le ricette ai giorni in pranzo o cena, usa \"Crea il menù\" per riempire le cene rimaste vuote (scegliendo se farlo con l'assistente, in automatico o a caso) e genera la spesa del mese o della settimana." },
   { icon: "book-bookmark", title: "Menu", text: "Dalla schermata Ricette, filtro \"Menu\": raggruppa più ricette (es. \"Cena con amici\") e genera un'unica lista della spesa." },
   { icon: "arrow-square-out", title: "Condividi", text: "Da una ricetta tocca \"Condividi\" per inviarla a qualcuno (WhatsApp, email…) con ingredienti e preparazione." },
   { icon: "calendar-dots", title: "Promemoria", text: "In Impostazioni attiva i \"Promemoria\": ricevi una notifica delle scadenze in dispensa e del pasto di oggi. Puoi scegliere l'ora dell'avviso e aggiungere un secondo avviso serale con l'anteprima dei pasti di domani. Su iPhone aggiungi prima l'app alla schermata Home." },
@@ -5703,7 +5793,7 @@ const TOURS = {
   ],
   menusett: [
     { title: "Menù della settimana", text: "Ti porto nel Piano, vista Settimana.", action: () => { planView = "week"; navigate("piano"); } },
-    { selector: "#aiWeek", title: "Menù AI", text: "Tocca \"✨ Menù AI\": l'app propone le cene della settimana dalle tue ricette, con anteprima.", action: () => { planView = "week"; navigate("piano"); } }
+    { selector: "#weekMenuBtn", title: "Crea il menù", text: "Tocca \"Crea il menù\" e scegli come: con l'assistente (con anteprima), in automatico dalle tue preferite, oppure a caso.", action: () => { planView = "week"; navigate("piano"); } }
   ],
   frigo: [
     { title: "Fotografa il frigo", text: "Ti porto nella Dispensa.", action: () => { shopTab = "dispensa"; navigate("spesa"); } },
@@ -6234,8 +6324,10 @@ function renderPantry() {
 
   wrap.innerHTML = `
     <div class="hint" style="margin-bottom:10px">Quello che metti qui non verrà aggiunto alla lista della spesa. La data di scadenza è facoltativa. Tocca la ⭐ per segnare una <b>scorta di base</b>: quando la elimini (finita) torna subito nella spesa.</div>
+    <!-- "Cosa posso cucinare" e "Svuota il frigo" rispondevano alla stessa
+         domanda da due porte diverse. Resta una porta sola: la scelta degli
+         avanzi è dentro, dove serve, non qui accanto a fare concorrenza. -->
     <button class="btn btn--primary btn--block" id="cookSuggest" style="margin-bottom:10px">${iconHtml("fork-knife")} Cosa posso cucinare con questi?</button>
-    <button class="btn btn--block" id="useItUp" style="margin-bottom:10px">♻️ Svuota il frigo (scegli gli avanzi)</button>
     <button class="btn btn--block" id="freezerBtn" style="margin-bottom:10px">🧊 Congelatore${(() => { const n = store.getFreezer().length; return n ? ` · ${n}` : ""; })()}</button>
     ${isImportConfigured() ? `<button class="btn btn--block" id="fridgePhoto" style="margin-bottom:10px">🧊 Fotografa il frigo (l'AI riconosce gli alimenti)</button><input type="file" id="fridgeFile" accept="image/*" capture="environment" hidden />` : ""}
     ${isImportConfigured() ? `<button class="btn btn--block" id="receiptScan" style="margin-bottom:14px">🧾 Scansiona lo scontrino</button><input type="file" id="receiptFile" accept="image/*" capture="environment" hidden />` : ""}
@@ -6263,7 +6355,6 @@ function renderPantry() {
   wrap.querySelector("#panAddBtn").addEventListener("click", doAdd);
   addInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doAdd(); });
   wrap.querySelector("#cookSuggest").addEventListener("click", openCookSuggestions);
-  wrap.querySelector("#useItUp").addEventListener("click", openUseItUp);
   wrap.querySelector("#freezerBtn").addEventListener("click", openFreezerList);
   const fridgePhoto = wrap.querySelector("#fridgePhoto");
   const fridgeFile = wrap.querySelector("#fridgeFile");
@@ -6385,6 +6476,7 @@ function openCookSuggestions() {
       <button class="btn btn--primary" id="ckLeftGo">${iconHtml("magnifying-glass")}</button>
     </div>
     <div class="hint" style="margin-top:6px">Cerca tra le tue ricette quelle che lo usano.</div>
+    <button class="btn btn--block" id="ckUseItUp" style="margin-top:10px">♻️ Oppure scegli gli avanzi dalla dispensa</button>
   </div>`;
   const m = openModal(`<h3 class="modal__title">${iconHtml("fork-knife")} Cosa puoi cucinare</h3>${body}${leftover}`);
   m.el.querySelectorAll(".cks-pick").forEach((b) => b.addEventListener("click", () => { m.close(); openRecipe(b.dataset.id); }));
@@ -6412,6 +6504,8 @@ function openCookSuggestions() {
   };
   m.el.querySelector("#ckLeftGo").addEventListener("click", goLeft);
   m.el.querySelector("#ckLeft").addEventListener("keydown", (e) => { if (e.key === "Enter") goLeft(); });
+  const uiu = m.el.querySelector("#ckUseItUp");
+  if (uiu) uiu.addEventListener("click", () => { m.close(); openUseItUp(); });
 }
 
 // ---------------- Schermata: Pianificazione (calendario) ----------------
@@ -6603,9 +6697,11 @@ function renderPlanWeek() {
     })()}
     <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
       <button class="btn btn--ghost" id="weekToday">Oggi</button>
-      ${isImportConfigured() ? `<button class="btn btn--primary" id="aiWeek">✨ Menù AI</button>` : ""}
-      <button class="btn btn--ghost" id="genWeek">${iconHtml("sparkle")} Menù settimana</button>
-      <button class="btn btn--ghost" id="fillWeek">${iconHtml("sparkle")} Riempi le cene</button>
+      <!-- Erano tre pulsanti che sembravano la stessa cosa ("Menù AI", "Menù
+           settimana", "Riempi le cene") e che invece facevano lavori diversi:
+           solo uno generava anche la spesa. Ora è una porta sola, e la scelta
+           si fa dentro, spiegata. Nessuna delle tre strade è stata tolta. -->
+      <button class="btn btn--primary" id="weekMenuBtn">${iconHtml("sparkle")} Crea il menù</button>
       <button class="btn btn--ghost" id="weekShop">${iconHtml("shopping-cart-simple")} Spesa settimana</button>
       <button class="btn btn--ghost" id="prepAhead">🧠 Prepara in anticipo</button>
       <button class="btn btn--ghost" id="coordDishes">🕐 Coordina i piatti</button>
@@ -6625,9 +6721,7 @@ function renderPlanWeek() {
   root.querySelectorAll(".week-meal").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); if (b.dataset.recipe) openRecipe(b.dataset.recipe); }));
   wireUpcomingEvents();
 
-  const aiWeek = root.querySelector("#aiWeek");
-  if (aiWeek) aiWeek.addEventListener("click", () => openWeekPlanner(days));
-  root.querySelector("#fillWeek").addEventListener("click", async () => {
+  const menuVeloce = async () => {
     const recipes = allRecipes();
     if (!recipes.length) { toast("Aggiungi prima qualche ricetta", "error"); return; }
     let pool = [];
@@ -6642,7 +6736,7 @@ function renderPlanWeek() {
       added++;
     }
     toast(added ? `${added} cene pianificate` : "Cene già pianificate", added ? "success" : "");
-  });
+  };
   root.querySelector("#weekShop").addEventListener("click", async () => {
     const set = new Set(days.map((d) => ymd(d.getFullYear(), d.getMonth(), d.getDate())));
     const entries = store.getPlan().filter((p) => set.has(p.date));
@@ -6668,7 +6762,7 @@ function renderPlanWeek() {
   // tutte), senza ripetere, dando priorità alle ricette che usano gli alimenti
   // in scadenza (anti-spreco) e variando strumento/categoria di giorno in giorno.
   // Poi genera la spesa della settimana.
-  root.querySelector("#genWeek").addEventListener("click", async () => {
+  const menuAuto = async () => {
     const recipes = allRecipes();
     if (!recipes.length) { toast("Aggiungi prima qualche ricetta", "error"); return; }
     const favs = recipes.filter((r) => r.favorite);
@@ -6701,6 +6795,28 @@ function renderPlanWeek() {
     const entries = store.getPlan().filter((p) => set.has(p.date));
     const res = await store.addShoppingItems(collectIngredients(entries));
     toast(`Menù creato: ${added} cene${antiWaste ? ` · ${antiWaste} anti-spreco` : ""} · ${shoppingToast(res)}`, "success");
+  };
+
+  // La porta unica: qui si sceglie COME creare il menù, con scritto cosa fa
+  // ciascuna strada (in particolare quale prepara anche la lista della spesa).
+  root.querySelector("#weekMenuBtn").addEventListener("click", () => {
+    const m = openModal(`
+      <h3 class="modal__title">${iconHtml("sparkle")} Crea il menù della settimana</h3>
+      <p class="hint" style="margin-top:-8px;margin-bottom:12px">Riempie le cene ancora vuote: quelle che hai già scelto non vengono toccate.</p>
+      ${isImportConfigured() ? `<button class="btn btn--primary btn--block" data-w="ai" style="margin-bottom:10px">✨ Con l'assistente<span class="wm__d">Propone le cene e te le fa vedere prima di confermare</span></button>` : ""}
+      <button class="btn btn--block" data-w="auto" style="margin-bottom:10px">🎯 In automatico<span class="wm__d">Pesca dalle tue preferite, evita i doppioni e usa prima ciò che sta per scadere · <b>prepara anche la lista della spesa</b></span></button>
+      <button class="btn btn--block" data-w="fast" style="margin-bottom:10px">🎲 A caso, al volo<span class="wm__d">Riempie e basta, senza scegliere nulla e senza toccare la spesa</span></button>
+      <div class="modal__actions"><button class="btn btn--ghost" data-act="ok">Annulla</button></div>
+    `);
+    m.el.querySelector('[data-act="ok"]').onclick = m.close;
+    m.el.querySelectorAll("[data-w]").forEach((b) => {
+      b.onclick = () => {
+        m.close();
+        if (b.dataset.w === "ai") openWeekPlanner(days);
+        else if (b.dataset.w === "auto") menuAuto();
+        else menuVeloce();
+      };
+    });
   });
 }
 
@@ -7883,11 +7999,11 @@ function renderImpostazioni() {
           <button class="btn" id="householdBtn">${getHousehold() ? "Gestisci" : "Attiva"}</button>
         </div>` : "";
   const accountGroup = `
-      <h2 class="setting-section"><span class="setting-section__ic">👤</span> Account</h2>
+      <h2 class="setting-section"><span class="setting-section__ic">👤</span> Il tuo account</h2>
       <div class="setting-group">${accountRows}${nickRow}${householdRow}</div>`;
   // --- Sezione "Amministrazione" (solo admin) ---
   const adminGroup = info.email === ADMIN_EMAIL ? `
-      <h2 class="setting-section"><span class="setting-section__ic">🛠️</span> Amministrazione</h2>
+      <h2 class="setting-sub"><span class="setting-section__ic">🛠️</span> Amministrazione</h2>
       <div class="setting-group">
         <div class="setting-row">
           <div>
@@ -7910,7 +8026,7 @@ function renderImpostazioni() {
     <p class="page-sub">Tutto a portata di mano, raggruppato per argomento.</p>
     ${accountGroup}
 
-    <h2 class="setting-section"><span class="setting-section__ic">📊</span> I tuoi numeri</h2>
+    <h2 class="setting-sub"><span class="setting-section__ic">📊</span> I tuoi numeri</h2>
     <div class="setting-group">
       <div class="setting-row">
         <div>
@@ -7921,7 +8037,7 @@ function renderImpostazioni() {
       </div>
     </div>
 
-    <h2 class="setting-section"><span class="setting-section__ic">🎨</span> Aspetto</h2>
+    <h2 class="setting-section"><span class="setting-section__ic">🎨</span> Come vuoi l'app</h2>
     <div class="setting-group">
       <div class="setting-row">
         <div>
@@ -8004,7 +8120,7 @@ function renderImpostazioni() {
       </div>
     </div>
 
-    <h2 class="setting-section"><span class="setting-section__ic">🍽️</span> Preferenze di cucina</h2>
+    <h2 class="setting-sub"><span class="setting-section__ic">🍽️</span> Preferenze di cucina</h2>
     <div class="setting-group">
       <div class="setting-row setting-row--intro" style="display:block">
         <div class="setting-row__desc">Aggiunge il filtro "Per me" in Home e nasconde le ricette non adatte.</div>
@@ -8032,7 +8148,7 @@ function renderImpostazioni() {
       </div>
     </div>
 
-    <h2 class="setting-section"><span class="setting-section__ic">🏠</span> Schermata Home</h2>
+    <h2 class="setting-sub"><span class="setting-section__ic">🏠</span> Schermata Home</h2>
     <div class="setting-group">
       <div class="setting-row setting-row--intro" style="display:block">
         <div class="setting-row__desc">Scegli cosa mostrare nella schermata iniziale.</div>
@@ -8059,10 +8175,10 @@ function renderImpostazioni() {
       </label>
     </div>
 
-    <h2 class="setting-section"><span class="setting-section__ic">🔔</span> Promemoria e notifiche</h2>
+    <h2 class="setting-section"><span class="setting-section__ic">🔔</span> Promemoria e strumenti</h2>
     ${notifyGroupHtml()}
 
-    <h2 class="setting-section"><span class="setting-section__ic">🧰</span> Strumenti</h2>
+    <h2 class="setting-sub"><span class="setting-section__ic">🧰</span> Strumenti</h2>
     <div class="setting-group">
       <div class="setting-row">
         <div>
@@ -8087,7 +8203,7 @@ function renderImpostazioni() {
       </div>
     </div>
 
-    <h2 class="setting-section"><span class="setting-section__ic">💾</span> Dati e backup</h2>
+    <h2 class="setting-section"><span class="setting-section__ic">💾</span> Dati e informazioni</h2>
     <div class="setting-group">
       <div class="setting-row">
         <div>
@@ -8110,9 +8226,16 @@ function renderImpostazioni() {
         </div>
         <button class="btn" id="pdfBtn">Esporta</button>
       </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-row__label">Cosa usi davvero</div>
+          <div class="setting-row__desc">Quante volte hai toccato ciascun pulsante. Resta su questo telefono: non viene inviato a nessuno. Serve a capire cosa semplificare.</div>
+        </div>
+        <button class="btn" id="usageBtn">Vedi</button>
+      </div>
     </div>
 
-    <h2 class="setting-section"><span class="setting-section__ic">ℹ️</span> Informazioni</h2>
+    <h2 class="setting-sub"><span class="setting-section__ic">ℹ️</span> Informazioni</h2>
     <div class="setting-group">
       <div class="setting-row">
         <div>
@@ -8254,6 +8377,24 @@ function renderImpostazioni() {
   });
 
   root.querySelector("#pdfBtn").addEventListener("click", () => exportRecipesPdf());
+
+  root.querySelector("#usageBtn").addEventListener("click", () => {
+    const top = usageTop().filter((x) => x.id && x.n > 0);
+    const righe = top.length
+      ? top.slice(0, 40).map((x) => `<div class="stat-row"><span>${escapeHtml(x.id)}</span><b>${x.n}×${x.last ? ` <span class="ovb__alt">${escapeHtml(x.last)}</span>` : ""}</b></div>`).join("")
+      : `<div class="hint" style="text-align:center;padding:10px">Ancora niente: il conteggio parte da adesso.</div>`;
+    const m = openModal(`
+      <h3 class="modal__title">📈 Cosa usi davvero</h3>
+      <p class="hint" style="margin-top:-8px;margin-bottom:12px">Conteggio locale dei tocchi, in ordine di frequenza. Non esce da questo telefono e non finisce nel backup. I nomi sono quelli tecnici dei pulsanti.</p>
+      <div class="stat-list">${righe}</div>
+      <div class="modal__actions">
+        <button class="btn btn--ghost" data-act="reset" style="color:var(--danger)">Azzera</button>
+        <button class="btn btn--primary" data-act="ok">Chiudi</button>
+      </div>
+    `);
+    m.el.querySelector('[data-act="ok"]').onclick = m.close;
+    m.el.querySelector('[data-act="reset"]').onclick = () => { resetUsage(); m.close(); toast("Conteggio azzerato", "success"); };
+  });
 
   root.querySelector("#seedBtn").addEventListener("click", async () => {
     const added = await store.seedDefaults();

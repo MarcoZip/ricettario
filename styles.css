@@ -491,6 +491,50 @@ a { color: var(--primary-2); }
   margin-bottom: 16px;
 }
 /* Intestazione di una sezione di Impostazioni (es. "Account", "Aspetto"). */
+/* Barra fissa della scheda ricetta: sta sopra la navigazione in basso e tiene
+   sempre raggiungibili Cucina / Alla spesa / Fatta. La pagina riceve in fondo
+   uno spazio pari alla sua altezza, così l'ultimo pulsante non ci finisce sotto. */
+.rbar {
+  position: fixed; left: 0; right: 0;
+  bottom: calc(var(--nav-h) + var(--safe-bottom));
+  z-index: 90;
+  display: flex; gap: 8px;
+  padding: 8px 12px;
+  background: var(--nav-bg);
+  backdrop-filter: blur(22px);
+  border-top: 1px solid var(--border);
+}
+.rbar__b {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 11px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text);
+  font-size: 0.92rem; font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rbar__b--go { background: var(--primary); border-color: transparent; color: #fff; }
+.rbar__b:active { transform: scale(0.97); }
+.rbar-spacer { height: 64px; }
+.timer-quick { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+/* Descrizione sotto l'etichetta, nelle scelte dove serve dire cosa fa davvero
+   un'opzione (es. quale crea anche la lista della spesa). */
+.wm__d { display: block; margin-top: 3px; font-size: 0.8rem; font-weight: 500; opacity: 0.78; white-space: normal; line-height: 1.35; }
+@media (prefers-reduced-motion: reduce) { .rbar__b:active { transform: none; } }
+
+/* Titolo di gruppo nella colonna di azioni della scheda ricetta: stesso tono
+   dei titoli di Impostazioni, così la colonna si scorre a gruppi invece che
+   leggendo una per una diciassette etichette tutte uguali. */
+.act-group__t {
+  font-size: 0.74rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.07em;
+  color: var(--primary-2);
+  margin: 22px 4px 9px;
+}
+.act-group__t:first-of-type { margin-top: 8px; }
+
 .setting-section {
   display: flex; align-items: center; gap: 8px;
   font-size: 0.74rem; font-weight: 800;
@@ -499,6 +543,17 @@ a { color: var(--primary-2); }
   margin: 24px 6px 9px;
 }
 .setting-section:first-of-type { margin-top: 6px; }
+/* Sotto-titolo dentro una sezione: le dieci sezioni sono diventate quattro, ma
+   i vecchi nomi restano come segnaletica interna — accorparli e basta avrebbe
+   solo allungato le liste, cioè il problema che stiamo togliendo. */
+.setting-sub {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 0.78rem; font-weight: 700;
+  color: var(--muted);
+  margin: 16px 6px 7px;
+}
+.setting-sub .setting-section__ic { font-size: 0.98rem; line-height: 1; }
+.setting-sub + .setting-group { margin-top: 0; }
 .setting-section__ic { font-size: 1.05rem; line-height: 1; }
 .setting-section + .setting-group { margin-top: 0; }
 .setting-row--intro { padding: 12px 0 8px; }
