@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.46",
+    d: "2026-08-09",
+    minor: true,
+    items: [
+      "Corretto: la casella di \"Detta la ricetta\" appariva bianca e fuori tema rispetto al resto dell'app."
+    ]
+  },
+  {
     v: "8.45",
     d: "2026-08-09",
     items: [

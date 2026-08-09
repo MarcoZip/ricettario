@@ -5140,7 +5140,7 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       <p class="hint" style="margin-top:-8px;margin-bottom:10px">Parla con calma: di' il nome del piatto, poi gli ingredienti e infine i passaggi. Puoi correggere il testo a mano prima di continuare.</p>
       <button class="btn btn--primary btn--block" id="dtMic">🎤 Comincia a parlare</button>
       <div class="hint" id="dtStato" style="margin:8px 0">Pronto.</div>
-      <textarea id="dtText" rows="8" placeholder="Qui comparirà quello che dici…"></textarea>
+      <div class="field"><textarea id="dtText" rows="8" placeholder="Qui comparirà quello che dici…"></textarea></div>
       <div class="modal__actions">
         <button class="btn" data-act="cancel">Annulla</button>
         <button class="btn btn--primary" id="dtOk">Trasforma in ricetta</button>

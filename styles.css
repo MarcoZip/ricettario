@@ -528,7 +528,9 @@ a { color: var(--primary-2); }
 /* Le aree di testo crescono con quello che ci scrivi invece di restare alte
    quattro righe con la barra di scorrimento interna. */
 @supports (field-sizing: content) {
-  textarea { field-sizing: content; min-height: 4.5em; max-height: 55vh; }
+  /* Solo quelle dentro .field: sono le uniche impaginate dall'app, e così non
+     si scavalca il min-height dichiarato lì sotto. */
+  .field textarea { field-sizing: content; max-height: 55vh; }
 }
 
 /* Angoli "squircle" come quelli dei telefoni, al posto del raggio circolare:
