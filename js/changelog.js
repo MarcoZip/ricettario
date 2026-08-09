@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.40",
+    d: "2026-08-09",
+    items: [
+      "Tolti due pulsanti diventati doppioni: \"Modalità cucina\" in fondo alla preparazione e \"Segna come cucinata\" in mezzo alla pagina. Fanno esattamente le stesse cose di <b>Cucina</b> e <b>Fatta</b> nella barra in basso, che è sempre a portata di pollice. Il conteggio delle volte che hai cucinato un piatto ora si legge sul tasto \"Fatta\".",
+      "Il pulsante \"Com'è venuto? Controlla con una foto\" si chiama ora <b>\"Giudica la foto del piatto\"</b>: prima stava attaccato a \"Com'è venuta?\" e i due nomi differivano per una sola lettera, pur facendo cose diverse — uno è il tuo voto con nota, l'altro è l'AI che guarda la foto e dice com'è riuscito."
+    ]
+  },
+  {
     v: "8.39",
     d: "2026-08-09",
     minor: true,

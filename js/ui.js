@@ -2511,7 +2511,6 @@ function renderRecipeDetail() {
     ${steps.length ? `<div class="section-card">
       <h3 class="section-title">${iconHtml("fork-knife")} Preparazione</h3>
       <ol class="steps-list">${steps.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ol>
-      <button class="btn btn--primary btn--block" id="cookBtn" style="margin-top:6px">${iconHtml("fire")} Modalità cucina</button>
     </div>` : ""}
 
     ${r.notes ? `<div class="section-card"><h3 class="section-title">${iconHtml("note-pencil")} Note</h3><div class="recipe-item__notes" style="margin-top:0">${escapeHtml(r.notes)}</div></div>` : ""}
@@ -2554,9 +2553,10 @@ function renderRecipeDetail() {
     <button class="btn btn--block" id="completeMealBtn" style="margin-bottom:10px">🍽️ Completa il pasto (abbinamenti)</button>
 
     <div class="act-group__t">✅ Quando hai finito</div>
-    <button class="btn btn--block" id="cookedBtn" style="margin-bottom:10px">${iconHtml("fire")} Segna come cucinata${r.cookCount ? ` · ${r.cookCount} ${r.cookCount === 1 ? "volta" : "volte"}` : ""}</button>
     <button class="btn btn--block" id="reviewBtn" style="margin-bottom:10px">📝 Com'è venuta? (voto, foto, nota)</button>
-    <button class="btn btn--block" id="checkPhotoBtn" style="margin-bottom:10px">📷 Com'è venuto? Controlla con una foto</button>
+    <!-- Si chiamava "Com'è venuto?", cioè lo stesso nome di quello sopra a meno
+         di UNA lettera, e faceva una cosa completamente diversa. -->
+    <button class="btn btn--block" id="checkPhotoBtn" style="margin-bottom:10px">🔍 Giudica la foto del piatto (AI)</button>
     <input type="file" id="checkPhotoFile" accept="image/*" capture="environment" hidden />
     <button class="btn btn--block" id="freezeBtn" style="margin-bottom:10px">🧊 Porziona e congela</button>
 
@@ -2581,7 +2581,7 @@ function renderRecipeDetail() {
     <div class="rbar">
       ${steps.length ? `<button class="rbar__b rbar__b--go" id="rbarCook">${iconHtml("fire")} Cucina</button>` : ""}
       <button class="rbar__b" id="rbarShop">${iconHtml("shopping-cart-simple")} Alla spesa</button>
-      <button class="rbar__b" id="rbarDone">${iconHtml("fire")} Fatta</button>
+      <button class="rbar__b" id="rbarDone">${iconHtml("fire")} Fatta${r.cookCount ? ` · ${r.cookCount}` : ""}</button>
     </div>
   `;
 
@@ -2674,8 +2674,6 @@ function renderRecipeDetail() {
 
   root.querySelectorAll("[data-sim]").forEach((b) => b.addEventListener("click", () => openRecipe(b.dataset.sim)));
 
-  const cookBtn = root.querySelector("#cookBtn");
-  if (cookBtn) cookBtn.addEventListener("click", () => openCookingMode(r));
 
   // Usata sia dal pulsante in fondo alla pagina sia da quello della barra fissa:
   // stessa logica, effetto che parte dal pulsante davvero toccato.
@@ -2686,9 +2684,9 @@ function renderRecipeDetail() {
     const contata = await store.markCooked(r.id);
     toast(contata ? "Segnata come cucinata 🔥" : "L'avevi già segnata poco fa: non l'ho contata due volte", contata ? "success" : "info");
   };
-  root.querySelector("#cookedBtn").addEventListener("click", (e) => segnaCucinata(e.currentTarget));
-
   // Barra fissa in basso: le tre azioni vere, senza scorrere fino in fondo.
+  // Dalla v8.40 è l'unico posto da cui si avvia la cottura e si segna il piatto:
+  // i due pulsanti gemelli in mezzo alla pagina sono stati tolti.
   const rbCook = root.querySelector("#rbarCook");
   if (rbCook) rbCook.addEventListener("click", () => openCookingMode(r));
   const rbShop = root.querySelector("#rbarShop");
@@ -3104,7 +3102,7 @@ function openQr(r) {
 }
 
 // "Com'è venuta?": voto a stelle + nota datata + foto, dopo aver cucinato.
-// "Com'è venuto?": scatta/scegli una foto del piatto e chiede a un'AI di visione
+// "Giudica la foto del piatto": scatta/scegli una foto del piatto e chiede a un'AI di visione
 // un breve parere (cottura, colore, consistenza). Onesto sui limiti: è un parere
 // a colpo d'occhio, non valuta sale/sapore/cottura interna.
 async function openDishCheck(file, title) {
@@ -3112,7 +3110,7 @@ async function openDishCheck(file, title) {
   try { dataUrl = await fileToDataUrl(file, 672, 0.6); }
   catch (e) { toast("Foto non valida", "error"); return; }
   const m = openModal(`
-    <h3 class="modal__title">📷 Com'è venuto?</h3>
+    <h3 class="modal__title">🔍 Giudica la foto del piatto</h3>
     <img src="${escapeHtml(dataUrl)}" alt="" style="width:100%;max-height:240px;object-fit:cover;border-radius:14px;display:block;margin-bottom:12px" />
     <div id="dishCheckBody"><div style="text-align:center;padding:6px 0"><div class="ai-load"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div><div class="sk sk--line"></div></div><div class="hint">Sto guardando il piatto…</div></div></div>
     <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
@@ -5743,7 +5741,7 @@ const GUIDE_SECTIONS = [
   { icon: "cooking-pot", title: "Le tue ricette", text: "Organizza le ricette per strumento di cottura. Crea uno strumento (forno, friggitrice ad aria…) e salva sotto le ricette con foto, link, ingredienti, porzioni, passi e categorie." },
   { icon: "calendar-dots", title: "Oggi si mangia", text: "In cima alla schermata Ricette trovi le ricette che hai pianificato per oggi: toccale per aprirle al volo." },
   { icon: "image", title: "Aggiungi senza fatica", text: "Nel form ricetta: incolla un link e tocca \"Importa\", \"Scansiona da una foto\" per leggere da un libro o quaderno, \"Importa da video social\" per TikTok/Instagram/YouTube, oppure \"Inventa una ricetta (AI)\" dagli ingredienti che hai. O salvale da \"Scopri\"." },
-  { icon: "sparkle", title: "Aiuto AI", text: "Aiuti intelligenti (gratis): \"Inventa una ricetta\" dagli ingredienti, \"Chiedi allo chef\" per dubbi e sostituzioni, \"Com'è venuto?\" che giudica la foto del piatto, \"Adatta la ricetta\" (vegano/leggero…), \"Modalità robot\" per Companion/Bimby, \"Fotografa il frigo\" e il menù della settimana. Sono un aiuto, non infallibili." },
+  { icon: "sparkle", title: "Aiuto AI", text: "Aiuti intelligenti (gratis): \"Inventa una ricetta\" dagli ingredienti, \"Chiedi allo chef\" per dubbi e sostituzioni, \"Giudica la foto del piatto\" che valuta la riuscita, \"Adatta la ricetta\" (vegano/leggero…), \"Modalità robot\" per Companion/Bimby, \"Fotografa il frigo\" e il menù della settimana. Sono un aiuto, non infallibili." },
   { icon: "book-open", title: "Scopri", text: "Cerca idee online o tra i siti italiani; tocca \"Salva\" per aggiungerle a uno dei tuoi strumenti. Le ricette online sono in inglese: al salvataggio vengono tradotte in italiano in automatico." },
   { icon: "fork-knife", title: "Porzioni su misura", text: "Apri una ricetta e cambia il numero di persone con + e −: le quantità degli ingredienti si ricalcolano da sole." },
   { icon: "carrot", title: "Valori nutrizionali", text: "In una ricetta tocca \"Calcola\" sotto gli ingredienti: l'app stima calorie e macronutrienti (proteine, carboidrati, grassi) per porzione e totali. Per ciò che non conosce cerca online su Open Food Facts e ti mostra anche cosa non ha conteggiato. È una stima: cambia con il numero di porzioni." },
