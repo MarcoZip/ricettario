@@ -6,6 +6,17 @@
 
 export const CHANGELOG = [
   {
+    v: "8.44",
+    d: "2026-08-09",
+    items: [
+      "L'app scorre più fluida sul telefono. Gli effetti legati allo scorrimento — la foto della ricetta che si muove piano, il riflesso di luce sulle schede di vetro — ora li disegna direttamente il browser invece di calcolarli con del codice a ogni movimento del dito.",
+      "Le schede con foto fuori dallo schermo non vengono più preparate finché non servono: con tante ricette la lista scorre più leggera.",
+      "Gli angoli delle schede sono ora \"a squircle\", con la curva che entra più morbida nei lati — la stessa forma degli angoli del telefono.",
+      "Le caselle di testo lunghe (note, dettatura, passaggi) crescono da sole man mano che scrivi, invece di restare piccole con la barra di scorrimento dentro.",
+      "Corretto un errore silenzioso che compariva quando si toccava due volte di fila molto in fretta, cambiando schermata o tema."
+    ]
+  },
+  {
     v: "8.43",
     d: "2026-08-09",
     items: [

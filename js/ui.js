@@ -37,6 +37,15 @@ const STEAM_HTML = '<div class="steam" aria-hidden="true"><span class="steam__w"
 // Animazioni: rispetta la preferenza di sistema "riduci animazioni".
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+// Il browser sa animare in base allo scorrimento? In tal caso gli effetti legati
+// allo scroll (parallax della foto, riflesso sul vetro) li fa il CSS sul thread
+// del compositore, e il JavaScript che li calcolava a mano si spegne. La classe
+// sul tag <html> permette al CSS di attivarli solo quando è davvero così.
+const scrollFxAttivo = (() => {
+  try { return CSS.supports("animation-timeline", "scroll()"); } catch (e) { return false; }
+})();
+if (scrollFxAttivo) document.documentElement.classList.add("scroll-fx");
+
 // Esegue una transizione animata tra schermate (stile iOS) quando supportata.
 // `verso`: "avanti" quando si entra in qualcosa (una ricetta, uno strumento),
 // "indietro" quando si torna. Prima le due direzioni erano identiche, quindi
@@ -45,10 +54,19 @@ const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").match
 // mostrano l'animazione di sempre.
 function withTransition(fn, verso = "") {
   if (reduceMotion || !document.startViewTransition) return fn();
+  // Toccando due volte in fretta, la seconda transizione annulla la prima e il
+  // browser rifiuta le promesse della transizione interrotta. È normale e non è
+  // un errore, ma senza questo finisce nella console come guasto non gestito.
+  const zittisci = (t) => {
+    try { if (t && t.finished) t.finished.catch(() => {}); } catch (e) {}
+    try { if (t && t.ready) t.ready.catch(() => {}); } catch (e) {}
+    try { if (t && t.updateCallbackDone) t.updateCallbackDone.catch(() => {}); } catch (e) {}
+    return t;
+  };
   try {
-    if (verso) return document.startViewTransition({ update: fn, types: [verso] });
+    if (verso) return zittisci(document.startViewTransition({ update: fn, types: [verso] }));
   } catch (e) { /* browser senza i tipi: si prosegue con quella classica */ }
-  document.startViewTransition(fn);
+  return zittisci(document.startViewTransition(fn));
 }
 
 // Esplosione di particelle (confetti o emoji) per i momenti "wow".
@@ -288,7 +306,9 @@ function switchThemeReveal(newTheme, originEl) {
       { duration: 520, easing: "cubic-bezier(0.3,0.7,0.2,1)", pseudoElement: "::view-transition-new(root)" }
     );
   }).catch(() => {});
-  vt.finished.finally(() => document.documentElement.classList.remove("theme-switching"));
+  // `finally` da solo NON assorbe il rifiuto: lo rilancia, e se la transizione
+  // viene interrotta (due tocchi ravvicinati) finisce in console come guasto.
+  vt.finished.finally(() => document.documentElement.classList.remove("theme-switching")).catch(() => {});
 }
 
 // Carta "Ricetta del giorno" 3D: si inclina seguendo il giroscopio del telefono,
@@ -735,6 +755,11 @@ function setupRipple() {
 // "Vetro liquido": aggiorna la variabile --sheen con lo scroll, così il riflesso
 // di luce sulle superfici di vetro scorre mentre si naviga. Throttle con rAF.
 function setupGlassSheen() {
+  // Con le animazioni legate allo scorrimento il riflesso lo muove il CSS: qui
+  // non serve nulla. Il vecchio modo scriveva una variabile su <html> a ogni
+  // fotogramma, e cambiare una variabile sulla radice obbliga il browser a
+  // ricontrollare gli stili di TUTTA la pagina — costoso su un telefono medio.
+  if (scrollFxAttivo) return;
   let pending = false;
   const upd = () => {
     pending = false;
@@ -2658,6 +2683,10 @@ function renderRecipeDetail() {
   const heroEl = root.querySelector(".recipe-hero");
   if (heroEl && !reduceMotion) {
     const heroImg = heroEl.querySelector("img");
+    // Se il browser sa animare in base allo scorrimento, il parallax lo fa il
+    // CSS sul thread del compositore (vedi .recipe-hero img in styles.css) e qui
+    // non serve alcun JavaScript. Questo ramo resta come ripiego per gli altri.
+    if (scrollFxAttivo) return;
     // Throttle con rAF: senza, si scriveva `transform` a OGNI evento di scroll
     // (anche decine per fotogramma), e su un telefono datato lo scorrimento
     // della scheda ricetta diventava a scatti. Ora al massimo una volta a frame.
