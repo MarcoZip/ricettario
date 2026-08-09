@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.33",
+    d: "2026-06-24",
+    items: [
+      "Corretto: in tema chiaro il pulsante \"Nuova ricetta\" in Home era quasi invisibile (scritta chiara su sfondo chiaro).",
+      "Protezioni sul servizio online dell'app: limite di richieste ravvicinate, blocco degli indirizzi interni e tetto alla dimensione delle foto inviate. Serve a evitare che estranei consumino le funzioni AI."
+    ]
+  },
+  {
     v: "8.32",
     d: "2026-06-24",
     items: [

@@ -19,6 +19,43 @@ const CORS = {
   "Access-Control-Allow-Headers": "*"
 };
 
+// ============================================================
+//  PROTEZIONI DEL WORKER
+// ------------------------------------------------------------
+//  L'indirizzo del worker è pubblico: senza questi controlli chiunque potrebbe
+//  usarlo come proxy anonimo o bruciare la quota AI e le chiavi dei servizi.
+// ============================================================
+
+// Indirizzi che non devono MAI essere raggiunti: rete locale, loopback, servizi
+// interni dei cloud provider. Evita che il worker faccia da ponte verso l'interno.
+const PRIVATE_HOST = /^(localhost|.*\.local|.*\.internal|0\.0\.0\.0|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?|\[?fc|\[?fd)/i;
+function safeTarget(raw) {
+  let u;
+  try { u = new URL(String(raw || "")); } catch (e) { return null; }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return null; // no file:, data:, gopher:
+  if (u.username || u.password) return null;                           // no credenziali nell'URL
+  if (PRIVATE_HOST.test(u.hostname)) return null;                      // no rete interna
+  return u.toString();
+}
+
+// Limite di chiamate per indirizzo IP. È volutamente semplice (memoria della
+// singola istanza del worker, si azzera da sola): non ferma un attacco
+// distribuito, ma blocca gli abusi banali "a ciclo" che svuotano la quota.
+const RL = new Map();
+const RL_WINDOW_MS = 60000;
+function rateLimited(request, max) {
+  const ip = request.headers.get("CF-Connecting-IP") || "sconosciuto";
+  const now = Date.now();
+  let e = RL.get(ip);
+  if (!e || now - e.start > RL_WINDOW_MS) { e = { start: now, n: 0 }; RL.set(ip, e); }
+  e.n++;
+  if (RL.size > 5000) RL.clear(); // non far crescere la memoria all'infinito
+  return e.n > max;
+}
+function tooMany() {
+  return json({ error: "rate", message: "Troppe richieste ravvicinate: riprova fra un minuto." }, 429);
+}
+
 const BROWSER_HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
   Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -427,6 +464,12 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
 
     const url = new URL(request.url);
+
+    // Le rotte AI costano (quota Workers AI, chiavi Spoonacular/Edamam/jina):
+    // limite più stretto. Le altre hanno comunque un tetto ragionevole.
+    const AI_ROUTES = /^\/(vision|ask|generate|importvideo|robot|oven|fridge|receipt|structure|dishname|planweek|convert|apphelp)$/;
+    if (rateLimited(request, AI_ROUTES.test(url.pathname) ? 20 : 60)) return tooMany();
+
     if (url.pathname === "/vision") return handleVision(request, env);
     if (url.pathname === "/ask") return handleAsk(request, env);
     if (url.pathname === "/generate") return handleGenerate(request, env);
@@ -454,8 +497,10 @@ export default {
     if (url.pathname === "/spoon-info") return handleSpoonInfo(url.searchParams.get("id"), env);
     if (url.pathname === "/wine") return handleWine(url.searchParams.get("food"), env);
 
-    const target = url.searchParams.get("url");
-    if (!target) return json({ error: "missing", message: "Parametro 'url' mancante" }, 400);
+    const rawTarget = url.searchParams.get("url");
+    if (!rawTarget) return json({ error: "missing", message: "Parametro 'url' mancante" }, 400);
+    const target = safeTarget(rawTarget);
+    if (!target) return json({ error: "badurl", message: "Indirizzo non ammesso." }, 400);
 
     let res, html;
     try {
@@ -510,6 +555,7 @@ export default {
 // (r.jina.ai) che restituisce il testo pulito della pagina da un altro IP, poi
 // struttura la ricetta con l'AI. Ritorna null se non ci riesce.
 async function readerFallback(target, env) {
+  if (!safeTarget(target)) return null; // il lettore esterno non deve girare su indirizzi interni
   let md = "";
   try {
     const headers = { "Accept": "text/plain", "X-Return-Format": "markdown" };
@@ -664,6 +710,7 @@ async function handleVision(request, env) {
   let body;
   try { body = await request.json(); } catch (e) { return json({ error: "badreq", message: "Richiesta non valida" }, 400); }
   const b64 = String((body && body.image) || "").replace(/^data:[^,]+,/, "");
+  if (b64.length > 8000000) return json({ error: "toobig", message: "Foto troppo grande." }, 413); // tetto ~6 MB
   if (!b64) return json({ error: "noimage", message: "Foto mancante" }, 400);
 
   let bytes;
@@ -827,6 +874,7 @@ async function handleGenerate(request, env) {
 // incollato. POST { url? , text? }. Legge la didascalia/descrizione e la
 // struttura con l'AI in { title, servings, ingredients[], steps[] }.
 async function fetchCaption(rawUrl) {
+  if (!safeTarget(rawUrl)) return ""; // niente indirizzi interni o schemi strani
   let host = "";
   try { host = new URL(rawUrl).hostname.replace(/^www\./, ""); } catch (e) { return ""; }
   let caption = "";
@@ -1001,6 +1049,7 @@ async function handleFridge(request, env) {
   let body;
   try { body = await request.json(); } catch (e) { return json({ error: "badreq" }, 400); }
   const b64 = String((body && body.image) || "").replace(/^data:[^,]+,/, "");
+  if (b64.length > 8000000) return json({ error: "toobig", message: "Foto troppo grande." }, 413); // tetto ~6 MB
   if (!b64) return json({ error: "noimage", message: "Foto mancante" }, 400);
   let bytes;
   try { const bin = atob(b64); bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); }
@@ -1032,6 +1081,7 @@ async function handleReceipt(request, env) {
   let body;
   try { body = await request.json(); } catch (e) { return json({ error: "badreq" }, 400); }
   const b64 = String((body && body.image) || "").replace(/^data:[^,]+,/, "");
+  if (b64.length > 8000000) return json({ error: "toobig", message: "Foto troppo grande." }, 413); // tetto ~6 MB
   if (!b64) return json({ error: "noimage", message: "Foto mancante" }, 400);
   let bytes;
   try { const bin = atob(b64); bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); }
@@ -1086,6 +1136,7 @@ async function handleDishName(request, env) {
   let body;
   try { body = await request.json(); } catch (e) { return json({ error: "badreq" }, 400); }
   const b64 = String((body && body.image) || "").replace(/^data:[^,]+,/, "");
+  if (b64.length > 8000000) return json({ error: "toobig", message: "Foto troppo grande." }, 413); // tetto ~6 MB
   if (!b64) return json({ error: "noimage", message: "Foto mancante" }, 400);
   let bytes;
   try { const bin = atob(b64); bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); }
