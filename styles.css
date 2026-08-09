@@ -519,6 +519,15 @@ a { color: var(--primary-2); }
 .rbar__b:active { transform: scale(0.97); }
 .rbar-spacer { height: 64px; }
 .timer-quick { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+/* Parole cercate evidenziate nei risultati. Sfondo tenue e non un blocco pieno,
+   così sui titoli che vanno a capo non si formano bande spezzate. */
+mark {
+  background: rgba(255, 160, 70, 0.28);
+  color: inherit;
+  border-radius: 4px;
+  padding: 0 2px;
+}
+.pcard__title mark { background: rgba(255, 170, 80, 0.42); }
 /* Promemoria della tua nota dell'ultima volta, sul primo passo della cottura. */
 .cook__last {
   margin: 8px 0 0; padding: 10px 12px;
@@ -833,6 +842,22 @@ a { color: var(--primary-2); }
 }
 @keyframes vtIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes vtOut { to { opacity: 0; } }
+
+/* Verso della navigazione: entrando in una ricetta la pagina nuova arriva da
+   destra, tornando indietro rientra da sinistra — come ci si aspetta da un
+   telefono. Prima i due versi erano identici e "avanti" e "indietro" si
+   assomigliavano. Dove :active-view-transition-type() non esiste, questo blocco
+   viene semplicemente ignorato e resta l'animazione di prima. */
+@media (prefers-reduced-motion: no-preference) {
+  html:active-view-transition-type(avanti)::view-transition-old(root) { animation: vtOutLeft 0.24s ease both; }
+  html:active-view-transition-type(avanti)::view-transition-new(root) { animation: vtInRight 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  html:active-view-transition-type(indietro)::view-transition-old(root) { animation: vtOutRight 0.24s ease both; }
+  html:active-view-transition-type(indietro)::view-transition-new(root) { animation: vtInLeft 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+}
+@keyframes vtInRight { from { opacity: 0.2; transform: translateX(26px); } to { opacity: 1; transform: none; } }
+@keyframes vtOutLeft { to { opacity: 0; transform: translateX(-16px); } }
+@keyframes vtInLeft { from { opacity: 0.2; transform: translateX(-26px); } to { opacity: 1; transform: none; } }
+@keyframes vtOutRight { to { opacity: 0; transform: translateX(16px); } }
 /* Cambio tema a onda circolare: niente dissolvenza, nuovo tema sopra ritagliato a cerchio */
 html.theme-switching::view-transition-old(root), html.theme-switching::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
 html.theme-switching::view-transition-old(root) { z-index: 1; }

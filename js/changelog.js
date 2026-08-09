@@ -6,6 +6,18 @@
 
 export const CHANGELOG = [
   {
+    v: "8.43",
+    d: "2026-08-09",
+    items: [
+      "Cercando, le parole che hai scritto vengono <b>evidenziate</b> nei titoli dei risultati, sia nel tuo ricettario sia in Scopri: si capisce a colpo d'occhio perché una ricetta è comparsa.",
+      "La ricerca nel tuo ricettario ora capisce il singolare e il plurale come già faceva quella online: <i>\"torta mela\"</i> trova <i>\"Torta di mele e zucca\"</i>, <i>\"zucchina\"</i> trova le ricette con le zucchine.",
+      "Nuova scheda nelle ricette: <b>\"Quanto dura, e quando è cotto\"</b> — quanti giorni si conserva in frigo, quanti mesi in congelatore e a che temperatura al cuore la carne o il pesce sono cotti. Sono tabelle ufficiali (FoodSafety.gov / USDA FoodKeeper), non risposte generate dall'AI: funzionano anche senza rete.",
+      "\"Porziona e congela\" propone ora i mesi giusti per quel piatto invece di sempre 3: il pesce meno, un dolce da forno di più.",
+      "Novità: <b>\"Detta la ricetta a voce\"</b> nel modulo di una nuova ricetta. Parli, l'app scrive, e poi trasforma da sola quello che hai detto in titolo, ingredienti e passaggi. Comodo se te la detta qualcuno al telefono.",
+      "Entrando in una ricetta la schermata scorre da destra e tornando indietro rientra da sinistra: prima i due movimenti erano identici e si perdeva il senso di dove si stava andando."
+    ]
+  },
+  {
     v: "8.42",
     d: "2026-08-09",
     minor: true,

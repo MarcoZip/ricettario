@@ -192,16 +192,24 @@ export function searchRecipes(q) {
   const s = (q || "").toLowerCase().trim();
   if (!s) return [];
   const toolName = (r) => { const t = state.tools.find((x) => x.id === r.toolId); return t ? (t.name || "").toLowerCase() : ""; };
+  // Stesso trattamento della ricerca online: accenti tolti e singolare/plurale
+  // equivalenti. Senza, cercare "torta mela" nel PROPRIO ricettario non trovava
+  // "Torta di mele" mentre online funzionava — due comportamenti diversi per la
+  // stessa cosa scritta nella stessa casella.
+  const contiene = (testo, term) => {
+    const h = normAlimento(testo), t = normAlimento(term);
+    return !!t && (h.includes(t) || h.split(" ").some((w) => w === t));
+  };
   const matchesTerm = (r, term) =>
-    (r.title || "").toLowerCase().includes(term) ||
-    (r.tags || []).some((t) => (t || "").toLowerCase().includes(term)) ||
-    (r.ingredients || []).some((i) => (i.name || "").toLowerCase().includes(term)) ||
+    contiene(r.title || "", term) ||
+    (r.tags || []).some((t) => contiene(t || "", term)) ||
+    (r.ingredients || []).some((i) => contiene(i.name || "", term)) ||
     // Anche nelle NOTE: sono le annotazioni scritte a mano ("meno sale", "per il
     // compleanno di Anna") ed erano l'unica cosa dell'app che non si poteva più
     // ritrovare. NON nei passi, invece: cercando "sale" mezzo ricettario
     // risponderebbe, riportando il rumore tolto con il filtro di pertinenza.
-    (r.notes || "").toLowerCase().includes(term) ||
-    toolName(r).includes(term); // così "costolette friggitrice" filtra anche per strumento
+    contiene(r.notes || "", term) ||
+    contiene(toolName(r), term); // così "costolette friggitrice" filtra anche per strumento
   // Più parole (separate da spazi, virgole o " e ") devono comparire TUTTE.
   const terms = s.split(/[\s,]+|\s+e\s+/).map((t) => t.trim()).filter(Boolean);
   if (terms.length > 1) return state.recipes.filter((r) => terms.every((term) => matchesTerm(r, term)));

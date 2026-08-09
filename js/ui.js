@@ -17,6 +17,7 @@ import { estimateCost } from "./cost.js";
 import { estimateImpact } from "./co2.js";
 import { restockDue, forgetRestock } from "./restock.js";
 import { applianceKB, kbRackFor, kbTableFor } from "./appliances.js";
+import { conservazioneFor, alCuoreFor, mesiFreezerSuggeriti, FONTE_CONSERVAZIONE } from "./conservazione.js";
 import { seasonalProduce, recipeSeasonalMatches, monthName, currentMonth } from "./seasonal.js";
 import { convertMeasures } from "./measures.js";
 import { getNickname, setNickname, getCover, setCover } from "./profile.js";
@@ -37,8 +38,16 @@ const STEAM_HTML = '<div class="steam" aria-hidden="true"><span class="steam__w"
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // Esegue una transizione animata tra schermate (stile iOS) quando supportata.
-function withTransition(fn) {
+// `verso`: "avanti" quando si entra in qualcosa (una ricetta, uno strumento),
+// "indietro" quando si torna. Prima le due direzioni erano identiche, quindi
+// entrare e uscire si assomigliavano e si perdeva il senso di dove si è finiti.
+// I browser che non conoscono i "tipi" di transizione ignorano l'opzione e
+// mostrano l'animazione di sempre.
+function withTransition(fn, verso = "") {
   if (reduceMotion || !document.startViewTransition) return fn();
+  try {
+    if (verso) return document.startViewTransition({ update: fn, types: [verso] });
+  } catch (e) { /* browser senza i tipi: si prosegue con quella classica */ }
   document.startViewTransition(fn);
 }
 
@@ -761,8 +770,8 @@ function handleAppBack() {
   const guide = document.querySelector(".guide");
   if (guide) { guide.remove(); return true; }
   if (loginMode) return false;
-  if (currentRecipeId) { currentRecipeId = null; detailServings = null; withTransition(() => render()); return true; }
-  if (currentToolId) { currentToolId = null; withTransition(() => render()); return true; }
+  if (currentRecipeId) { currentRecipeId = null; detailServings = null; withTransition(() => render(), "indietro"); return true; }
+  if (currentToolId) { currentToolId = null; withTransition(() => render(), "indietro"); return true; }
   if (currentRoute && currentRoute !== "strumenti") { navigate("strumenti"); return true; }
   return false;
 }
@@ -1499,16 +1508,19 @@ function fzDaysLeft(bestBefore) {
 }
 function openFreezeDialog(recipe) {
   const today = new Date();
-  let months = 3;
+  // Il predefinito non è più sempre 3 mesi: viene dalla tabella di conservazione
+  // (il pesce regge meno, un dolce da forno di più).
+  const sugg = mesiFreezerSuggeriti(recipe);
+  let months = sugg;
   const m = openModal(`
     <h3 class="modal__title">🧊 Porziona e congela</h3>
     <div class="field"><label>Piatto</label><input type="text" id="fzTitle" value="${escapeHtml(recipe ? recipe.title : "")}" placeholder="Es. Ragù" /></div>
     <div class="field"><label>Porzioni</label><input type="number" id="fzPort" min="1" inputmode="numeric" value="${recipe && recipe.servings ? recipe.servings : 2}" /></div>
-    <div class="field"><label>Da consumare entro</label><div class="fz-months">${[1, 3, 6, 12].map((n) => `<button type="button" class="chip fz-month ${n === 3 ? "is-on" : ""}" data-m="${n}">${n} mes${n === 1 ? "e" : "i"}</button>`).join("")}</div></div>
+    <div class="field"><label>Da consumare entro</label><div class="fz-months">${[1, 3, 6, 12].map((n) => `<button type="button" class="chip fz-month ${n === sugg ? "is-on" : ""}" data-m="${n}">${n} mes${n === 1 ? "e" : "i"}</button>`).join("")}</div></div>
     <div class="field"><label>Nota (facoltativa)</label><input type="text" id="fzNote" placeholder="Es. in 2 vaschette" /></div>
     <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button><button class="btn btn--primary" data-act="ok">🧊 Congela</button></div>
   `);
-  m.el.querySelectorAll(".fz-month").forEach((b) => b.onclick = () => { m.el.querySelectorAll(".fz-month").forEach((x) => x.classList.remove("is-on")); b.classList.add("is-on"); months = parseInt(b.dataset.m, 10) || 3; });
+  m.el.querySelectorAll(".fz-month").forEach((b) => b.onclick = () => { m.el.querySelectorAll(".fz-month").forEach((x) => x.classList.remove("is-on")); b.classList.add("is-on"); months = parseInt(b.dataset.m, 10) || sugg; });
   m.el.querySelector('[data-act="cancel"]').onclick = m.close;
   m.el.querySelector('[data-act="ok"]').onclick = async () => {
     const t = m.el.querySelector("#fzTitle").value.trim();
@@ -1689,7 +1701,7 @@ export function handleShortcut(action) {
 function openTool(toolId) {
   currentToolId = toolId;
   currentRecipeId = null;
-  withTransition(() => render());
+  withTransition(() => render(), "avanti");
   window.scrollTo(0, 0);
 }
 
@@ -1716,7 +1728,7 @@ function openRecipe(recipeId) {
   document.querySelectorAll(".bottom-nav__btn").forEach((b) => {
     b.classList.toggle("is-active", b.dataset.route === "strumenti");
   });
-  withTransition(() => render());
+  withTransition(() => render(), "avanti");
   window.scrollTo(0, 0);
 }
 
@@ -1774,7 +1786,34 @@ function updateAppBadge() {
 }
 
 // ---------------- Schermata: Ricette (le tue, per strumento di cottura) ----------------
-function recipeResultRow(r, i = 0) {
+// Evidenzia le parole cercate dentro un titolo. Il testo viene messo in
+// sicurezza PEZZO PER PEZZO e l'unico tag aggiunto è <mark>: così nessun
+// carattere del titolo può diventare HTML, e l'evidenziatore non rischia di
+// spezzare le entità (&amp;, &lt;) come farebbe una sostituzione sul testo già
+// convertito. Il gambo fa evidenziare anche il plurale (peperoni/peperone).
+function highlightHtml(testo, q) {
+  const raw = String(testo || "");
+  const termini = String(q || "").toLowerCase()
+    .split(/[\s,]+/).map((t) => t.trim())
+    .filter((t) => t.length >= 3 && !SEARCH_STOPWORDS.has(t))
+    .map((t) => (t.length >= 4 ? t.slice(0, -1) : t))
+    .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    // Il gambo serve a trovare anche il plurale, ma l'evidenziazione deve
+    // arrivare a fine parola: sennò si legge "Risott‑o", che sembra un errore.
+    .map((t) => t + "[^\\s.,;:!?()\\[\\]]*");
+  if (!raw || !termini.length) return escapeHtml(raw);
+  let rx;
+  try { rx = new RegExp(`(${termini.join("|")})`, "gi"); } catch (e) { return escapeHtml(raw); }
+  let out = "", last = 0, m;
+  while ((m = rx.exec(raw)) !== null) {
+    if (m[0] === "") { rx.lastIndex++; continue; } // niente cicli infiniti
+    out += escapeHtml(raw.slice(last, m.index)) + `<mark>${escapeHtml(m[0])}</mark>`;
+    last = m.index + m[0].length;
+  }
+  return out + escapeHtml(raw.slice(last));
+}
+
+function recipeResultRow(r, i = 0, q = "") {
   const tool = store.getTool(r.toolId);
   // Con foto: card grande con titolo in sovrimpressione (stile ricetta del giorno).
   if (r.photo) {
@@ -1787,7 +1826,7 @@ function recipeResultRow(r, i = 0) {
       <span class="pcard__grad"></span>
       ${r.favorite ? `<span class="pcard__fav">${iconHtml("heart")}</span>` : ""}
       <span class="pcard__body">
-        <span class="pcard__title">${escapeHtml(r.title)}</span>
+        <span class="pcard__title">${highlightHtml(r.title, q)}</span>
         ${meta.length ? `<span class="pcard__meta">${meta.join(" · ")}</span>` : ""}
       </span>
     </button>`;
@@ -1800,7 +1839,7 @@ function recipeResultRow(r, i = 0) {
   const diff = r.difficulty ? ` <span class="meta-diff">${diffDots(r.difficulty)}</span>` : "";
   const srcLbl = recipeSourceLabel(r);
   const src = srcLbl ? ` <span class="meta-src">${iconHtml("link-simple")} ${escapeHtml(srcLbl)}</span>` : "";
-  return `<button class="pick-row stagger" data-id="${r.id}" style="--i:${i}"><span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span><span class="day-row__name">${escapeHtml(r.title)}${fav}${rate}${cooked}${tm}${diff}${src}</span></button>`;
+  return `<button class="pick-row stagger" data-id="${r.id}" style="--i:${i}"><span class="day-row__icon">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span><span class="day-row__name">${highlightHtml(r.title, q)}${fav}${rate}${cooked}${tm}${diff}${src}</span></button>`;
 }
 
 // Punteggio delle reazioni della famiglia su una ricetta (😍>🔥>👍>😐).
@@ -1863,10 +1902,10 @@ function renderHomeBody() {
     }
     const qText = homeQuery.trim();
     const onlineBtn = qText
-      ? `<button class="btn btn--ghost btn--block" id="homeSearchOnline" style="margin-top:14px">${iconHtml("magnifying-glass")} Cerca "${escapeHtml(qText)}" nel ricettario online</button>`
+      ? `<button class="btn btn--ghost btn--block" id="homeSearchOnline" style="margin-top:14px">${iconHtml("magnifying-glass")} Cerca "${escapeHtml(qText)}" in Scopri</button>`
       : "";
     body.innerHTML = (results.length
-      ? `<div class="result-grid">${results.map((r, i) => recipeResultRow(r, i)).join("")}</div>`
+      ? `<div class="result-grid">${results.map((r, i) => recipeResultRow(r, i, qText)).join("")}</div>`
       : `<div class="empty">${emptyArt(emptyIcon === "heart" ? "heart" : "pot")}<div style="margin-top:6px">${emptyMsg}</div></div>`) + onlineBtn;
     body.querySelectorAll(".pick-row").forEach((b) => b.addEventListener("click", () => openRecipe(b.dataset.id)));
     const ob = body.querySelector("#homeSearchOnline");
@@ -2299,7 +2338,7 @@ function renderToolDetail() {
     <button class="fab" id="addRecipe">${iconHtml("plus")} Aggiungi ricetta</button>
   `;
 
-  root.querySelector("#back").addEventListener("click", () => { currentToolId = null; withTransition(() => render()); });
+  root.querySelector("#back").addEventListener("click", () => { currentToolId = null; withTransition(() => render(), "indietro"); });
   root.querySelector("#addRecipe").addEventListener("click", () => openRecipeForm({ toolId: tool.id }));
   root.querySelector("#editTool").addEventListener("click", () => openToolForm(tool));
   root.querySelector("#delTool").addEventListener("click", async () => {
@@ -2484,6 +2523,21 @@ function renderRecipeDetail() {
       ${sides.ideas.length ? `<div class="tag-row">${sides.ideas.map((i) => `<span class="tagchip tagchip--ro">${escapeHtml(i)}</span>`).join("")}</div>` : ""}
     </div>` : "";
 
+  // Conservazione e temperatura al cuore: tabelle statiche, non generate dall'AI
+  // (è sicurezza alimentare: qui un'invenzione è un rischio, non un fastidio).
+  const cons = conservazioneFor(r);
+  const cuore = alCuoreFor(r);
+  const conservCard = (cons || cuore) ? `<div class="section-card">
+      <h3 class="section-title">🧊 Quanto dura, e quando è cotto</h3>
+      <div class="ovb">
+        ${cuore ? `<div class="ovb__r"><span class="ovb__k">Cotto al cuore</span><span class="ovb__v"><b>${cuore.gradi}°C</b>${cuore.nota ? ` <span class="ovb__alt">— ${escapeHtml(cuore.nota)}</span>` : ""}</span></div>` : ""}
+        ${cons ? `<div class="ovb__r"><span class="ovb__k">In frigo</span><span class="ovb__v"><b>${escapeHtml(cons.frigo)}</b> <span class="ovb__alt">— coperto, messo via entro 2 ore</span></span></div>` : ""}
+        ${cons ? `<div class="ovb__r"><span class="ovb__k">In congelatore</span><span class="ovb__v">${cons.freezer ? `<b>${cons.freezer} mes${cons.freezer === 1 ? "e" : "i"}</b> <span class="ovb__alt">— oltre resta sicuro ma peggiora</span>` : `<span class="ovb__alt">meglio di no: cambia consistenza</span>`}</span></div>` : ""}
+        ${cons && cons.nota ? `<div class="ovb__r"><span class="ovb__k">Nota</span><span class="ovb__v">${escapeHtml(cons.nota)}</span></div>` : ""}
+        <div class="ovb__src">Da <b>${escapeHtml(FONTE_CONSERVAZIONE)}</b> — non generati dall'AI. ${cuore ? "La temperatura al cuore si misura con un termometro da cucina. " : ""}Indicazioni prudenti: se qualcosa ti sembra strano, fidati dei tuoi sensi.</div>
+      </div>
+    </div>` : "";
+
   root.innerHTML = `
     <div class="read-progress" aria-hidden="true"></div>
     <div class="toolbar">
@@ -2519,6 +2573,7 @@ function renderRecipeDetail() {
     ${subsCard}
     ${wineCard}
     ${sidesCard}
+    ${conservCard}
 
     ${steps.length ? `<div class="section-card">
       <h3 class="section-title">${iconHtml("fork-knife")} Preparazione</h3>
@@ -2597,7 +2652,7 @@ function renderRecipeDetail() {
     </div>
   `;
 
-  root.querySelector("#back").addEventListener("click", () => { currentRecipeId = null; detailServings = null; withTransition(() => render()); });
+  root.querySelector("#back").addEventListener("click", () => { currentRecipeId = null; detailServings = null; withTransition(() => render(), "indietro"); });
 
   // Parallax/zoom della foto hero mentre si scorre (si auto-rimuove uscendo).
   const heroEl = root.querySelector(".recipe-hero");
@@ -4927,6 +4982,7 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       <label>Ingredienti (uno per riga)</label>
       <textarea id="rIngredients" rows="6" placeholder="200 g di farina&#10;2 uova&#10;1 bustina di lievito&#10;sale q.b.">${escapeHtml(ingText)}</textarea>
       <button type="button" class="btn btn--ghost" id="rOcr" style="margin-top:8px">${iconHtml("image")} Fotografa una ricetta (o ingredienti)</button>
+      ${(("webkitSpeechRecognition" in window) || ("SpeechRecognition" in window)) && isImportConfigured() ? `<button type="button" class="btn btn--ghost" id="rDetta" style="margin-top:8px">🎤 Detta la ricetta a voce</button>` : ""}
       <input type="file" id="rOcrFile" accept="image/*" capture="environment" hidden />
       ${isImportConfigured() ? `<button type="button" class="btn btn--ghost" id="rGenerate" style="margin-top:8px">✨ Inventa una ricetta (AI)</button>` : ""}
     </div>
@@ -5018,6 +5074,76 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       ocrBtn.disabled = false; ocrBtn.innerHTML = old;
       toast(e.message || "Scansione fallita", "error");
     }
+  });
+
+  // --- Dettatura: parli, l'app scrive, poi la stessa funzione che legge le foto
+  // trasforma il testo in titolo/ingredienti/passi. Il riconoscimento vocale è
+  // già usato altrove nell'app, qui cambia solo dove finisce il testo.
+  const dettaBtn = m.el.querySelector("#rDetta");
+  if (dettaBtn) dettaBtn.addEventListener("click", () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { toast("Questo telefono non supporta la dettatura", "error"); return; }
+    const dm = openModal(`
+      <h3 class="modal__title">🎤 Detta la ricetta</h3>
+      <p class="hint" style="margin-top:-8px;margin-bottom:10px">Parla con calma: di' il nome del piatto, poi gli ingredienti e infine i passaggi. Puoi correggere il testo a mano prima di continuare.</p>
+      <button class="btn btn--primary btn--block" id="dtMic">🎤 Comincia a parlare</button>
+      <div class="hint" id="dtStato" style="margin:8px 0">Pronto.</div>
+      <textarea id="dtText" rows="8" placeholder="Qui comparirà quello che dici…"></textarea>
+      <div class="modal__actions">
+        <button class="btn" data-act="cancel">Annulla</button>
+        <button class="btn btn--primary" id="dtOk">Trasforma in ricetta</button>
+      </div>
+    `);
+    const ta = dm.el.querySelector("#dtText");
+    const stato = dm.el.querySelector("#dtStato");
+    const mic = dm.el.querySelector("#dtMic");
+    let rec = null, ascolto = false;
+    const stop = () => { ascolto = false; try { if (rec) rec.stop(); } catch (e) {} rec = null; mic.textContent = "🎤 Comincia a parlare"; stato.textContent = "In pausa. Puoi correggere il testo qui sotto."; };
+    mic.onclick = () => {
+      if (ascolto) { stop(); return; }
+      try {
+        rec = new SR();
+        rec.lang = "it-IT";
+        rec.continuous = true;
+        rec.interimResults = false;
+        rec.onresult = (ev) => {
+          for (let i = ev.resultIndex; i < ev.results.length; i++) {
+            const t = (ev.results[i][0] && ev.results[i][0].transcript || "").trim();
+            if (t) ta.value += (ta.value ? " " : "") + t;
+          }
+          ta.scrollTop = ta.scrollHeight;
+        };
+        // Il riconoscimento si ferma da solo dopo una pausa: se stiamo ancora
+        // dettando lo facciamo ripartire, altrimenti la ricetta si tronca.
+        rec.onend = () => { if (ascolto && rec) { try { rec.start(); } catch (e) { stop(); } } };
+        rec.onerror = () => { stato.textContent = "Non ho sentito. Tocca di nuovo il microfono."; stop(); };
+        rec.start();
+        ascolto = true;
+        mic.textContent = "⏸ Metti in pausa";
+        stato.textContent = "Ti ascolto…";
+      } catch (e) { toast("Microfono non disponibile", "error"); stop(); }
+    };
+    dm.el.querySelector('[data-act="cancel"]').onclick = () => { stop(); dm.close(); };
+    dm.el.querySelector("#dtOk").onclick = async () => {
+      stop();
+      const testo = ta.value.trim();
+      if (testo.length < 15) { toast("Detta ancora un po': il testo è troppo corto", "error"); return; }
+      const ok = dm.el.querySelector("#dtOk");
+      const old = ok.innerHTML;
+      ok.disabled = true; ok.textContent = "Leggo la ricetta…";
+      try {
+        const data = await structureRecipeText(testo);
+        const tEl = m.el.querySelector("#rTitle"); if (tEl && !tEl.value.trim() && data.title) tEl.value = data.title;
+        const sEl = m.el.querySelector("#rServings"); if (sEl && !sEl.value.trim() && data.servings) sEl.value = data.servings;
+        if (data.ingredients && data.ingredients.length) appendToField(m, "#rIngredients", data.ingredients.join("\n"));
+        if (data.steps && data.steps.length) appendToField(m, "#rSteps", data.steps.join("\n"));
+        dm.close();
+        toast("Ricetta scritta! Controllala e salva.", "success");
+      } catch (e) {
+        ok.disabled = false; ok.innerHTML = old;
+        toast(e.message || "Non riuscito", "error");
+      }
+    };
   });
 
   const rImport = m.el.querySelector("#rImport");
@@ -5612,7 +5738,7 @@ function renderOnlineTab() {
         <span class="pager__info">${mealPage + 1} / ${totalPages}</span>
         <button class="btn btn--ghost" id="pageNext" ${mealPage >= totalPages - 1 ? "disabled" : ""}>Succ. ${iconHtml("caret-right")}</button>
       </div>` : "";
-    resultsHtml = countLine + pageItems.map(mealCardHtml).join("") + pager;
+    resultsHtml = countLine + pageItems.map((m, i) => mealCardHtml(m, i, mealQuery)).join("") + pager;
   } else {
     resultsHtml = `<div class="empty">${emptyArt()}<div style="margin-top:6px">Cerca una ricetta in italiano.<br><small>Scegli la fonte qui sopra, o lasciati sorprendere.</small></div></div>`;
   }
@@ -5742,12 +5868,12 @@ async function translateMealTitles(results) {
   } catch (e) { /* in caso d'errore restano in inglese */ }
 }
 
-function mealCardHtml(m, i = 0) {
+function mealCardHtml(m, i = 0, q = "") {
   return `
     <div class="meal-card stagger" data-meal='${escapeHtml(JSON.stringify(m))}' style="--i:${i}">
       ${m.image ? `<img src="${escapeHtml(proxiedImg(m.image))}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : `<div class="meal-card__noimg">${iconHtml("fork-knife")}</div>`}
       <div class="meal-card__body">
-        <h3 class="meal-card__title">${escapeHtml(m.title_it || m.title)}</h3>
+        <h3 class="meal-card__title">${highlightHtml(m.title_it || m.title, q)}</h3>
         <div class="meal-card__meta"><span class="meal-src meal-src--${m.source}">${SOURCE_LABEL[m.source] || ""}</span>${m.meta ? " · " + escapeHtml(m.meta) : ""}</div>
         <div class="meal-card__actions">
           ${m.link ? `<a class="chip" href="${escapeHtml(safeUrl(m.link))}" target="_blank" rel="noopener">${iconHtml("arrow-square-out")} Apri</a>` : ""}
