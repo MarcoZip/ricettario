@@ -14,8 +14,17 @@ function read() {
   }
 }
 
+// Se la memoria del telefono è piena (le foto pesano) il salvataggio fallisce:
+// va detto all'utente, altrimenti crede di aver salvato e al riavvio non trova nulla.
+let onWriteError = null;
+export function setLocalWriteErrorHandler(fn) { onWriteError = fn; }
 function write(state) {
-  localStorage.setItem(KEY, JSON.stringify({ tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan, pantry: state.pantry, menus: state.menus, events: state.events, freezer: state.freezer }));
+  try {
+    localStorage.setItem(KEY, JSON.stringify({ tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan, pantry: state.pantry, menus: state.menus, events: state.events, freezer: state.freezer }));
+  } catch (e) {
+    try { if (onWriteError) onWriteError(e); } catch (e2) { /* niente */ }
+    console.error("Salvataggio locale non riuscito (memoria piena?)", e);
+  }
 }
 
 export function createLocalAdapter() {

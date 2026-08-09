@@ -1,11 +1,15 @@
 // Facciata unica per i dati. La UI parla SOLO con questo modulo e non sa se
 // dietro c'è il salvataggio locale o quello cloud.
 
-import { createLocalAdapter } from "./store-local.js";
+import { createLocalAdapter, setLocalWriteErrorHandler } from "./store-local.js";
 import { combine, categorize } from "./ingredients.js";
 import { logPurchase } from "./restock.js";
 
 let adapter = null;
+// L'app registra qui una funzione per avvisare l'utente se il salvataggio locale
+// fallisce (di solito: memoria del telefono piena per via delle foto).
+let saveErrorNotifier = null;
+export function onSaveError(fn) { saveErrorNotifier = fn; setLocalWriteErrorHandler(() => { if (saveErrorNotifier) saveErrorNotifier(); }); }
 let state = { tools: [], recipes: [], shopping: [], plan: [], pantry: [], menus: [], events: [], freezer: [] };
 const subscribers = new Set();
 

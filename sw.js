@@ -1,7 +1,7 @@
 // Service worker: mette in cache l'app per l'uso offline e l'installazione.
 // I dati (Firestore/TheMealDB) NON passano da qui: vanno sempre in rete / cache propria.
 
-const CACHE = "ricettario-v221";
+const CACHE = "ricettario-v222";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -11,6 +11,7 @@ const APP_SHELL = [
   "./js/ui.js",
   "./js/store.js",
   "./js/store-local.js",
+  "./js/auth.js",
   "./js/config.js",
   "./js/mealdb.js",
   "./js/translate.js",
@@ -113,7 +114,9 @@ self.addEventListener("fetch", (event) => {
           }
           return res;
         })
-        .catch(() => caches.match("./index.html"));
+        // Solo per le NAVIGAZIONI ripieghiamo sulla pagina: per un modulo .js
+        // servire index.html farebbe fallire l'import (e l'app partirebbe vuota).
+        .catch(() => (req.mode === "navigate" ? caches.match("./index.html") : Promise.reject(new Error("offline"))));
     })
   );
 });

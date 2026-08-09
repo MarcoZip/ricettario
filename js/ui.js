@@ -92,6 +92,14 @@ function celebrateSave(title) {
   setTimeout(() => el.remove(), reduceMotion ? 900 : 1800);
 }
 
+// Numero positivo da un campo, con tetto massimo: fuori range → null (campo vuoto).
+// Evita porzioni negative, tempi assurdi e quantità che rompono i calcoli.
+function posNum(v, max) {
+  const n = parseInt(String(v == null ? "" : v).replace(",", "."), 10);
+  if (!isFinite(n) || n <= 0) return null;
+  return max && n > max ? max : n;
+}
+
 // Leggero feedback aptico (vibrazione) sui dispositivi che lo supportano.
 function haptic(ms = 15) {
   try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* ignora */ }
@@ -597,6 +605,8 @@ export function mount(rootEl) {
   } catch {}
   setupBackHandler();
   setupRipple();
+  // Memoria del telefono piena: avvisa invece di perdere i dati in silenzio.
+  store.onSaveError(() => toast("Memoria piena: salvataggio non riuscito. Elimina qualche foto dalle ricette.", "error"));
   setupAurora();
   window.addEventListener("resize", moveNavBlob);
   setupGlassSheen();
@@ -4805,8 +4815,10 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       url: m.el.querySelector("#rUrl").value.trim(),
       notes: m.el.querySelector("#rNotes").value.trim(),
       ingredients: parseList(m.el.querySelector("#rIngredients").value),
-      servings: parseInt(m.el.querySelector("#rServings").value, 10) || null,
-      time: parseInt(m.el.querySelector("#rTime").value, 10) || null,
+      // Solo valori sensati: un numero negativo qui farebbe comparire quantità
+      // negative negli ingredienti di tutta l'app.
+      servings: posNum(m.el.querySelector("#rServings").value, 50),
+      time: posNum(m.el.querySelector("#rTime").value, 1440),
       difficulty: parseInt(m.el.querySelector("#rDiff").value, 10) || null,
       steps: m.el.querySelector("#rSteps").value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean),
       photo: photo,
@@ -5683,7 +5695,8 @@ function editShoppingQty(it) {
   m.el.querySelector('[data-act="save"]').onclick = async () => {
     const qv = m.el.querySelector("#eqQty").value.trim().replace(",", ".");
     const uv = m.el.querySelector("#eqUnit").value.trim();
-    const qty = qv === "" ? null : (parseFloat(qv) || null);
+    const qn = parseFloat(qv);
+    const qty = (qv === "" || !isFinite(qn) || qn <= 0) ? null : qn; // niente quantità negative
     await store.updateShoppingItem(it.id, { qty, unit: uv });
     m.close();
   };
@@ -7969,9 +7982,9 @@ function renderImpostazioni() {
       <div class="setting-row">
         <div>
           <div class="setting-row__label">Diario di cucina</div>
-          <div class="setting-row__desc">Statistiche: piatti più cucinati, ingredienti top…</div>
+          <div class="setting-row__desc">Album dei piatti cucinati, traguardi e calendario delle cotture.</div>
         </div>
-        <button class="btn" id="statsBtn">Apri</button>
+        <button class="btn" id="diaryBtn">Apri</button>
       </div>
     </div>
     ${adminGroup}
@@ -7989,7 +8002,8 @@ function renderImpostazioni() {
 
   root.querySelector("#guideBtn").addEventListener("click", () => openGuide());
   root.querySelector("#changelogBtn").addEventListener("click", () => openChangelog(CHANGELOG, {}));
-  root.querySelector("#statsBtn").addEventListener("click", () => openStats());
+  const diaryBtn = root.querySelector("#diaryBtn");
+  if (diaryBtn) diaryBtn.addEventListener("click", () => openStats());
   root.querySelector("#convBtn").addEventListener("click", () => openConverter());
   const timersBtn = root.querySelector("#timersBtn");
   if (timersBtn) timersBtn.addEventListener("click", () => openTimersTool());

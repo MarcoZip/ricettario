@@ -6,6 +6,17 @@
 
 export const CHANGELOG = [
   {
+    v: "8.32",
+    d: "2026-06-24",
+    items: [
+      "Corretto: toccando \"Le tue statistiche\" si aprivano due finestre sovrapposte e il pulsante \"Diario di cucina\" non faceva nulla. Ora funzionano entrambi, e tornano raggiungibili Album, Traguardi e Calendario delle cotture.",
+      "Corretto un problema che poteva mostrare un ricettario vuoto aprendo l'app senza rete dopo un aggiornamento.",
+      "Se la memoria del telefono è piena ora l'app te lo dice, invece di far finta di aver salvato.",
+      "Non si possono più inserire porzioni, tempi o quantità negativi (facevano comparire ingredienti con dosi negative).",
+      "Corretto il ripristino da backup quando è attiva la Casa condivisa: spesa e menù delle feste finivano in un posto che l'app non leggeva."
+    ]
+  },
+  {
     v: "8.31",
     d: "2026-06-24",
     items: [

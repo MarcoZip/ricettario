@@ -193,9 +193,11 @@ export async function createFirebaseAdapter(uid) {
         const { id, ...rest } = r;
         batch.set(doc(recipesCol, id), rest);
       });
+      // In Casa condivisa spesa ed eventi vivono in households/: se scrivessimo
+      // nelle collezioni personali, i dati importati non si vedrebbero.
       (data.shopping || []).forEach((s) => {
         const { id, ...rest } = s;
-        batch.set(doc(shoppingCol, id), rest);
+        batch.set(doc(shopTarget, id), rest);
       });
       (data.plan || []).forEach((p) => {
         const { id, ...rest } = p;
@@ -211,7 +213,7 @@ export async function createFirebaseAdapter(uid) {
       });
       (data.events || []).forEach((ev) => {
         const { id, ...rest } = ev;
-        batch.set(doc(eventsCol, id), rest);
+        batch.set(doc(eventsTarget, id), rest);
       });
       (data.freezer || []).forEach((fz) => {
         const { id, ...rest } = fz;
