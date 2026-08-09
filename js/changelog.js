@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    v: "8.48",
+    d: "2026-08-09",
+    minor: true,
+    items: [
+      "La temperatura al cuore (74°C) ora compare anche su scaloppine, cotoletta alla milanese, piccata, schnitzel e in genere sulle carni impanate.",
+      "L'app distingue i piatti che hanno lo stesso nome ma non sono carne: <i>risotto alla milanese</i>, <i>melanzane alla milanese</i>, <i>zucchine impanate</i> e <i>cotolette di verdure</i> non mostrano più alcuna temperatura, che per loro non vuol dire niente."
+    ]
+  },
+  {
     v: "8.47",
     d: "2026-08-09",
     minor: true,

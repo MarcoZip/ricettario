@@ -42,7 +42,14 @@ const AL_CUORE = [
   // difetto su una carne impanata è il tipo di errore che non vogliamo fare.
   // Quindi si dà sempre il valore più alto: è sicuro per tutti i tagli, e su una
   // fetta sottile si raggiunge comunque in fretta.
-  { rx: /cotolett|cordon bleu/i, gradi: 74, nota: "Valore prudente: va bene per pollo, vitello o maiale. Per le cotolette di verdure non serve." },
+  {
+    rx: /cotolett|cordon bleu|scaloppin|milanese|impanat|piccata|schnitzel/i,
+    // "Risotto alla milanese", "melanzane alla milanese", "zucchine impanate":
+    // stessi nomi, ma non sono carne. Qui la regola si spegne.
+    not: /risott|\briso\b|pasta|melanzan|zucchin|cavolfior|verdur|seitan|tofu|formagg/i,
+    gradi: 74,
+    nota: "Valore prudente: va bene per pollo, vitello o maiale, che dal nome del piatto non si distinguono."
+  },
   { rx: /pollo|tacchin|gallin|anatra|faraona|volatil/i, gradi: 74, nota: "Tutto il pollame, comprese le parti macinate." },
   { rx: /macinat|hamburger|polpett|polpetton|ragu|rag[uù]|bologne|salsicc/i, gradi: 71, nota: "Le carni macinate vanno più alte dei tagli interi." },
   { rx: /maial|lonza|arista|costine|braciol/i, gradi: 63, nota: "Poi 3 minuti di riposo prima di tagliare." },
@@ -65,15 +72,24 @@ function ingredientiDi(recipe) {
   if (!recipe) return "";
   return (recipe.ingredients || []).map((i) => (i && i.name) || "").join(" ");
 }
+// `not`: parole che ANNULLANO la regola. Serve per i nomi ambigui — "milanese"
+// è una cotoletta, ma anche un risotto; "impanate" possono essere le melanzane.
+// In caso di dubbio la regola non scatta: meglio non dire niente che dare una
+// temperatura di sicurezza a un piatto che non è carne.
+function combacia(regola, testo) {
+  if (!regola.rx.test(testo)) return false;
+  if (regola.not && regola.not.test(testo)) return false;
+  return true;
+}
 function trova(tabella, recipe, ripiegoSuIngredienti = true) {
   const t = titoloDi(recipe);
   if (t.trim()) {
-    const perTitolo = tabella.find((x) => x.rx.test(t));
+    const perTitolo = tabella.find((x) => combacia(x, t));
     if (perTitolo) return perTitolo;
   }
   if (!ripiegoSuIngredienti) return null;
   const ing = ingredientiDi(recipe);
-  return ing.trim() ? tabella.find((x) => x.rx.test(ing)) || null : null;
+  return ing.trim() ? tabella.find((x) => combacia(x, ing)) || null : null;
 }
 
 // { frigo, freezer (mesi, 0 = sconsigliato), nota } oppure null se non sappiamo.
