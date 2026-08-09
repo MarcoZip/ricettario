@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.42",
+    d: "2026-08-09",
+    minor: true,
+    items: [
+      "Casa condivisa: se tu e l'altra persona aggiungete lo stesso articolo nello stesso momento, in lista comparivano due voci uguali. Ora l'app se ne accorge e le unisce da sola, sommando le quantità. Gli articoli già spuntati non vengono toccati."
+    ]
+  },
+  {
     v: "8.41",
     d: "2026-08-09",
     items: [

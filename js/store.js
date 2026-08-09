@@ -62,6 +62,7 @@ export async function initCloud(userId, { seedIfEmpty = false } = {}) {
   await adapter.start((s) => {
     state = s;
     notify();
+    riconciliaSpesa();
   });
   if (seedIfEmpty && state.tools.length === 0) await seedDefaults();
 }
@@ -261,6 +262,70 @@ export function getShopping() {
 
 function shopKey(it) {
   return (it.name || "").toLowerCase().trim() + "|" + (it.unit || "").toLowerCase();
+}
+
+// In Casa condivisa due telefoni che aggiungono lo stesso articolo nello stesso
+// istante non si vedono a vicenda — ognuno decide guardando la propria copia
+// della lista — e creano due voci identiche. Senza transazioni non si può
+// impedire la collisione, ma la si può RIPARARE: a ogni aggiornamento le voci
+// non spuntate con la stessa chiave vengono fuse in una sola.
+//
+// È deterministica di proposito: vince sempre l'id più piccolo e le quantità si
+// sommano allo stesso modo ovunque, quindi se entrambi i telefoni la eseguono
+// insieme scrivono lo stesso identico risultato e cancellano lo stesso perdente
+// (ricancellare un documento già sparito non fa niente). Gli articoli già
+// spuntati non si toccano mai, per non far riapparire nella lista una cosa che
+// hai già messo nel carrello.
+let riconciliaInCorso = false;
+async function riconciliaSpesa() {
+  if (riconciliaInCorso || getMode() !== "cloud") return;
+  const gruppi = new Map();
+  for (const s of state.shopping) {
+    if (s.checked) continue;
+    const k = shopKey(s);
+    if (!gruppi.has(k)) gruppi.set(k, []);
+    gruppi.get(k).push(s);
+  }
+  const doppioni = [...gruppi.values()].filter((g) => g.length > 1);
+  if (!doppioni.length) return;
+  riconciliaInCorso = true;
+  try {
+    for (const g of doppioni) {
+      const ord = g.slice().sort((a, b) => String(a.id).localeCompare(String(b.id)));
+      const vincitore = ord[0];
+      const perdenti = ord.slice(1);
+      // `assorbiti` è la memoria di quali doppioni sono GIÀ stati sommati qui
+      // dentro. Senza, il secondo telefono può vedere il vincitore già
+      // aggiornato ma il perdente non ancora cancellato — Firestore consegna le
+      // modifiche una alla volta — e sommare una seconda volta la stessa
+      // quantità: due bottiglie di latte diventavano tre. Con la memoria, la
+      // fusione si può rieseguire quante volte si vuole e dà sempre lo stesso
+      // risultato, da qualunque telefono.
+      const assorbiti = new Set(Array.isArray(vincitore.mergedIds) ? vincitore.mergedIds : []);
+      let qty = vincitore.qty;
+      const from = new Set(String(vincitore.from || "").split(",").map((x) => x.trim()).filter(Boolean));
+      let nuovi = false;
+      for (const p of perdenti) {
+        if (assorbiti.has(p.id)) continue; // già sommato in un giro precedente
+        assorbiti.add(p.id);
+        nuovi = true;
+        if (p.qty != null) qty = qty != null ? qty + p.qty : p.qty;
+        String(p.from || "").split(",").map((x) => x.trim()).filter(Boolean).forEach((x) => from.add(x));
+      }
+      if (nuovi) {
+        await adapter.updateShopping(vincitore.id, {
+          qty: qty != null ? qty : null,
+          from: [...from].join(", "),
+          mergedIds: [...assorbiti].slice(-20) // non far crescere la lista all'infinito
+        });
+      }
+      for (const p of perdenti) await adapter.deleteShopping(p.id);
+    }
+  } catch (e) {
+    // Offline o permessi: si riproverà da sé al prossimo aggiornamento.
+  } finally {
+    riconciliaInCorso = false;
+  }
 }
 
 // Aggiunge una lista di ingredienti, unendo quelli uguali (anche con l'esistente).
