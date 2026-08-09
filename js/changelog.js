@@ -6,6 +6,17 @@
 
 export const CHANGELOG = [
   {
+    v: "8.45",
+    d: "2026-08-09",
+    items: [
+      "Nuovo interruttore in Impostazioni → <b>Vibrazione</b>, con un tasto \"Prova\": prima non c'era modo di spegnerla. Ora si sospende anche da sola quando accendi il risparmio batteria.",
+      "Il telefono ora vibra quando qualcosa <b>non riesce</b>: in cucina spesso è appoggiato e non lo guardi, e un errore restava del tutto silenzioso.",
+      "Vibra anche quando <b>avvii un timer</b>, così sai che è partito senza doverlo controllare.",
+      "Tolta la vibrazione all'apertura di ogni ricetta: è il gesto più frequente, e un colpetto decine di volte al giorno diventa fastidio invece che conferma.",
+      "Corretto: salvando una ricetta il telefono vibrava due volte di fila, una sopra l'altra."
+    ]
+  },
+  {
     v: "8.44",
     d: "2026-08-09",
     items: [

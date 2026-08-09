@@ -104,13 +104,13 @@ function fxBurstFrom(el, opts) {
 // Celebrazione scenica quando si salva una nuova ricetta: coriandoli a pioggia
 // dall'alto + un cartellino "Ricetta salvata!" che entra a molla e svanisce.
 function celebrateSave(title) {
-  haptic(30);
+  hapticPattern([30, 50, 30]); // tre colpetti: e una celebrazione, non un tocco
   playPling();
   const el = document.createElement("div");
   el.className = "save-cele";
   el.innerHTML = `<div class="save-cele__card"><div class="save-cele__emoji">🎉</div><div class="save-cele__t">Ricetta salvata!</div>${title ? `<div class="save-cele__sub">${escapeHtml(String(title).slice(0, 50))}</div>` : ""}</div>`;
   document.body.appendChild(el);
-  try { navigator.vibrate && navigator.vibrate([30, 50, 30]); } catch (e) {}
+
   if (!reduceMotion) {
     const W = window.innerWidth;
     for (let i = 0; i < 5; i++) setTimeout(() => fxBurst(W * (0.12 + i * 0.19), 70, { count: 16 }), i * 90);
@@ -153,8 +153,23 @@ function posNum(v, max) {
 }
 
 // Leggero feedback aptico (vibrazione) sui dispositivi che lo supportano.
+// Vibrazione. Passa TUTTA da qui, così un solo interruttore la spegne davvero e
+// la modalità risparmio batteria la sospende. Nota: fino alla v8.44 credevamo
+// non facesse nulla, perché Safari non l'ha mai implementata — ma il telefono su
+// cui gira Fornelli è Android, dove funziona eccome.
+function hapticOn() {
+  if (prefBool("hapticOff", false)) return false;
+  try { if (powerSaveActive()) return false; } catch (e) {}
+  return !!navigator.vibrate;
+}
 function haptic(ms = 15) {
-  try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* ignora */ }
+  if (!hapticOn()) return;
+  try { navigator.vibrate(ms); } catch (e) { /* ignora */ }
+}
+// Schemi più lunghi (allarmi, celebrazioni): stessa regola, un solo punto.
+function hapticPattern(pattern) {
+  if (!hapticOn()) return;
+  try { navigator.vibrate(pattern); } catch (e) { /* ignora */ }
 }
 
 // Anima un numero da 0 al valore finale.
@@ -519,6 +534,10 @@ export function toast(message, type = "") {
   t.className = "toast" + (type ? " toast--" + type : "");
   t.textContent = message;
   rootEl.appendChild(t);
+  // Due colpetti secchi quando qualcosa NON è riuscito: in cucina il telefono è
+  // spesso appoggiato e non lo si guarda, e finora un errore era del tutto
+  // silenzioso — si scopriva più tardi che l'operazione non era andata.
+  if (type === "error") hapticPattern([18, 60, 18]);
   setTimeout(() => {
     t.style.opacity = "0";
     setTimeout(() => t.remove(), 250);
@@ -1732,7 +1751,9 @@ function openTool(toolId) {
 
 function openRecipe(recipeId) {
   const r = store.getRecipe(recipeId);
-  haptic(6);
+  // Niente vibrazione qui: aprire una ricetta e il gesto piu frequente dell app,
+  // e un ronzio decine di volte al giorno diventa fastidio invece che conferma.
+  // Il cambio di schermata si vede gia dalla transizione.
   // Morph "elemento condiviso": tagga la miniatura sorgente con lo stesso nome
   // della foto hero del dettaglio, così la View Transition la fa "espandere".
   if (document.startViewTransition && !reduceMotion) {
@@ -3422,7 +3443,7 @@ function playBeep() {
     o.start(); g.gain.setValueAtTime(0.3, ctx.currentTime); o.stop(ctx.currentTime + 0.6);
   } catch (e) { /* audio non disponibile */ }
 }
-function vibrateAlarm() { try { navigator.vibrate && navigator.vibrate([300, 120, 300]); } catch (e) {} }
+function vibrateAlarm() { hapticPattern([300, 120, 300]); }
 function fmtClock(s) { const m = Math.floor(s / 60); return `${m}:${String(s % 60).padStart(2, "0")}`; }
 
 // Un timer deve essere un OROLOGIO, non un contatore di battiti. Prima si faceva
@@ -3481,6 +3502,7 @@ function gTick() {
 function addGlobalTimer(mins, secs, label) {
   const total = Math.max(1, (parseInt(mins, 10) || 0) * 60 + (parseInt(secs, 10) || 0));
   gTimers.push({ id: ++gSeq, label: (label || "").trim() || `Timer ${gTimers.length + 1}`, remaining: total, total, endsAt: Date.now() + total * 1000, running: true });
+  haptic(14); // conferma che il timer e partito davvero: e un impegno, non un tocco qualsiasi
   ensureGlobalTicker(); paintTimerWidget(); paintTimersPanel(); saveGTimers();
 }
 // Indicatore fluttuante mostrato quando c'è almeno un timer attivo.
@@ -4548,7 +4570,7 @@ function openCookingMode(recipe) {
         </div>
       </div>`;
     try { fxBurst(window.innerWidth / 2, window.innerHeight / 3, { count: 46 }); } catch (e) {}
-    try { navigator.vibrate && navigator.vibrate([40, 60, 40]); } catch (e) {}
+    hapticPattern([40, 60, 40]);
     el.querySelector("#ckRate").onclick = () => { close(); openCookReview(recipe); };
     el.querySelector("#ckDone").onclick = close;
   }
@@ -4677,7 +4699,7 @@ function openCookingMode(recipe) {
     for (const t of timers) {
       if (!t.running) continue;
       syncTimer(t); // dall'orologio, non un battito alla volta (vedi syncTimer)
-      if (t.remaining <= 0) { t.remaining = 0; t.running = false; t.alarming = true; if (getSoundOn()) playChime(); else beep(); try { navigator.vibrate && navigator.vibrate([300, 120, 300]); } catch (e) {} toast(`⏰ ${t.label} finito!`, "success"); }
+      if (t.remaining <= 0) { t.remaining = 0; t.running = false; t.alarming = true; if (getSoundOn()) playChime(); else beep(); vibrateAlarm(); toast(`⏰ ${t.label} finito!`, "success"); }
     }
     ensureTicker();
     ensureAlarm();
@@ -4706,12 +4728,13 @@ function openCookingMode(recipe) {
   // Allarme ripetuto (suono + vibrazione) finché non lo si ferma toccando il timer.
   function ensureAlarm() {
     const any = timers.some((t) => t.alarming);
-    if (any && !alarmTicker) alarmTicker = setInterval(() => { if (getSoundOn()) playChime(); else beep(); try { navigator.vibrate && navigator.vibrate([300, 120, 300]); } catch (e) {} }, 1700);
+    if (any && !alarmTicker) alarmTicker = setInterval(() => { if (getSoundOn()) playChime(); else beep(); vibrateAlarm(); }, 1700);
     else if (!any && alarmTicker) { clearInterval(alarmTicker); alarmTicker = null; }
   }
   function addTimer(mins, label) {
     const m = Math.max(1, parseInt(mins, 10) || 0);
     timers.push({ id: ++tseq, label: (label || "").trim() || `Timer ${timers.length + 1}`, remaining: m * 60, total: m * 60, endsAt: Date.now() + m * 60000, running: true });
+    haptic(14); // conferma che il timer e partito
     ensureTicker();
     paintTimers();
   }
@@ -8313,6 +8336,13 @@ function renderImpostazioni() {
       </label>
       <label class="setting-row" style="cursor:pointer">
         <div>
+          <div class="setting-row__label">📳 Vibrazione</div>
+          <div class="setting-row__desc">Un colpetto quando spunti la spesa, avvii un timer o qualcosa non riesce. Togliendola sparisce anche quella dei timer che suonano (il suono resta). <a href="#" id="hapticTest">Prova</a></div>
+        </div>
+        <input type="checkbox" id="hapticChk" class="mini-check" ${!prefBool("hapticOff", false) ? "checked" : ""} />
+      </label>
+      <label class="setting-row" style="cursor:pointer">
+        <div>
           <div class="setting-row__label">🪟 Vetro liquido</div>
           <div class="setting-row__desc">Card e pannelli in "vetro smerigliato" con un riflesso di luce che scorre mentre navighi. Look premium e arioso.</div>
         </div>
@@ -8532,6 +8562,19 @@ function renderImpostazioni() {
   if (seasonChk) seasonChk.addEventListener("change", () => setSeason(seasonChk.checked ? "on" : "off"));
   const soundChk = root.querySelector("#soundChk");
   if (soundChk) soundChk.addEventListener("change", () => { setSoundOn(soundChk.checked); if (soundChk.checked) playSample(); });
+
+  const hapticChk = root.querySelector("#hapticChk");
+  if (hapticChk) hapticChk.addEventListener("change", () => {
+    setPrefBool("hapticOff", !hapticChk.checked);
+    if (hapticChk.checked) hapticPattern([18, 60, 18]);
+  });
+  const hapticTest = root.querySelector("#hapticTest");
+  if (hapticTest) hapticTest.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (!navigator.vibrate) { toast("Questo dispositivo non vibra", ""); return; }
+    if (prefBool("hapticOff", false)) { toast("La vibrazione è spenta: accendila qui accanto", ""); return; }
+    hapticPattern([25, 70, 25, 70, 25]);
+  });
   const soundTest = root.querySelector("#soundTest");
   if (soundTest) soundTest.addEventListener("click", (e) => { e.preventDefault(); playSample(); });
   const glassChk = root.querySelector("#glassChk");
