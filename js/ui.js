@@ -339,12 +339,12 @@ let lastShopToggled = null; // id dell'ultimo articolo spuntato (per l'animazion
 let planView = "month"; // "month" | "week"
 let weekAnchor = null; // data di riferimento per la vista settimana
 
-// Stato locale della sezione Ricettario (per non perdere i risultati ad ogni render).
+// Stato locale della sezione Scopri (per non perdere i risultati ad ogni render).
 let mealTab = "online";
 let mealSource = "all"; // "all" | "mealdb" | "gz" | "misya" | "spoon"
 let mealQuery = "";
 let mealSourceCounts = []; // [{label, count}] per il riepilogo "Tutte le fonti"
-let pendingMealQuery = ""; // ricerca da avviare quando si apre il Ricettario online
+let pendingMealQuery = ""; // ricerca da avviare quando si apre la schermata Scopri
 let pendingVideoForImport = ""; // link video da agganciare alla prossima ricetta importata (flusso "cerca dal video")
 let mealResults = null;
 let mealLoading = false;
@@ -1636,7 +1636,7 @@ function openRecipe(recipeId) {
   const defServ = prefNum("defServings", 0);
   detailServings = r && r.servings ? (defServ > 0 ? defServ : r.servings) : null;
   ingChecks = new Set(); convertUnits = false; // azzera spunte/conversione per la nuova ricetta
-  // la schermata ricetta vive nella sezione "Strumenti"
+  // la schermata ricetta vive nella sezione "Ricette"
   currentRoute = "strumenti";
   document.querySelectorAll(".bottom-nav__btn").forEach((b) => {
     b.classList.toggle("is-active", b.dataset.route === "strumenti");
@@ -1698,7 +1698,7 @@ function updateAppBadge() {
   } catch (e) { /* non supportato o permesso mancante */ }
 }
 
-// ---------------- Schermata: Strumenti ----------------
+// ---------------- Schermata: Ricette (le tue, per strumento di cottura) ----------------
 function recipeResultRow(r, i = 0) {
   const tool = store.getTool(r.toolId);
   // Con foto: card grande con titolo in sovrimpressione (stile ricetta del giorno).
@@ -2124,7 +2124,7 @@ function renderStrumenti() {
   if (dykX) dykX.addEventListener("click", () => { tipDismissed = true; const b = root.querySelector("#dyk"); if (b) b.remove(); });
 
   // "Di stagione": tocca un ingrediente → cerca tra le ricette salvate (in Home).
-  // Dai risultati si può poi estendere la ricerca al Ricettario online col pulsante.
+  // Dai risultati si può poi estendere la ricerca alla schermata Scopri col pulsante.
   root.querySelectorAll(".season-chip[data-season]").forEach((c) => c.addEventListener("click", () => {
     homeQuery = c.dataset.season; homeFilter = "";
     renderStrumenti();
@@ -2155,7 +2155,7 @@ function startVoiceSearch() {
   try { rec.start(); } catch (e) { /* già in ascolto */ }
 }
 
-// Ricerca vocale nel Ricettario online: detta il termine e cerca sulla fonte scelta.
+// Ricerca vocale nella schermata Scopri: detta il termine e cerca sulla fonte scelta.
 function startMealVoiceSearch() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return;
@@ -3071,7 +3071,7 @@ function dishQueryFromTitle(title, author) {
   return t;
 }
 
-// Dall'autore/canale del video ricava la fonte del Ricettario online su cui
+// Dall'autore/canale del video ricava la fonte della schermata Scopri su cui
 // filtrare la ricerca (così cerca sullo stesso sito del video). null = tutte.
 function sourceFromAuthor(author) {
   const a = (author || "").toLowerCase();
@@ -3090,12 +3090,12 @@ function openVideoImport(prefillUrl, onRecipe) {
     <p class="hint" style="margin-top:-8px;margin-bottom:12px">Incolla il link di un video (TikTok, Instagram, YouTube): l'AI prova a ricavarne la ricetta. Funziona meglio se la ricetta è scritta nella descrizione del video.</p>
     <div class="field"><input type="url" id="viUrl" inputmode="url" placeholder="https://..." value="${escapeHtml(prefillUrl || "")}" /></div>
     <div class="field"><label>Oppure incolla qui la descrizione del video (facoltativo)</label><textarea id="viText" rows="4" placeholder="Incolla il testo della ricetta se il link non basta"></textarea></div>
-    <button class="btn btn--ghost btn--block" id="viSearchNow" style="margin-bottom:6px">${iconHtml("magnifying-glass")} Cerca questa ricetta nel Ricettario online</button>
+    <button class="btn btn--ghost btn--block" id="viSearchNow" style="margin-bottom:6px">${iconHtml("magnifying-glass")} Cerca questa ricetta in \"Scopri\"</button>
     <div id="viBody"></div>
     <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button><button class="btn btn--primary" data-act="ok">Importa</button></div>
   `);
   m.el.querySelector('[data-act="cancel"]').onclick = m.close;
-  // Sempre disponibile: riconosce il video e cerca quel piatto nel Ricettario online.
+  // Sempre disponibile: riconosce il video e cerca quel piatto nella schermata Scopri.
   const doSearchOnline = async (url) => {
     if (!url) { toast("Incolla prima il link del video", "error"); return; }
     const body = m.el.querySelector("#viBody");
@@ -3132,7 +3132,7 @@ function openVideoImport(prefillUrl, onRecipe) {
       if (meta && meta.title) {
         const q = dishQueryFromTitle(meta.title, meta.author);
         const src = sourceFromAuthor(meta.author);
-        const where = src ? `su ${escapeHtml(SOURCE_LABEL[src] || src)}` : "nel Ricettario online";
+        const where = src ? `su ${escapeHtml(SOURCE_LABEL[src] || src)}` : "in \"Scopri\"";
         body.insertAdjacentHTML("beforeend", `<div class="hint" style="margin-top:12px">🎬 Riconosciuto: <b>${escapeHtml(meta.title)}</b>${meta.author ? ` · ${escapeHtml(meta.author)}` : ""}.</div>${q ? `<button class="btn btn--primary btn--block" id="viSearch" style="margin-top:8px">${iconHtml("magnifying-glass")} Cerca "${escapeHtml(q)}" ${where}</button>` : ""}`);
         const sb = body.querySelector("#viSearch");
         if (sb) sb.onclick = () => { if (src) mealSource = src; closeAllModals(); searchOnline(q); if (videoInfo(url)) pendingVideoForImport = url; };
@@ -4971,11 +4971,11 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
   };
 }
 
-// ---------------- Schermata: Ricettario ----------------
+// ---------------- Schermata: Scopri (ricerca online) ----------------
 function renderRicettario() {
   root.innerHTML = `
-    <h1 class="page-title">Ricettario</h1>
-    <p class="page-sub">Trova ispirazione e salva le ricette nei tuoi strumenti.</p>
+    <h1 class="page-title">Scopri</h1>
+    <p class="page-sub">Trova ispirazione e salva le ricette nei tuoi strumenti di cottura.</p>
     <div class="tabs">
       <button class="tab-btn ${mealTab === "online" ? "is-active" : ""}" data-tab="online">${iconHtml("magnifying-glass")} Cerca online</button>
       <button class="tab-btn ${mealTab === "siti" ? "is-active" : ""}" data-tab="siti">${iconHtml("book-bookmark")} Siti italiani</button>
@@ -5131,7 +5131,7 @@ async function runMealSearch(q) {
   return out;
 }
 
-// Illustrazione SVG (pentola con vapore) per le schermate vuote del Ricettario.
+// Illustrazione SVG (pentola con vapore) per le schermate vuote di Scopri.
 function emptyArt(kind = "pot") {
   const tint = "rgba(var(--primary-rgb,255,184,107),0.22)";
   const bg = `<circle cx="60" cy="62" r="52" fill="rgba(var(--primary-rgb,255,184,107),0.10)"/>`;
@@ -5193,14 +5193,14 @@ function detectSource(q) {
   }
   return null;
 }
-// Va al Ricettario online (scheda "Cerca online") e lancia subito la ricerca.
+// Va alla schermata Scopri (scheda "Cerca online") e lancia subito la ricerca.
 function searchOnline(term) {
   const q = (term || "").trim();
   if (!q) return;
   pendingVideoForImport = ""; // una ricerca normale non porta dietro alcun video
   mealTab = "online";
   if (BROWSE_SOURCES.has(mealSource)) mealSource = "all"; // una fonte con ricerca testuale
-  // Avvia la ricerca DOPO che la pagina Ricettario è disegnata: la consuma
+  // Avvia la ricerca DOPO che la pagina Scopri è disegnata: la consuma
   // renderOnlineTab (altrimenti partirebbe prima del DOM e resterebbe bloccata).
   pendingMealQuery = q;
   navigate("ricettario");
@@ -5637,18 +5637,18 @@ function renderSitiTab() {
 
 // ---------------- Guida / aiuto ----------------
 const GUIDE_SECTIONS = [
-  { icon: "cooking-pot", title: "Strumenti & ricette", text: "Organizza le ricette per strumento di cottura. Crea uno strumento (forno, friggitrice ad aria…) e salva sotto le ricette con foto, link, ingredienti, porzioni, passi e categorie." },
-  { icon: "calendar-dots", title: "Oggi si mangia", text: "In cima alla schermata Strumenti trovi le ricette che hai pianificato per oggi: toccale per aprirle al volo." },
-  { icon: "image", title: "Aggiungi senza fatica", text: "Nel form ricetta: incolla un link e tocca \"Importa\", \"Scansiona da una foto\" per leggere da un libro o quaderno, \"Importa da video social\" per TikTok/Instagram/YouTube, oppure \"Inventa una ricetta (AI)\" dagli ingredienti che hai. O salva dal Ricettario online." },
+  { icon: "cooking-pot", title: "Le tue ricette", text: "Organizza le ricette per strumento di cottura. Crea uno strumento (forno, friggitrice ad aria…) e salva sotto le ricette con foto, link, ingredienti, porzioni, passi e categorie." },
+  { icon: "calendar-dots", title: "Oggi si mangia", text: "In cima alla schermata Ricette trovi le ricette che hai pianificato per oggi: toccale per aprirle al volo." },
+  { icon: "image", title: "Aggiungi senza fatica", text: "Nel form ricetta: incolla un link e tocca \"Importa\", \"Scansiona da una foto\" per leggere da un libro o quaderno, \"Importa da video social\" per TikTok/Instagram/YouTube, oppure \"Inventa una ricetta (AI)\" dagli ingredienti che hai. O salvale da \"Scopri\"." },
   { icon: "sparkle", title: "Aiuto AI", text: "Aiuti intelligenti (gratis): \"Inventa una ricetta\" dagli ingredienti, \"Chiedi allo chef\" per dubbi e sostituzioni, \"Com'è venuto?\" che giudica la foto del piatto, \"Adatta la ricetta\" (vegano/leggero…), \"Modalità robot\" per Companion/Bimby, \"Fotografa il frigo\" e il \"Menù AI\" della settimana. Sono un aiuto, non infallibili." },
-  { icon: "book-open", title: "Ricettario", text: "Cerca idee online o tra i siti italiani; tocca \"Salva\" per aggiungerle a uno dei tuoi strumenti. Le ricette online sono in inglese: al salvataggio vengono tradotte in italiano in automatico." },
+  { icon: "book-open", title: "Scopri", text: "Cerca idee online o tra i siti italiani; tocca \"Salva\" per aggiungerle a uno dei tuoi strumenti. Le ricette online sono in inglese: al salvataggio vengono tradotte in italiano in automatico." },
   { icon: "fork-knife", title: "Porzioni su misura", text: "Apri una ricetta e cambia il numero di persone con + e −: le quantità degli ingredienti si ricalcolano da sole." },
   { icon: "carrot", title: "Valori nutrizionali", text: "In una ricetta tocca \"Calcola\" sotto gli ingredienti: l'app stima calorie e macronutrienti (proteine, carboidrati, grassi) per porzione e totali. Per ciò che non conosce cerca online su Open Food Facts e ti mostra anche cosa non ha conteggiato. È una stima: cambia con il numero di porzioni." },
-  { icon: "heart", title: "Trova al volo", text: "Dalla schermata Strumenti cerca per nome o ingrediente e usa i filtri: Preferiti, Più cucinate, Di recente, per tempo (≤15 e ≤30 min) e le categorie. Indica il tempo di preparazione nella ricetta (modifica) per usare i filtri rapidi. Dai un voto a stelle e \"Segna come cucinata\" per il conto." },
+  { icon: "heart", title: "Trova al volo", text: "Dalla schermata Ricette cerca per nome o ingrediente e usa i filtri: Preferiti, Più cucinate, Di recente, per tempo (≤15 e ≤30 min) e le categorie. Indica il tempo di preparazione nella ricetta (modifica) per usare i filtri rapidi. Dai un voto a stelle e \"Segna come cucinata\" per il conto." },
   { icon: "shopping-cart-simple", title: "Spesa & Dispensa", text: "Aggiungi gli ingredienti alla lista della spesa (uniti e per reparto). Tocca il nome per spuntare un articolo e la quantità per modificarla. Con \"Spesa fatta\" passa tutto in dispensa. In Dispensa tieni ciò che hai già — con la scadenza, e l'app ti avvisa quando qualcosa sta per scadere — e \"Cosa posso cucinare\" suggerisce le ricette con quello che hai." },
   { icon: "fire", title: "Modalità cucina", text: "Nelle ricette con i passi, tocca \"Modalità cucina\": istruzioni passo-passo, più timer con nome (pasta, forno…), lettura vocale (🔊) e schermo sempre acceso. Tocca un ingrediente nel passo per vedere la quantità. Col microfono 🎤 vai avanti/indietro a voce, avvii timer e puoi anche fare domande (\"posso sostituire il burro?\") con risposta a voce." },
   { icon: "calendar-blank", title: "Pianificazione", text: "Nel calendario (vista Mese o Settimana) assegna le ricette ai giorni in pranzo o cena, usa \"Riempi le cene\" per riempire la settimana e genera la spesa del mese o della settimana." },
-  { icon: "book-bookmark", title: "Menu", text: "Dalla schermata Strumenti, filtro \"Menu\": raggruppa più ricette (es. \"Cena con amici\") e genera un'unica lista della spesa." },
+  { icon: "book-bookmark", title: "Menu", text: "Dalla schermata Ricette, filtro \"Menu\": raggruppa più ricette (es. \"Cena con amici\") e genera un'unica lista della spesa." },
   { icon: "arrow-square-out", title: "Condividi", text: "Da una ricetta tocca \"Condividi\" per inviarla a qualcuno (WhatsApp, email…) con ingredienti e preparazione." },
   { icon: "calendar-dots", title: "Promemoria", text: "In Impostazioni attiva i \"Promemoria\": ricevi una notifica delle scadenze in dispensa e del pasto di oggi. Puoi scegliere l'ora dell'avviso e aggiungere un secondo avviso serale con l'anteprima dei pasti di domani. Su iPhone aggiungi prima l'app alla schermata Home." },
   { icon: "sparkle", title: "Personalizza", text: "In Impostazioni scegli il tema chiaro o scuro. Con l'accesso le ricette sono salvate nel cloud e sincronizzate su tutti i dispositivi; puoi anche esportare un backup." }

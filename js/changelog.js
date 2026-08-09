@@ -6,6 +6,16 @@
 
 export const CHANGELOG = [
   {
+    v: "8.37",
+    d: "2026-08-09",
+    items: [
+      "Due schede della barra in basso cambiano nome: \"Strumenti\" diventa \"Ricette\" (è lì che stanno le tue, ordinate per forno, friggitrice e compagnia) e \"Ricettario\" diventa \"Scopri\" (è lì che si cercano idee nuove online).",
+      "Cambiano solo i nomi: dentro non si è spostato niente, tutto funziona esattamente come prima.",
+      "Il motivo: \"Strumenti\" indicava due cose diverse — la schermata delle ricette e i tuoi apparecchi di cottura. Adesso \"Strumenti\" vuol dire una cosa sola, cioè forno, microonde, friggitrice e robot.",
+      "Aggiornati di conseguenza la Guida e l'assistente \"Chiedi a Fornelli\", che cercando \"ricettario\" ti porta comunque su Scopri."
+    ]
+  },
+  {
     v: "8.36",
     d: "2026-08-09",
     items: [

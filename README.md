@@ -4,7 +4,7 @@ App (PWA) per organizzare le ricette di casa **per strumento di cottura**
 (friggitrice ad aria, forno, induzione, gas, vaporiera, ecc.).
 
 Per ogni strumento si possono salvare ricette con **titolo, link e note**.
-C'è anche un **Ricettario** integrato per cercare idee online (TheMealDB) e una
+C'è anche una schermata **Scopri** per cercare idee online e una
 lista dei migliori **siti italiani**.
 
 - ✅ Funziona **offline** e si installa sul telefono come una app.
