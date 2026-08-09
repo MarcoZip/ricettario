@@ -204,22 +204,44 @@ Ricette/
 ├─ sw.js                   Service worker (funzionamento offline)
 ├─ firestore.rules         Regole di sicurezza da incollare in Firebase
 ├─ icons/                  Icone dell'app
-└─ js/
-   ├─ app.js               Avvio e orchestrazione
-   ├─ config.js            👉 QUI si incolla la configurazione Firebase
-   ├─ store.js             Logica dati (interfaccia unica)
-   ├─ store-local.js       Salvataggio sul telefono
-   ├─ store-firebase.js    Salvataggio nel cloud
-   ├─ auth.js              Login / registrazione
-   ├─ ui.js                Interfaccia e schermate
-   ├─ mealdb.js            Ricerca ricette online (TheMealDB)
-   ├─ nutrition.js         Stima valori nutrizionali (+ Open Food Facts)
-   ├─ notify.js            Promemoria locali (notifiche di sistema)
-   ├─ push.js              Notifiche push (iscrizione + promemoria al worker)
-   └─ sites.js             Elenco siti italiani
-   worker/
-   ├─ recipe-extractor.js  Import ingredienti dai link (Cloudflare Worker)
-   └─ push-sender.js       Invio notifiche push (Cloudflare Worker + Cron)
+├─ .claude/agents/         Team di agenti AI permanenti usati in sviluppo
+│                          (revisione, sicurezza, grafica, documentazione…)
+├─ js/
+│  ├─ app.js               Avvio e orchestrazione
+│  ├─ app-help.js          Manuale dell'assistente "Chiedi a Fornelli" (HELP_TOPICS)
+│  ├─ appliances.js        Dati verificati sui manuali dei forni/apparecchi (per "Come lo imposto?")
+│  ├─ changelog.js         Storico delle novità (finestra "Novità")
+│  ├─ co2.js                Stima impatto ambientale (CO2) di una ricetta
+│  ├─ config.js            👉 QUI si incolla la configurazione Firebase
+│  ├─ cost.js              Stima del costo di una ricetta
+│  ├─ diets.js             Motore "sicuro per tutti": allergeni, intolleranze, diete
+│  ├─ icons.js / icons-data.js   Icone (Phosphor) incorporate per l'uso offline
+│  ├─ image.js             Ridimensionamento foto prima del salvataggio
+│  ├─ import-recipe.js     Import ingredienti da un link (via Worker) + "Come lo imposto?"
+│  ├─ ingredients.js       Interpretazione righe ingredienti, somma, reparti
+│  ├─ measures.js          Conversione misure USA/UK in metrico
+│  ├─ mealdb.js            Ricerca ricette online (TheMealDB)
+│  ├─ notify.js            Promemoria locali (notifiche di sistema)
+│  ├─ nutrition.js         Stima valori nutrizionali (+ Open Food Facts)
+│  ├─ ocr.js               Lettura testo da foto (Tesseract.js, scontrino/libri)
+│  ├─ profile.js           Nickname e preferenze del profilo
+│  ├─ push.js              Notifiche push (iscrizione + promemoria al worker)
+│  ├─ restock.js           Restock predittivo ("Presto da ricomprare")
+│  ├─ seasonal.js          Ingredienti di stagione (badge "di stagione")
+│  ├─ share-image.js       Cartolina immagine di una ricetta da condividere
+│  ├─ sites.js             Elenco siti italiani
+│  ├─ sound.js             Micro-suoni opzionali (Web Audio, nessun file)
+│  ├─ store.js             Logica dati (interfaccia unica)
+│  ├─ store-local.js       Salvataggio sul telefono
+│  ├─ store-firebase.js    Salvataggio nel cloud
+│  ├─ auth.js              Login / registrazione
+│  ├─ substitutions.js     Sostituzioni comuni in cucina
+│  ├─ theme.js             Tema chiaro/scuro e aspetto
+│  ├─ translate.js         Traduzione EN→IT delle ricette online
+│  └─ ui.js                Interfaccia e schermate
+worker/
+├─ recipe-extractor.js  Import ingredienti dai link (Cloudflare Worker)
+└─ push-sender.js       Invio notifiche push (Cloudflare Worker + Cron)
 ```
 
 ## Note

@@ -6,6 +6,17 @@
 
 export const CHANGELOG = [
   {
+    v: "8.34",
+    d: "2026-08-09",
+    minor: true,
+    items: [
+      "Corretto: l'assistente \"Chiedi a Fornelli\" e la Guida parlavano di \"Opzioni\", ma il tasto in basso si chiama \"Impostazioni\" — ora i testi usano il nome giusto.",
+      "Aggiunte all'assistente le voci mancanti per: Scansiona lo scontrino, Come lo imposto? (forno/microonde/friggitrice/piano cottura), Porziona e congela, Presto da ricomprare, Svuota il frigo, Bilancio nutrizionale della settimana, Sfide della settimana, Album di cucina, Aggiungi al calendario, Muro delle ricette, Reazioni della famiglia, Copertina personale.",
+      "Corretto: finire la Modalità cucina e poi toccare anche \"Segna come cucinata\" contava due volte la stessa cena, falsando statistiche, diario, album e sfide.",
+      "Corretto: il tasto \"Cosa posso cucinare con questi?\" apriva una finestra intitolata \"Svuota la dispensa\", che è un'altra cosa."
+    ]
+  },
+  {
     v: "8.33",
     d: "2026-06-24",
     items: [

@@ -659,7 +659,7 @@ function setupAurora() {
 }
 
 // (L'atmosfera stagionale sullo sfondo è ora gestita da applySeason() in theme.js,
-//  con anche l'estate e un interruttore in Opzioni.)
+//  con anche l'estate e un interruttore in Impostazioni.)
 
 // Tasto Indietro del telefono: torna alla schermata precedente DENTRO l'app
 // invece di chiuderla. Teniamo sempre uno "stato in più" nella cronologia: a
@@ -1748,7 +1748,7 @@ function renderHomeBody() {
     // 1) Base in funzione del filtro/categoria scelto (o tutte le ricette).
     let base;
     if (homeFilter === "reco") { base = recommendedRecipes(); emptyIcon = "sparkle"; emptyMsg = "Cucina e reagisci a qualche ricetta: imparerò cosa consigliarti."; }
-    else if (homeFilter === "permeo") { base = store.getAllRecipes().filter(matchesDiet); emptyIcon = "heart"; emptyMsg = "Nessuna ricetta adatta alle tue preferenze alimentari (impostale in Opzioni)."; }
+    else if (homeFilter === "permeo") { base = store.getAllRecipes().filter(matchesDiet); emptyIcon = "heart"; emptyMsg = "Nessuna ricetta adatta alle tue preferenze alimentari (impostale in Impostazioni)."; }
     else if (homeFilter === "fav") { base = store.getFavorites(); emptyIcon = "heart"; emptyMsg = "Nessun preferito: tocca il cuore in una ricetta."; }
     else if (homeFilter === "cooked") { base = store.getMostCooked(); emptyIcon = "fire"; emptyMsg = "Nessuna ricetta ancora segnata come cucinata."; }
     else if (homeFilter === "recent") { base = store.getRecentCooked(); emptyIcon = "timer"; emptyMsg = "Niente cucinato di recente."; }
@@ -1904,7 +1904,7 @@ function renderStrumenti() {
     let lastBk = 0, snooze = 0;
     try { lastBk = Date.parse(localStorage.getItem("ricettario.lastBackup") || "") || 0; snooze = parseInt(localStorage.getItem("ricettario.bkSnooze"), 10) || 0; } catch (e) {}
     if (Date.now() > snooze && (Date.now() - lastBk) > 30 * 86400000) {
-      backupBanner = `<button class="alert-banner" id="bkAlert">${iconHtml("download-simple")} <span>Fai un backup delle tue ricette (Opzioni → Esporta)</span></button>`;
+      backupBanner = `<button class="alert-banner" id="bkAlert">${iconHtml("download-simple")} <span>Fai un backup delle tue ricette (Impostazioni → Esporta)</span></button>`;
     }
   }
 
@@ -1937,7 +1937,7 @@ function renderStrumenti() {
       </div>`
     : "";
 
-  // Avviso scadenze (giorni di anticipo configurabili in Opzioni → Notifiche).
+  // Avviso scadenze (giorni di anticipo configurabili in Impostazioni → Notifiche).
   const expDays = getNotifyPrefs().days || 3;
   const exp = store.getExpiringPantry(expDays);
   const expBanner = exp.length
@@ -5515,8 +5515,8 @@ const GUIDE_SECTIONS = [
   { icon: "calendar-blank", title: "Pianificazione", text: "Nel calendario (vista Mese o Settimana) assegna le ricette ai giorni in pranzo o cena, usa \"Riempi le cene\" per riempire la settimana e genera la spesa del mese o della settimana." },
   { icon: "book-bookmark", title: "Menu", text: "Dalla schermata Strumenti, filtro \"Menu\": raggruppa più ricette (es. \"Cena con amici\") e genera un'unica lista della spesa." },
   { icon: "arrow-square-out", title: "Condividi", text: "Da una ricetta tocca \"Condividi\" per inviarla a qualcuno (WhatsApp, email…) con ingredienti e preparazione." },
-  { icon: "calendar-dots", title: "Promemoria", text: "In Opzioni attiva i \"Promemoria\": ricevi una notifica delle scadenze in dispensa e del pasto di oggi. Puoi scegliere l'ora dell'avviso e aggiungere un secondo avviso serale con l'anteprima dei pasti di domani. Su iPhone aggiungi prima l'app alla schermata Home." },
-  { icon: "sparkle", title: "Personalizza", text: "In Opzioni scegli il tema chiaro o scuro. Con l'accesso le ricette sono salvate nel cloud e sincronizzate su tutti i dispositivi; puoi anche esportare un backup." }
+  { icon: "calendar-dots", title: "Promemoria", text: "In Impostazioni attiva i \"Promemoria\": ricevi una notifica delle scadenze in dispensa e del pasto di oggi. Puoi scegliere l'ora dell'avviso e aggiungere un secondo avviso serale con l'anteprima dei pasti di domani. Su iPhone aggiungi prima l'app alla schermata Home." },
+  { icon: "sparkle", title: "Personalizza", text: "In Impostazioni scegli il tema chiaro o scuro. Con l'accesso le ricette sono salvate nel cloud e sincronizzate su tutti i dispositivi; puoi anche esportare un backup." }
 ];
 
 // Mini-motore di "tour guidato": evidenzia elementi e apre le pagine giuste,
@@ -6244,7 +6244,7 @@ function openCookSuggestions() {
     </div>
     <div class="hint" style="margin-top:6px">Cerca tra le tue ricette quelle che lo usano.</div>
   </div>`;
-  const m = openModal(`<h3 class="modal__title">🧹 Svuota la dispensa</h3>${body}${leftover}`);
+  const m = openModal(`<h3 class="modal__title">${iconHtml("fork-knife")} Cosa puoi cucinare</h3>${body}${leftover}`);
   m.el.querySelectorAll(".cks-pick").forEach((b) => b.addEventListener("click", () => { m.close(); openRecipe(b.dataset.id); }));
   m.el.querySelectorAll(".cks-add").forEach((b) => b.addEventListener("click", async (e) => {
     e.stopPropagation();
