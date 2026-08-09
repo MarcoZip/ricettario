@@ -107,6 +107,18 @@ function shortModel(m, max = 14) {
 
 // Numero positivo da un campo, con tetto massimo: fuori range → null (campo vuoto).
 // Evita porzioni negative, tempi assurdi e quantità che rompono i calcoli.
+// L'ultima annotazione datata scritta in "Com'è venuta?" (formato "[gg/mm/aaaa]
+// testo", accodate in `notes`). Finivano in fondo alla scheda e non ricomparivano
+// mai nel momento in cui servono davvero: quando ricucini quel piatto.
+function ultimaNota(r) {
+  const testo = String((r && r.notes) || "");
+  if (!testo.trim()) return "";
+  const datate = testo.match(/\[\d{1,2}\/\d{1,2}\/\d{2,4}\][^\[]*/g);
+  if (!datate || !datate.length) return "";
+  const ultima = datate[datate.length - 1].replace(/^\[[^\]]*\]\s*/, "").trim();
+  return ultima.length > 220 ? ultima.slice(0, 217) + "…" : ultima;
+}
+
 function posNum(v, max) {
   const n = parseInt(String(v == null ? "" : v).replace(",", "."), 10);
   if (!isFinite(n) || n <= 0) return null;
@@ -2591,10 +2603,20 @@ function renderRecipeDetail() {
   const heroEl = root.querySelector(".recipe-hero");
   if (heroEl && !reduceMotion) {
     const heroImg = heroEl.querySelector("img");
-    const onHeroScroll = () => {
-      if (!document.body.contains(heroEl)) { window.removeEventListener("scroll", onHeroScroll); return; }
+    // Throttle con rAF: senza, si scriveva `transform` a OGNI evento di scroll
+    // (anche decine per fotogramma), e su un telefono datato lo scorrimento
+    // della scheda ricetta diventava a scatti. Ora al massimo una volta a frame.
+    let heroPending = false;
+    const paintHero = () => {
+      heroPending = false;
       const y = Math.max(0, window.scrollY || window.pageYOffset || 0);
       heroImg.style.transform = `scale(${1 + Math.min(y, 320) * 0.0007}) translateY(${Math.min(y, 320) * 0.08}px)`;
+    };
+    const onHeroScroll = () => {
+      if (!document.body.contains(heroEl)) { window.removeEventListener("scroll", onHeroScroll); return; }
+      if (heroPending) return;
+      heroPending = true;
+      requestAnimationFrame(paintHero);
     };
     window.addEventListener("scroll", onHeroScroll, { passive: true });
   }
@@ -3659,7 +3681,10 @@ function applianceFacts(kb, tool) {
   if (!base) return "";
   const lim = kb && kb.limits ? `LIMITI INVALICABILI DI QUESTO APPARECCHIO (non proporre MAI valori fuori da questi): ${kb.limits}\n` : "";
   // Errore ricorrente dei modelli AI: far "selezionare il ripiano" dal pannello.
-  const rack = kb && kb.family !== "robot" ? "Il ripiano NON si imposta dai comandi: la teglia si infila fisicamente al livello indicato.\n" : "";
+  // Va detto anche quando il modello NON è nella base di conoscenza ma l'utente
+  // ha scritto le sue note dal manuale: era esattamente il caso per cui questa
+  // regola è nata, e prima proprio lì non veniva inviata.
+  const rack = (!kb || kb.family !== "robot") ? "Il ripiano NON si imposta dai comandi: la teglia si infila fisicamente al livello indicato.\n" : "";
   return lim + rack + base;
 }
 
@@ -4532,10 +4557,20 @@ function openCookingMode(recipe) {
   function speakText(txt) { if (!window.speechSynthesis || !txt) return; try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(txt); u.lang = "it-IT"; window.speechSynthesis.speak(u); } catch {} }
 
   // Tieni acceso lo schermo, se supportato.
+  // `chiusa` serve contro una corsa: la richiesta del wake lock è asincrona, e
+  // chiudendo la schermata prima che si risolva `release()` non trovava ancora
+  // niente da rilasciare — poi il lock arrivava e restava acceso per sempre.
+  let chiusa = false;
   async function lock() {
-    try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request("screen"); } catch {}
+    try {
+      if (!navigator.wakeLock || chiusa) return;
+      const w = await navigator.wakeLock.request("screen");
+      if (chiusa) { try { w.release(); } catch {} return; } // chiusa nel frattempo
+      wakeLock = w;
+    } catch {}
   }
   function release() {
+    chiusa = true;
     try { if (wakeLock) { wakeLock.release(); wakeLock = null; } } catch {}
   }
   document.addEventListener("visibilitychange", onVis);
@@ -4649,6 +4684,7 @@ function openCookingMode(recipe) {
         <button class="cook__close ${speak ? "is-on" : ""}" id="ckSpeak" title="Leggi ad alta voce">🔊</button>
       </div>
       <div class="cook__track"><div class="cook__fill" style="width:${((idx + 1) / steps.length) * 100}%"></div></div>
+      ${idx === 0 && ultimaNota(recipe) ? `<div class="cook__last">📝 <b>L'ultima volta avevi scritto:</b> ${escapeHtml(ultimaNota(recipe))}</div>` : ""}
       <div class="cook__body"><div class="cook__step">${buildStepHtml(steps[idx], recipe.ingredients)}</div></div>
       <div class="cook__timers" id="ckTimers"></div>
       ${(() => { const ds = parseDurations(steps[idx]); return ds.length ? `<div class="cook__quick">${ds.map((d) => { const lab = timerLabelFor(steps[idx], d); return `<button class="chip" data-qmin="${d}" data-tlabel="${lab ? escapeHtml(lab) : ""}">${iconHtml("timer")} ${lab ? escapeHtml(lab) + " · " : ""}${fmtDur(d)}</button>`; }).join("")}</div>` : ""; })()}
@@ -5945,9 +5981,18 @@ function openSupermarketMode() {
   const el = document.createElement("div");
   el.className = "super";
   host.appendChild(el);
-  let wake = null, unsub = null;
-  (async () => { try { if (navigator.wakeLock) wake = await navigator.wakeLock.request("screen"); } catch (e) {} })();
-  const close = () => { try { if (wake) wake.release(); } catch (e) {} wake = null; if (unsub) { try { unsub(); } catch (e) {} unsub = null; } el.remove(); };
+  let wake = null, unsub = null, chiusa = false;
+  // Stessa corsa della Modalità cucina: uscendo subito, il wake lock arrivava
+  // dopo la chiusura e nessuno lo rilasciava più (schermo sempre acceso).
+  (async () => {
+    try {
+      if (!navigator.wakeLock || chiusa) return;
+      const w = await navigator.wakeLock.request("screen");
+      if (chiusa) { try { w.release(); } catch (e) {} return; }
+      wake = w;
+    } catch (e) {}
+  })();
+  const close = () => { chiusa = true; try { if (wake) wake.release(); } catch (e) {} wake = null; if (unsub) { try { unsub(); } catch (e) {} unsub = null; } el.remove(); };
   const superRow = (it) => {
     const qty = it.qty != null ? formatQty(it.qty) : "";
     const amount = [qty, it.unit && it.unit !== "q.b." ? it.unit : (it.unit === "q.b." ? "q.b." : "")].filter(Boolean).join(" ");
@@ -8372,7 +8417,9 @@ function renderImpostazioni() {
       const data = JSON.parse(text);
       const ok = await confirmDialog({
         title: "Importare il backup?",
-        message: "I dati attuali verranno sostituiti con quelli del file.",
+        message: getHousehold()
+          ? "Ricette, strumenti, dispensa, piano, menù e congelatore verranno sostituiti con quelli del file: quello che hai ora e non è nel backup viene eliminato. La lista della spesa e i menù delle feste della Casa condivisa non vengono toccati, perché sono anche dell'altra persona: da lì il backup viene solo aggiunto."
+          : "I dati attuali verranno sostituiti con quelli del file: quello che hai ora e non è nel backup viene eliminato.",
         confirmText: "Importa",
         danger: true
       });

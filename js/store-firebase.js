@@ -183,43 +183,53 @@ export async function createFirebaseAdapter(uid) {
       await deleteDoc(doc(freezerCol, id));
     },
 
+    // Ripristino da backup. Due difetti corretti qui:
+    //
+    // 1. Un solo writeBatch: Firestore ne accetta al massimo 500 operazioni, e
+    //    un ricettario grande faceva fallire l'INTERO import senza importare
+    //    niente. Ora le operazioni vengono spezzate in blocchi.
+    // 2. Non era una sostituzione ma una fusione: i documenti già presenti e
+    //    NON contenuti nel backup restavano lì. Chi ripristinava si ritrovava
+    //    l'unione dei due stati, mentre la finestra di conferma prometteva
+    //    "I dati attuali verranno sostituiti". Ora quelli in più si cancellano.
     async replaceAll(data) {
-      const batch = writeBatch(db);
-      (data.tools || []).forEach((t) => {
-        const { id, ...rest } = t;
-        batch.set(doc(toolsCol, id), rest);
-      });
-      (data.recipes || []).forEach((r) => {
-        const { id, ...rest } = r;
-        batch.set(doc(recipesCol, id), rest);
-      });
-      // In Casa condivisa spesa ed eventi vivono in households/: se scrivessimo
-      // nelle collezioni personali, i dati importati non si vedrebbero.
-      (data.shopping || []).forEach((s) => {
-        const { id, ...rest } = s;
-        batch.set(doc(shopTarget, id), rest);
-      });
-      (data.plan || []).forEach((p) => {
-        const { id, ...rest } = p;
-        batch.set(doc(planCol, id), rest);
-      });
-      (data.pantry || []).forEach((p) => {
-        const { id, ...rest } = p;
-        batch.set(doc(pantryCol, id), rest);
-      });
-      (data.menus || []).forEach((mn) => {
-        const { id, ...rest } = mn;
-        batch.set(doc(menusCol, id), rest);
-      });
-      (data.events || []).forEach((ev) => {
-        const { id, ...rest } = ev;
-        batch.set(doc(eventsTarget, id), rest);
-      });
-      (data.freezer || []).forEach((fz) => {
-        const { id, ...rest } = fz;
-        batch.set(doc(freezerCol, id), rest);
-      });
-      await batch.commit();
+      const ops = [];
+      // Le collezioni PERSONALI vengono sostituite davvero.
+      const personali = [
+        [toolsCol, data.tools || []],
+        [recipesCol, data.recipes || []],
+        [planCol, data.plan || []],
+        [pantryCol, data.pantry || []],
+        [menusCol, data.menus || []],
+        [freezerCol, data.freezer || []]
+      ];
+      for (const [col, righe] of personali) {
+        const tenere = new Set(righe.map((x) => x.id));
+        const attuali = await getDocs(col);
+        attuali.forEach((d) => { if (!tenere.has(d.id)) ops.push({ del: d.ref }); });
+        righe.forEach((x) => { const { id, ...rest } = x; ops.push({ ref: doc(col, id), data: rest }); });
+      }
+      // Spesa ed eventi in Casa condivisa appartengono anche all'ALTRA persona:
+      // qui non si cancella niente, altrimenti ripristinare un backup dal
+      // proprio telefono svuoterebbe la lista della spesa del partner. Senza
+      // casa condivisa sono collezioni personali e valgono le regole di sopra.
+      const condivise = [[shopTarget, data.shopping || []], [eventsTarget, data.events || []]];
+      for (const [col, righe] of condivise) {
+        if (!household) {
+          const tenere = new Set(righe.map((x) => x.id));
+          const attuali = await getDocs(col);
+          attuali.forEach((d) => { if (!tenere.has(d.id)) ops.push({ del: d.ref }); });
+        }
+        righe.forEach((x) => { const { id, ...rest } = x; ops.push({ ref: doc(col, id), data: rest }); });
+      }
+      // Blocchi da 450 (sotto il tetto di 500) per stare larghi.
+      for (let i = 0; i < ops.length; i += 450) {
+        const batch = writeBatch(db);
+        for (const op of ops.slice(i, i + 450)) {
+          if (op.del) batch.delete(op.del); else batch.set(op.ref, op.data);
+        }
+        await batch.commit();
+      }
     },
 
     // Registra un accesso dell'utente (per le statistiche admin), con i conteggi

@@ -519,6 +519,13 @@ a { color: var(--primary-2); }
 .rbar__b:active { transform: scale(0.97); }
 .rbar-spacer { height: 64px; }
 .timer-quick { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+/* Promemoria della tua nota dell'ultima volta, sul primo passo della cottura. */
+.cook__last {
+  margin: 8px 0 0; padding: 10px 12px;
+  border-radius: 12px; border: 1px solid rgba(255, 200, 120, 0.32);
+  background: rgba(255, 180, 90, 0.12); color: #ffe6c4;
+  font-size: 0.95rem; line-height: 1.4;
+}
 /* Descrizione sotto l'etichetta, nelle scelte dove serve dire cosa fa davvero
    un'opzione (es. quale crea anche la lista della spesa). */
 .wm__d { display: block; margin-top: 3px; font-size: 0.8rem; font-weight: 500; opacity: 0.78; white-space: normal; line-height: 1.35; }

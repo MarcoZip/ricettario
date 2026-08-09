@@ -195,6 +195,11 @@ export function searchRecipes(q) {
     (r.title || "").toLowerCase().includes(term) ||
     (r.tags || []).some((t) => (t || "").toLowerCase().includes(term)) ||
     (r.ingredients || []).some((i) => (i.name || "").toLowerCase().includes(term)) ||
+    // Anche nelle NOTE: sono le annotazioni scritte a mano ("meno sale", "per il
+    // compleanno di Anna") ed erano l'unica cosa dell'app che non si poteva più
+    // ritrovare. NON nei passi, invece: cercando "sale" mezzo ricettario
+    // risponderebbe, riportando il rumore tolto con il filtro di pertinenza.
+    (r.notes || "").toLowerCase().includes(term) ||
     toolName(r).includes(term); // così "costolette friggitrice" filtra anche per strumento
   // Più parole (separate da spazi, virgole o " e ") devono comparire TUTTE.
   const terms = s.split(/[\s,]+|\s+e\s+/).map((t) => t.trim()).filter(Boolean);
@@ -482,13 +487,24 @@ export async function deletePlan(id) {
 export function getPantry() {
   return [...state.pantry];
 }
+// Normalizza per confrontare due nomi di alimento: minuscole, senza accenti né
+// punteggiatura, e senza l'ultima lettera sulle parole lunghe (pomodoro/pomodori).
+function normAlimento(s) {
+  return String(s || "").toLowerCase()
+    .replace(/[àáâä]/g, "a").replace(/[èéêë]/g, "e").replace(/[ìíîï]/g, "i")
+    .replace(/[òóôö]/g, "o").replace(/[ùúûü]/g, "u")
+    .replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim()
+    .split(" ").map((w) => (w.length >= 4 ? w.slice(0, -1) : w)).join(" ");
+}
+// Confronto ESATTO (a meno di accenti e singolare/plurale). Prima si accettava
+// la sottostringa nei due versi, e "latte di cocco" spariva dalla spesa perché
+// in dispensa c'era del "latte": l'app diceva "è già in dispensa" e l'ingrediente
+// non veniva comprato. Meglio sbagliare comprando due volte la farina che
+// tornare a casa senza il latte di cocco.
 export function inPantry(name) {
-  const n = (name || "").toLowerCase().trim();
+  const n = normAlimento(name);
   if (!n) return false;
-  return state.pantry.some((p) => {
-    const pn = (p.name || "").toLowerCase().trim();
-    return pn && (pn === n || n.includes(pn) || pn.includes(n));
-  });
+  return state.pantry.some((p) => normAlimento(p.name) === n);
 }
 export async function addPantryItem(name, expiry = null) {
   const clean = (name || "").trim();

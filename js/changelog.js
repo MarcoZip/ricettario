@@ -6,6 +6,18 @@
 
 export const CHANGELOG = [
   {
+    v: "8.41",
+    d: "2026-08-09",
+    items: [
+      "Corretto un difetto che faceva sparire ingredienti dalla spesa: se in dispensa avevi \"latte\", aggiungendo <b>\"latte di cocco\"</b> l'app rispondeva \"è già in dispensa\" e non lo metteva in lista. Lo stesso con olio/olio di semi, panna/panna da cucina. Ora il confronto è esatto (restano uguali solo singolare e plurale, come pomodoro/pomodori).",
+      "Novità: ricucinando un piatto, al primo passo della Modalità cucina ricompare la nota che avevi lasciato l'ultima volta con \"Com'è venuta?\" — <i>\"meno sale\", \"10 minuti in più\"</i>. Prima quella nota finiva in fondo alla scheda e non tornava mai quando serviva.",
+      "La ricerca ora guarda anche dentro le tue note, così ritrovi il piatto che avevi annotato. (Non nei passaggi: cercando \"sale\" risponderebbe mezzo ricettario.)",
+      "Ripristino da backup: prima falliva del tutto se il ricettario era grande, e non era una vera sostituzione — quello che avevi e non era nel backup restava lì. Ora funziona anche con molti dati e sostituisce davvero. In Casa condivisa la lista della spesa e i menù delle feste non vengono toccati, perché appartengono anche all'altra persona.",
+      "Lo scorrimento della scheda ricetta è più fluido sui telefoni meno recenti, e lo schermo non resta più acceso a consumare batteria se esci subito dalla Modalità cucina o dalla Modalità supermercato.",
+      "\"Come lo imposto?\": la regola che impedisce all'assistente di inventarsi il ripiano ora vale anche quando il tuo apparecchio non è fra quelli già noti all'app ma hai scritto tu le note del manuale."
+    ]
+  },
+  {
     v: "8.40",
     d: "2026-08-09",
     items: [
