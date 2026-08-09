@@ -627,6 +627,15 @@ export default {
 
     html = await res.text();
     const recipe = extractRecipe(html) || extractMicrodata(html) || extractHeuristic(html);
+    // "404 morbido": alcuni siti (GialloZafferano fra questi) servono la pagina
+    // di errore con codice 200, quindi il controllo sullo stato qui sopra non la
+    // vede. L'estrazione riesce lo stesso e ne esce una finta ricetta intitolata
+    // "404: pagina non trovata", pronta da salvare nel ricettario. La riconosciamo
+    // dal titolo, ancorato all'INIZIO: nessuna ricetta vera si chiama così, ma
+    // "Torta not found" o simili non devono essere scartate per sbaglio.
+    if (recipe && /^\s*(errore\s*)?404\b|^\s*pagina non trovata|^\s*not found|^\s*page not found|^\s*oops/i.test(recipe.title || "")) {
+      return json({ error: "notfound", message: "Pagina non trovata: controlla che il link sia giusto." }, 404);
+    }
     if (recipe) {
       // Se la pagina contiene anche un video (YouTube/Vimeo/TikTok), allego il link.
       if (!recipe.video) { const v = extractVideo(html); if (v) recipe.video = v; }
