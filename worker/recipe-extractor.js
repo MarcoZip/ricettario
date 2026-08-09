@@ -609,12 +609,17 @@ export default {
     // Siti dietro una "sfida" anti-bot (Cloudflare, ecc.): rispondono con un
     // codice di errore. NB: la sola presenza di script Cloudflare in una pagina
     // valida non è un blocco, quindi prima si prova comunque a estrarre.
-    // Qualunque risposta non valida, non solo 403/503/429: i siti rispondono
-    // alle letture automatiche con codici molto diversi fra loro. Le pagine
-    // ricetta di GialloZafferano e Cookist ne restituiscono uno che finiva
-    // dritto in "Pagina non raggiungibile", senza nemmeno provare il lettore
-    // alternativo — che invece su quei siti funziona.
     if (!res.ok) {
+      // Una pagina che NON ESISTE va detta subito. Passandola al lettore
+      // alternativo, quello legge la pagina di errore del sito e ne ricava una
+      // finta ricetta intitolata "404: pagina non trovata", che l'utente si
+      // ritroverebbe salvata nel ricettario.
+      if (res.status === 404 || res.status === 410) {
+        return json({ error: "notfound", message: "Pagina non trovata: controlla che il link sia giusto." }, 404);
+      }
+      // Sugli ALTRI codici invece il ripiego serve: i siti rispondono alle
+      // letture automatiche in modi molto diversi, non solo con 403/503/429,
+      // e prima ci si arrendeva senza nemmeno provare.
       const viaReader = await readerFallback(target, env);
       if (viaReader) return json(viaReader, 200);
       return json({ error: "blocked", message: `Questo sito blocca la lettura automatica (codice ${res.status}).` }, 200);
