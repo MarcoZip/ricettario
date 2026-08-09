@@ -60,23 +60,29 @@ function findPrice(name) {
   return null;
 }
 
-function gramsOf(item, price) {
+function gramsOf(item, price, assumeOne) {
   const unit = item.unit || "";
   if (unit === "q.b.") return 0;
   if (unit && UNIT_G[unit] != null) return (item.qty != null ? item.qty : 1) * UNIT_G[unit];
   if (item.qty != null && price && price.pz) return item.qty * price.pz;
+  // Nella lista della spesa si scrive quasi sempre solo "latte" o "pane", senza
+  // quantità: scartandoli la stima del carrello contava metà articoli (€ 2,74
+  // su 12). Lì assumiamo una confezione. Nelle RICETTE no: un ingrediente senza
+  // quantità è di solito un aroma, e contarlo a mezzo chilo falserebbe tutto.
+  if (assumeOne && item.qty == null) return price && price.pz ? price.pz : 500;
   return null;
 }
 
 // Ritorna { total (€), counted, total_n } stimando il costo dei vari ingredienti.
-export function estimateCost(ingredients) {
+// assumeOne: per la lista della spesa, conta una confezione anche senza quantità.
+export function estimateCost(ingredients, assumeOne = false) {
   let total = 0, counted = 0, totalN = 0;
   for (const it of ingredients || []) {
     if (!it || !it.name) continue;
     totalN++;
     const price = findPrice(it.name);
     if (!price) continue;
-    const g = gramsOf(it, price);
+    const g = gramsOf(it, price, assumeOne);
     if (g == null) continue;
     total += (g / 1000) * price.kg;
     counted++;

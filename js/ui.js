@@ -1264,7 +1264,13 @@ function openTonightAssistant() {
         <button class="btn btn--ghost" id="tnAgain" style="flex:1">🎲 Rilancia</button>
         <button class="btn btn--primary" id="tnGo" style="flex:1">${iconHtml("cooking-pot")} Cuciniamo</button>
       </div>`;
-    reveal.querySelector("#tnGo").onclick = () => { closeAllModals(); openRecipe(r.id); };
+    // "Cuciniamo" deve cucinare: prima apriva solo la ricetta e lasciava il
+    // pulsante Modalità cucina tre schermate più in basso, da cercare a mano.
+    reveal.querySelector("#tnGo").onclick = () => {
+      closeAllModals();
+      openRecipe(r.id);
+      if ((r.steps || []).length) setTimeout(() => openCookingMode(r), 250);
+    };
     reveal.querySelector("#tnAgain").onclick = roll;
   };
   const roll = () => {
@@ -3651,7 +3657,7 @@ function ovenBasics(recipe, tool) {
     return { family, time: recipe.time || null, kb, temp: family === "altro" ? temp : null, mode: null, rack: null, preheat: false, altMode: null, kbTemp: null };
   }
   return {
-    temp, mode, preheat, kb, kbTemp: kbRack && kbRack.temp ? kbRack.temp : null,
+    family, temp, mode, preheat, kb, kbTemp: kbRack && kbRack.temp ? kbRack.temp : null,
     time: recipe.time || null,
     rack: rule ? rule.rack : null,
     rackWhy: rule ? rule.why : null,
@@ -3665,6 +3671,9 @@ function ovenBasicsHtml(b) {
   if (b.mode) rows.push(["Funzione", escapeHtml(b.mode) + (b.altMode ? ` <span class="ovb__alt">(${escapeHtml(b.altMode)})</span>` : "")]);
   if (b.temp) rows.push(["Temperatura", `${b.temp}°C${b.kbTemp ? ` <span class="ovb__alt">(manuale: ${escapeHtml(b.kbTemp)})</span>` : ""}`]);
   else if (b.kbTemp) rows.push(["Temperatura", `${escapeHtml(b.kbTemp)} <span class="ovb__alt">(dal manuale)</span>`]);
+  // Meglio dire "non lo so" che far sparire la riga: sparendo, il vuoto veniva
+  // riempito più sotto da un valore inventato dall'AI, con la stessa grafica.
+  else if (b.family === "forno") rows.push(["Temperatura", `<span class="ovb__alt">non indicata nella ricetta — controlla tu</span>`]);
   if (b.rack) rows.push(["Ripiano", `${escapeHtml(b.rack)}${b.rackWhy ? ` <span class="ovb__alt">— ${escapeHtml(b.rackWhy)}</span>` : ""}`]);
   if (b.preheat) rows.push(["Preriscaldamento", "Sì, prima di infornare"]);
   if (b.kbTime) rows.push(["Durata", `${escapeHtml(b.kbTime)} <span class="ovb__alt">(dal manuale)</span>${b.time ? ` · ricetta: ${escapeHtml(String(b.time))} min` : ""}`]);
@@ -3709,10 +3718,18 @@ function openApplianceSetup(recipe, tool) {
 async function runApplianceSetup(recipe, tool, kind) {
   const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
   const basics = ovenBasics(recipe, tool);
+  // La sequenza dei comandi e le particolarità dell'apparecchio sono dati
+  // LOCALI, presi dal manuale: vanno mostrati subito, prima di parlare con
+  // l'AI. Stavano dentro il ramo di successo, quindi senza rete — proprio in
+  // cucina — sparivano insieme ai passaggi, pur essendo già in memoria.
+  const kb = basics.kb;
+  const seqHtml = `${kb && kb.sequence ? `<div class="ov-seq"><div class="ov-seq__t">🎛️ Sul tuo pannello</div>${escapeHtml(kb.sequence)}</div>` : ""}
+    ${kb && kb.quirks && kb.quirks.length ? `<div class="ov-quirks"><div class="ov-quirks__t">💡 Del tuo ${escapeHtml(kb.label)}</div><ul>${kb.quirks.slice(0, 3).map((q) => `<li>${escapeHtml(q)}</li>`).join("")}</ul></div>` : ""}`;
   const m = openModal(`
     <h3 class="modal__title">🎛️ Come lo imposto?</h3>
     <p class="hint" style="margin-top:-6px">${escapeHtml(tool.model || tool.name)} · ${escapeHtml(recipe.title)} · <a href="#" id="apChange">cambia apparecchio</a></p>
     ${ovenBasicsHtml(basics)}
+    ${seqHtml}
     <div id="apBody"><div style="text-align:center;padding:8px 0"><div class="ai-load"><div class="sk sk--line"></div><div class="sk sk--line sk--short"></div><div class="sk sk--line"></div></div><div class="hint">Preparo i passaggi sul tuo apparecchio…</div></div></div>
     <div class="modal__actions"><button class="btn btn--primary" data-act="ok">Chiudi</button></div>
   `);
@@ -3723,16 +3740,20 @@ async function runApplianceSetup(recipe, tool, kind) {
   try {
     // I valori già certi (dalla ricetta + regole standard) vengono passati come
     // VINCOLI: l'AI deve usarli, non ricalcolarli a modo suo.
+    const noTemp = !basics.temp && !basics.kbTemp && basics.family === "forno";
     const fixed = [
       basics.mode ? `funzione ${basics.mode}` : "",
       basics.temp ? `${basics.temp}°C` : "",
       basics.rack ? `ripiano ${basics.rack}` : "",
       basics.preheat ? "con preriscaldamento" : "",
-      basics.time ? `durata ${basics.time} minuti` : ""
+      basics.time ? `durata ${basics.time} minuti` : "",
+      // Senza questo divieto l'AI riempiva il buco con un valore inventato (es.
+      // 200°C) che compariva nella stessa lista dei dati verificati, quindi
+      // indistinguibile da essi.
+      noTemp ? "NON indicare alcuna temperatura in gradi: la ricetta non la specifica e non va inventata" : ""
     ].filter(Boolean).join(", ");
     // Fonte sui comandi: prima le note dell'utente, altrimenti i dati verificati
     // del manuale (se il modello è nella base di conoscenza).
-    const kb = basics.kb;
     const howto = applianceFacts(kb, tool);
     const d = await applianceSetup({
       applianceName: kind, model: tool.model || "", howto,
@@ -3754,11 +3775,12 @@ async function runApplianceSetup(recipe, tool, kind) {
       seenSteps.add(k); return true;
     });
     const list = steps2.map((s, i) => `<div class="robot-step"><span class="robot-step__n">${i + 1}</span><div class="robot-step__main"><div class="robot-step__a">${escapeHtml(s.azione)}</div>${s.impostazioni ? `<div class="robot-step__s">${iconHtml("sliders-horizontal")} ${escapeHtml(s.impostazioni)}</div>` : ""}</div></div>`).join("");
-    body.innerHTML = `${kb && kb.sequence ? `<div class="ov-seq"><div class="ov-seq__t">🎛️ Sul tuo pannello</div>${escapeHtml(kb.sequence)}</div>` : ""}
+    // Etichetta esplicita: sopra ci sono i dati verificati, qui comincia quello
+    // che ha scritto l'AI. Prima le due cose avevano la stessa identica grafica.
+    body.innerHTML = `<div class="ov-seq__t" style="margin-bottom:6px">🤖 Passaggi suggeriti dall'assistente</div>
       ${d.note ? `<div class="hint" style="margin-bottom:10px">${escapeHtml(d.note)}</div>` : ""}
       <div class="robot-list">${list}</div>
       ${d.check ? `<div class="ov-check">✅ <b>Come capisci che è pronto:</b> ${escapeHtml(d.check)}</div>` : ""}
-      ${kb && kb.quirks && kb.quirks.length ? `<div class="ov-quirks"><div class="ov-quirks__t">💡 Del tuo ${escapeHtml(kb.label)}</div><ul>${kb.quirks.slice(0, 3).map((q) => `<li>${escapeHtml(q)}</li>`).join("")}</ul></div>` : ""}
       <div class="ov-warn">⚠️ ${(tool.howto || "").trim()
         ? "Guida basata sulle note che hai salvato sul tuo apparecchio: controlla comunque i valori."
         : (kb ? `Comandi e livelli dal <b>${escapeHtml(kb.source)}</b>. Verifica sempre sul tuo forno: le versioni possono differire.${kb.caveat ? `<br><b>Nota:</b> ${escapeHtml(kb.caveat)}` : ""}`
@@ -5994,7 +6016,7 @@ function renderShoppingList() {
     ${shopManual ? `<div class="hint" style="margin-bottom:8px">Usa le frecce per ordinare. Tocca "Fine" per tornare alla lista.</div>` : ""}
     ${active.length && !shopManual ? `<button class="btn btn--primary btn--block" id="superMode" style="margin:10px 0">🛒 Modalità supermercato</button>` : ""}
     <div id="shopBody">${body}</div>
-    ${(() => { const c = estimateCost(active); return c.counted ? `<div class="shop-cost">${iconHtml("basket")} Costo stimato del carrello: <b>€ ${c.total.toFixed(2)}</b><span class="shop-cost__note"> · stima su ${c.counted} articoli</span></div>` : ""; })()}
+    ${(() => { const c = estimateCost(active, true); return c.counted ? `<div class="shop-cost">${iconHtml("basket")} Costo stimato del carrello: <b>€ ${c.total.toFixed(2)}</b><span class="shop-cost__note"> · stima su ${c.counted} articoli su ${c.total_n}</span></div>` : ""; })()}
     ${budgetLineHtml()}
     ${done.length ? `<button class="btn btn--primary btn--block" id="toPantry" style="margin-top:18px">${iconHtml("basket")} Spesa fatta: presi in dispensa</button>` : ""}
     ${items.length ? `<div style="display:flex;gap:8px;margin-top:${done.length ? "8px" : "18px"};flex-wrap:wrap">
@@ -6056,7 +6078,7 @@ function renderShoppingList() {
   const tp = wrap.querySelector("#toPantry");
   if (tp) tp.addEventListener("click", () => {
     const done = store.getShopping().filter((s) => s.checked);
-    const c = estimateCost(done); if (c.counted) addSpend(c.total);
+    const c = estimateCost(done, true); if (c.counted) addSpend(c.total);
     openPutInPantry(done);
   });
   const sp = wrap.querySelector("#spendLine");
@@ -6530,7 +6552,14 @@ function renderPlan() {
 
 function renderPlanWeek() {
   const today = new Date();
-  if (!weekAnchor) weekAnchor = startOfWeek(today);
+  // Nel fine settimana si pianifica la settimana CHE VIENE, non quella che sta
+  // finendo: di domenica la vista si apriva su lun–dom già passati e ci si
+  // pianificavano sei cene nel passato, spesa compresa.
+  if (!weekAnchor) {
+    weekAnchor = startOfWeek(today);
+    const g = today.getDay(); // 0 = domenica, 6 = sabato
+    if (g === 0 || g === 6) weekAnchor.setDate(weekAnchor.getDate() + 7);
+  }
   const start = startOfWeek(weekAnchor);
   const days = [];
   for (let i = 0; i < 7; i++) { const d = new Date(start); d.setDate(start.getDate() + i); days.push(d); }

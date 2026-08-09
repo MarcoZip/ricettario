@@ -6,6 +6,18 @@
 
 export const CHANGELOG = [
   {
+    v: "8.36",
+    d: "2026-08-09",
+    items: [
+      "\"Come lo imposto?\": il riquadro \"Sul tuo pannello\", che viene dal manuale del tuo apparecchio, ora compare subito e resta anche senza rete. Prima spariva insieme ai passaggi, pur essendo già in memoria: proprio in cucina, dove il telefono prende peggio.",
+      "Non viene più inventata una temperatura quando la ricetta non la indica: al suo posto trovi \"non indicata nella ricetta — controlla tu\". Prima l'assistente riempiva il vuoto con un valore suo, che appariva identico ai dati presi dal manuale.",
+      "Nella stessa schermata i passaggi scritti dall'assistente sono ora separati e indicati come tali, per non confonderli con i dati verificati.",
+      "Nel fine settimana il pianificatore si apre sulla settimana che viene: di domenica proponeva quella che stava finendo e ci si pianificavano cene già passate, spesa compresa.",
+      "La stima del carrello ora conta anche gli articoli scritti senza quantità (latte, pane): prima ne saltava la maggior parte e il totale era molto più basso del vero.",
+      "\"Cuciniamo\" adesso cucina: dal suggerimento della sera si entra diritti in Modalità cucina, invece di dover cercare il pulsante tre schermate più in basso."
+    ]
+  },
+  {
     v: "8.35",
     d: "2026-08-09",
     items: [
