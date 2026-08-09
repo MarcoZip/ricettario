@@ -37,6 +37,12 @@ const CONSERVAZIONE = [
 // Temperatura al cuore: serve un termometro da cucina. Dove l'USDA indica anche
 // un tempo di riposo, è scritto nella nota.
 const AL_CUORE = [
+  // Sta per PRIMA di tutte apposta. Una cotoletta può essere di pollo (74°C),
+  // di maiale o di vitello (63°C): dal titolo non si capisce, e sbagliare per
+  // difetto su una carne impanata è il tipo di errore che non vogliamo fare.
+  // Quindi si dà sempre il valore più alto: è sicuro per tutti i tagli, e su una
+  // fetta sottile si raggiunge comunque in fretta.
+  { rx: /cotolett|cordon bleu/i, gradi: 74, nota: "Valore prudente: va bene per pollo, vitello o maiale. Per le cotolette di verdure non serve." },
   { rx: /pollo|tacchin|gallin|anatra|faraona|volatil/i, gradi: 74, nota: "Tutto il pollame, comprese le parti macinate." },
   { rx: /macinat|hamburger|polpett|polpetton|ragu|rag[uù]|bologne|salsicc/i, gradi: 71, nota: "Le carni macinate vanno più alte dei tagli interi." },
   { rx: /maial|lonza|arista|costine|braciol/i, gradi: 63, nota: "Poi 3 minuti di riposo prima di tagliare." },

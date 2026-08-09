@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.47",
+    d: "2026-08-09",
+    minor: true,
+    items: [
+      "Le cotolette e il cordon bleu ora mostrano anche la temperatura al cuore: <b>74°C</b>. È il valore prudente — va bene per pollo, vitello o maiale, visto che dal nome del piatto non si capisce quale sia."
+    ]
+  },
+  {
     v: "8.46",
     d: "2026-08-09",
     minor: true,
