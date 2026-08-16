@@ -632,13 +632,11 @@ function openModal(innerHtml) {
     else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primo.focus(); }
   }
   document.addEventListener("keydown", onKey, true);
-  // Il focus entra nella finestra: sul primo campo se c'è, sennò sulla finestra.
-  setTimeout(() => {
-    if (!backdrop.isConnected) return;
-    const f = fuocabili();
-    const campo = f.find((x) => /^(INPUT|TEXTAREA|SELECT)$/.test(x.tagName));
-    (campo || el).focus();
-  }, 30);
+  // Il focus entra nella FINESTRA, non nel primo campo di testo: mettendolo sul
+  // campo, su Android si apre da sola la tastiera e si mangia mezzo schermo —
+  // anche quando si voleva solo toccare "10 min" fra le durate pronte. Da qui
+  // il Tab raggiunge comunque tutto, e chi vuole scrivere tocca il campo.
+  setTimeout(() => { if (backdrop.isConnected) el.focus(); }, 30);
 
   backdrop.addEventListener("click", (e) => {
     if (e.target === backdrop) close();

@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    v: "8.54",
+    d: "2026-08-16",
+    items: [
+      "<b>Corretta la ricerca</b>: scrivere il titolo per intero — <i>torta di mele</i>, <i>spaghetti alla carbonara</i>, <i>crema di broccoli</i> — non trovava più nulla. La colpa era delle paroline come \"di\" e \"alla\", che venivano pretese nel risultato invece di essere ignorate. Scrivere il nome di una ricetta come viene naturale ora funziona di nuovo.",
+      "Aprendo una finestra non salta più su la tastiera del telefono: prima si mangiava mezzo schermo anche quando volevi solo toccare un pulsante, per esempio una durata del timer.",
+      "Il pulsante <b>?</b> in alto ora si tocca davvero: la sua zona sensibile era coperta dal pallino rosso della Guida e risultava perfino più piccola del pulsante."
+    ]
+  },
+  {
     v: "8.53",
     d: "2026-08-16",
     items: [

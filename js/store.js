@@ -217,10 +217,15 @@ export function searchRecipes(q) {
     // risponderebbe, riportando il rumore tolto con il filtro di pertinenza.
     contiene(r.notes || "", term) ||
     contiene(toolName(r), term); // così "costolette friggitrice" filtra anche per strumento
-  // Più parole (separate da spazi, virgole o " e ") devono comparire TUTTE.
-  const terms = s.split(/[\s,]+|\s+e\s+/).map((t) => t.trim()).filter(Boolean);
+  // Più parole (separate da spazi, virgole o " e ") devono comparire TUTTE —
+  // ma le PAROLINE di servizio vanno tolte dall'elenco, non pretese. Scrivendo
+  // "torta di mele" il "di" non compare da nessuna parte come parola portante,
+  // quindi preteso insieme alle altre azzerava ogni risultato: cercare il
+  // titolo esatto di una ricetta non ne trovava nessuna.
+  const terms = s.split(/[\s,]+/).map((t) => t.trim()).filter((t) => t && paroleDi(t).length);
+  if (!terms.length) return [];
   if (terms.length > 1) return state.recipes.filter((r) => terms.every((term) => matchesTerm(r, term)));
-  return state.recipes.filter((r) => matchesTerm(r, s));
+  return state.recipes.filter((r) => matchesTerm(r, terms[0]));
 }
 export function getByTag(tag) {
   const t = (tag || "").toLowerCase();

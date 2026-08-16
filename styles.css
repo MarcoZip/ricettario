@@ -554,14 +554,21 @@ a { color: var(--primary-2); }
   /* Sotto al contenuto e senza sfondo: si tocca, non si vede. */
 }
 .header-btn, .shop-row .check, .shop-row__del, .star, .super__close { position: relative; }
-.header-btn::after, .shop-row .check::after, .shop-row__del::after, .star::after, .super__close::after {
+/* Si usa ::before e NON ::after: su "?" l'::after è già occupato dal pallino
+   rosso della Guida (.hot-dot), che essendo dichiarato più sotto vinceva e
+   riduceva l'area sensibile a 9px — cioè meno del pulsante stesso. */
+.header-btn::before, .shop-row .check::before, .shop-row__del::before, .star::before, .super__close::before {
   content: ""; position: absolute; left: 50%; top: 50%;
   width: 44px; height: 44px; transform: translate(-50%, -50%);
 }
+/* I due pulsanti dell'header sono attaccati fra loro e al bordo: senza spazio,
+   l'area allargata di uno finisce coperta dal vicino e non serve a niente
+   (misurata 30px effettivi sul "?" invece di 44). */
+.app-header__status { gap: 14px; padding-right: 4px; }
 /* Le stelle del voto sono cinque in fila: un'area di 44px le farebbe
    accavallare, quindi si allarga solo in altezza e si distanziano un po'. */
 .rating { display: inline-flex; gap: 6px; }
-.star::after { width: 34px; }
+.star::before { width: 34px; }
 /* Le pastiglie sono testo: qui si può crescere davvero, senza stravolgere. */
 .timer-quick .chip, .season-chip, .filter-chip { min-height: 40px; display: inline-flex; align-items: center; }
 .season-row, .tag-row { gap: 10px; }
