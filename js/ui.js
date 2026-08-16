@@ -2702,12 +2702,14 @@ function renderRecipeDetail() {
 
   // Parallax/zoom della foto hero mentre si scorre (si auto-rimuove uscendo).
   const heroEl = root.querySelector(".recipe-hero");
-  if (heroEl && !reduceMotion) {
+  // `!scrollFxAttivo` va nella CONDIZIONE, non dentro il blocco: qui siamo nel
+  // corpo della funzione che disegna E collega la scheda, quindi un `return`
+  // messo là dentro non salta il parallax — esce dall'intera funzione e lascia
+  // senza gestore tutti i pulsanti che vengono collegati più sotto.
+  // Dove il browser sa animare in base allo scorrimento il parallax lo fa il
+  // CSS (vedi .recipe-hero img in styles.css); questo ramo è solo il ripiego.
+  if (heroEl && !reduceMotion && !scrollFxAttivo) {
     const heroImg = heroEl.querySelector("img");
-    // Se il browser sa animare in base allo scorrimento, il parallax lo fa il
-    // CSS sul thread del compositore (vedi .recipe-hero img in styles.css) e qui
-    // non serve alcun JavaScript. Questo ramo resta come ripiego per gli altri.
-    if (scrollFxAttivo) return;
     // Throttle con rAF: senza, si scriveva `transform` a OGNI evento di scroll
     // (anche decine per fotogramma), e su un telefono datato lo scorrimento
     // della scheda ricetta diventava a scatti. Ora al massimo una volta a frame.

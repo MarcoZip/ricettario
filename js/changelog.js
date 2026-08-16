@@ -6,6 +6,13 @@
 
 export const CHANGELOG = [
   {
+    v: "8.49",
+    d: "2026-08-09",
+    items: [
+      "Corretto un guasto serio introdotto poco fa: dentro una ricetta <b>quasi nessun pulsante funzionava più</b> — né \"Cucina\", né \"Quando inizio?\", né \"Come lo imposto?\", né gli altri. Rispondeva solo la freccia Indietro. Ora funzionano di nuovo tutti."
+    ]
+  },
+  {
     v: "8.48",
     d: "2026-08-09",
     minor: true,
