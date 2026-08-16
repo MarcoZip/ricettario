@@ -5235,6 +5235,11 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
   // --- OCR: scansiona da una foto ---
   const ocrBtn = m.el.querySelector("#rOcr");
   const ocrFile = m.el.querySelector("#rOcrFile");
+  // Il blocco delle scorciatoie esiste solo per le ricette NUOVE: modificandone
+  // una esistente questi due non ci sono. Senza guardia si lanciava un errore
+  // che interrompeva il resto del collegamento — compresi Salva e Annulla, che
+  // smettevano di funzionare.
+  if (ocrBtn && ocrFile) {
   ocrBtn.addEventListener("click", () => ocrFile.click());
   ocrFile.addEventListener("change", async () => {
     const f = ocrFile.files[0];
@@ -5253,6 +5258,7 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       toast(e.message || "Scansione fallita", "error");
     }
   });
+  }
 
   // --- Dettatura: parli, l'app scrive, poi la stessa funzione che legge le foto
   // trasforma il testo in titolo/ingredienti/passi. Il riconoscimento vocale è

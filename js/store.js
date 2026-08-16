@@ -730,9 +730,14 @@ function scriviCopia(chiave, dati) {
     localStorage.setItem(chiave, testo);
     return true;
   } catch (e) {
-    // Memoria piena: liberiamo l'altra copia e riproviamo una volta sola.
+    // Memoria piena. Solo la copia "prima del ripristino" può farsi spazio
+    // buttando quella automatica: è quella che serve ad annullare un disastro
+    // in corso. Mai il contrario — un salvataggio automatico che non entra in
+    // memoria non deve cancellare la rete di sicurezza, e succederebbe proprio
+    // quando la memoria è piena, cioè quando le cose vanno già male.
+    if (chiave !== BK_PRIMA) return false;
     try {
-      localStorage.removeItem(chiave === BK_AUTO ? BK_PRIMA : BK_AUTO);
+      localStorage.removeItem(BK_AUTO);
       localStorage.setItem(chiave, testo);
       return true;
     } catch (e2) { return false; }
@@ -755,18 +760,21 @@ export function backupAutomatico() {
 }
 
 // { quando, ricette, tipo } della copia più recente disponibile, o null.
+// Si preferisce SEMPRE la copia "prima del ripristino", non la più recente.
+// Sceglierla per data era un errore sottile: la copia automatica fotografa lo
+// stato CORRENTE a ogni avvio, quindi dopo un ripristino sbagliato bastava
+// riaprire l'app il giorno dopo — cosa che si fa proprio perché qualcosa non
+// torna — e "Torna com'era" rimetteva lo stato rotto, con data più recente.
 export function copiaSicurezza() {
   const prima = leggiCopia(BK_PRIMA), auto = leggiCopia(BK_AUTO);
-  const scegli = (d, tipo) => d && { quando: d.exportedAt, ricette: (d.recipes || []).length, tipo };
-  const a = scegli(prima, "prima del ripristino"), b = scegli(auto, "automatica");
-  if (a && b) return Date.parse(a.quando) >= Date.parse(b.quando) ? a : b;
-  return a || b;
+  const d = prima || auto;
+  if (!d) return null;
+  return { quando: d.exportedAt, ricette: (d.recipes || []).length, tipo: prima ? "prima del ripristino" : "automatica" };
 }
 
 // Rimette i dati com'erano. Serve dopo un ripristino andato male.
 export async function ripristinaCopiaSicurezza() {
-  const prima = leggiCopia(BK_PRIMA), auto = leggiCopia(BK_AUTO);
-  const d = (prima && auto) ? (Date.parse(prima.exportedAt) >= Date.parse(auto.exportedAt) ? prima : auto) : (prima || auto);
+  const d = leggiCopia(BK_PRIMA) || leggiCopia(BK_AUTO); // stessa priorità di copiaSicurezza()
   if (!d) throw new Error("Non c'è nessuna copia di sicurezza.");
   await importData(d, { merge: false, saltaCopia: true });
   return (d.recipes || []).length;

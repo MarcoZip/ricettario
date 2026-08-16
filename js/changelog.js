@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    v: "8.59",
+    d: "2026-08-16",
+    items: [
+      "<b>Corretto un guasto grave della versione precedente: modificando una ricetta esistente, il tasto Salva non funzionava.</b> Spostando le scorciatoie in cima avevo lasciato scoperto un pezzo di codice che, nella finestra di modifica, si fermava a metà e lasciava senza gestore anche Salva e Annulla.",
+      "La copia di sicurezza per \"Torna com'era\" ora è sempre quella giusta: prima poteva essere sostituita dal salvataggio automatico del giorno dopo, che avrebbe rimesso lo stato sbagliato proprio mentre cercavi di annullarlo.",
+      "Se la memoria del telefono è piena, il salvataggio automatico non cancella più la copia che serve ad annullare un ripristino."
+    ]
+  },
+  {
     v: "8.58",
     d: "2026-08-16",
     items: [
