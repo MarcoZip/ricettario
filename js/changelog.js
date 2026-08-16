@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    v: "8.58",
+    d: "2026-08-16",
+    items: [
+      "Corretto: la Guida e l'assistente dicevano di toccare un pulsante chiamato <b>\"Modalità cucina\"</b> che non esiste più — dalla scorsa versione si chiama <b>Cucina</b> ed è nella barra in fondo alla ricetta. Tre testi mandavano a cercare una cosa che non c'era.",
+      "<b>Fotografa</b>, <b>Detta a voce</b> e <b>Inventa</b> ora sono in cima al modulo della nuova ricetta, sotto la domanda \"Non hai voglia di scrivere?\". Erano in fondo, dentro il campo degli ingredienti: cioè sotto dieci campi da riempire a mano, il che le rendeva inutili proprio a chi non voleva scrivere.",
+      "L'assistente ora spiega perché \"Come lo imposto?\" appare su certe ricette e non su altre: compare solo per gli strumenti che hanno qualcosa da regolare."
+    ]
+  },
+  {
     v: "8.57",
     d: "2026-08-16",
     items: [

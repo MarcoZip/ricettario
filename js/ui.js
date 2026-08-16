@@ -2090,7 +2090,7 @@ function pickSuggestions(limit = 3) {
 // "Lo sapevi?": consigli a bassa pressione, uno per sessione, ognuno una volta sola.
 const APP_TIPS = [
   { id: "t-chiedi", text: "tocca il ❓ in alto e chiedi a Fornelli come fare qualsiasi cosa.", topic: null },
-  { id: "t-voce", text: "in Modalità cucina, col microfono, puoi fare domande a voce (\"posso sostituire il burro?\").", topic: "modalita-cucina" },
+  { id: "t-voce", text: "toccando \"Cucina\" nella barra della ricetta, col microfono, puoi fare domande a voce (\"posso sostituire il burro?\").", topic: "modalita-cucina" },
   { id: "t-casa", text: "puoi condividere la lista della spesa in tempo reale con un'altra persona.", topic: "casa-condivisa" },
   { id: "t-adatta", text: "puoi rendere una ricetta vegana o più leggera con un tocco.", topic: "adatta-ricetta" },
   { id: "t-frigo", text: "fotografa il frigo e l'app riconosce gli alimenti.", topic: "foto-frigo" },
@@ -5093,6 +5093,18 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
 
   const m = openModal(`
     <h3 class="modal__title">${editing ? "Modifica ricetta" : "Nuova ricetta"}</h3>
+    ${!editing ? `<div class="field">
+      <label>Non hai voglia di scrivere?</label>
+      <!-- Stavano in fondo, dentro il campo Ingredienti: cioè sotto dieci campi
+           da riempire a mano. Una scorciatoia per chi non vuole scrivere,
+           messa sotto tutto quello che dovrebbe scrivere, non la trova nessuno. -->
+      <div class="quickstart">
+        <button type="button" class="btn btn--ghost" id="rOcr">${iconHtml("image")} Fotografa</button>
+        ${(("webkitSpeechRecognition" in window) || ("SpeechRecognition" in window)) && isImportConfigured() ? `<button type="button" class="btn btn--ghost" id="rDetta">🎤 Detta a voce</button>` : ""}
+        ${isImportConfigured() ? `<button type="button" class="btn btn--ghost" id="rGenerate">✨ Inventa (AI)</button>` : ""}
+      </div>
+      <input type="file" id="rOcrFile" accept="image/*" capture="environment" hidden />
+    </div>` : ""}
     <div class="field">
       <label>Titolo</label>
       <input type="text" id="rTitle" placeholder="Es. Pollo al limone" value="${escapeHtml(title)}" />
@@ -5149,10 +5161,6 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
     <div class="field">
       <label>Ingredienti (uno per riga)</label>
       <textarea id="rIngredients" rows="6" placeholder="200 g di farina&#10;2 uova&#10;1 bustina di lievito&#10;sale q.b.">${escapeHtml(ingText)}</textarea>
-      <button type="button" class="btn btn--ghost" id="rOcr" style="margin-top:8px">${iconHtml("image")} Fotografa una ricetta (o ingredienti)</button>
-      ${(("webkitSpeechRecognition" in window) || ("SpeechRecognition" in window)) && isImportConfigured() ? `<button type="button" class="btn btn--ghost" id="rDetta" style="margin-top:8px">🎤 Detta la ricetta a voce</button>` : ""}
-      <input type="file" id="rOcrFile" accept="image/*" capture="environment" hidden />
-      ${isImportConfigured() ? `<button type="button" class="btn btn--ghost" id="rGenerate" style="margin-top:8px">✨ Inventa una ricetta (AI)</button>` : ""}
     </div>
     <div class="field">
       <label>Preparazione (un passo per riga)</label>
@@ -6079,7 +6087,7 @@ const GUIDE_SECTIONS = [
   { icon: "carrot", title: "Valori nutrizionali", text: "In una ricetta tocca \"Calcola\" sotto gli ingredienti: l'app stima calorie e macronutrienti (proteine, carboidrati, grassi) per porzione e totali. Per ciò che non conosce cerca online su Open Food Facts e ti mostra anche cosa non ha conteggiato. È una stima: cambia con il numero di porzioni." },
   { icon: "heart", title: "Trova al volo", text: "Dalla schermata Ricette cerca per nome o ingrediente e usa i filtri: Preferiti, Più cucinate, Di recente, per tempo (≤15 e ≤30 min) e le categorie. Indica il tempo di preparazione nella ricetta (modifica) per usare i filtri rapidi. Dai un voto a stelle e \"Segna come cucinata\" per il conto." },
   { icon: "shopping-cart-simple", title: "Spesa & Dispensa", text: "Aggiungi gli ingredienti alla lista della spesa (uniti e per reparto). Tocca il nome per spuntare un articolo e la quantità per modificarla. Con \"Spesa fatta\" passa tutto in dispensa. In Dispensa tieni ciò che hai già — con la scadenza, e l'app ti avvisa quando qualcosa sta per scadere — e \"Cosa posso cucinare\" suggerisce le ricette con quello che hai." },
-  { icon: "fire", title: "Modalità cucina", text: "Nelle ricette con i passi, tocca \"Modalità cucina\": istruzioni passo-passo, più timer con nome (pasta, forno…), lettura vocale (🔊) e schermo sempre acceso. Tocca un ingrediente nel passo per vedere la quantità. Col microfono 🎤 vai avanti/indietro a voce, avvii timer e puoi anche fare domande (\"posso sostituire il burro?\") con risposta a voce." },
+  { icon: "fire", title: "Modalità cucina", text: "Apri una ricetta e tocca \"Cucina\" nella barra in basso: istruzioni passo-passo, più timer con nome (pasta, forno…), lettura vocale (🔊) e schermo sempre acceso. Tocca un ingrediente nel passo per vedere la quantità. Col microfono 🎤 vai avanti/indietro a voce, avvii timer e puoi anche fare domande (\"posso sostituire il burro?\") con risposta a voce." },
   { icon: "calendar-blank", title: "Pianificazione", text: "Nel calendario (vista Mese o Settimana) assegna le ricette ai giorni in pranzo o cena, usa \"Crea il menù\" per riempire le cene rimaste vuote (scegliendo se farlo con l'assistente, in automatico o a caso) e genera la spesa del mese o della settimana." },
   { icon: "book-bookmark", title: "Menu", text: "Dalla schermata Ricette, filtro \"Menu\": raggruppa più ricette (es. \"Cena con amici\") e genera un'unica lista della spesa." },
   { icon: "arrow-square-out", title: "Condividi", text: "Da una ricetta tocca \"Condividi\" per inviarla a qualcuno (WhatsApp, email…) con ingredienti e preparazione." },

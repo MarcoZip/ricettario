@@ -540,6 +540,9 @@ a { color: var(--primary-2); }
 .rbar__b:active { transform: scale(0.97); }
 .rbar-spacer { height: 64px; }
 .timer-quick { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+/* Le tre vie per non scrivere la ricetta a mano, in cima al modulo. */
+.quickstart { display: flex; flex-wrap: wrap; gap: 8px; }
+.quickstart .btn { flex: 1 1 auto; min-height: 44px; }
 
 /* ---------- Bersagli da toccare ----------
    In cucina si tocca con le mani bagnate, di fretta, spesso senza guardare.
