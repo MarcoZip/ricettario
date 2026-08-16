@@ -6,6 +6,21 @@
 
 export const CHANGELOG = [
   {
+    v: "8.53",
+    d: "2026-08-16",
+    items: [
+      "<b>In tema chiaro la Modalità cucina era illeggibile</b>: la schermata resta scura in entrambi i temi, ma il testo dei passaggi prendeva il colore del tema chiaro, diventando quasi nero su quasi nero. Si leggeva solo grazie alle parole degli ingredienti evidenziate, quindi i passaggi che non ne contengono sparivano. Corretto.",
+      "Sempre in tema chiaro, le pillole della ricetta (tempo, categoria, e soprattutto \"Fonte: sito\") erano scritte in un colore troppo tenue per il fondo chiaro. Ora si leggono.",
+      "Pulsanti più facili da centrare con le mani bagnate: spunta della spesa, cestino, stelle del voto, ⏱ e ?, chiusure. Restano della stessa dimensione ma la zona che risponde al dito è più larga.",
+      "Le finestre ora si chiudono con <b>Esc</b>, il cursore ci entra da solo e non si esce per sbaglio con Tab: prima chi usa la tastiera o un lettore di schermo restava fuori dalla finestra appena aperta.",
+      "Aggiunti i nomi parlati ai pulsanti che hanno solo un'icona (indietro, chiudi, preferito, spunta, elimina): prima un lettore di schermo li annunciava tutti come \"pulsante\".",
+      "Digitando nella ricerca l'app non ridisegna più la lista a ogni lettera, ma una volta finita la parola: su un telefono di fascia media erano fino a 130 millisecondi persi per ogni tasto.",
+      "Ogni foto di ricetta veniva scaricata due volte, e la seconda non poteva servire a nulla. Ora una sola.",
+      "A schermo largo la barra in basso non si allarga più oltre il contenuto.",
+      "Corretto \"50 gpecorino\" negli ingredienti della carbonara."
+    ]
+  },
+  {
     v: "8.52",
     d: "2026-08-16",
     items: [

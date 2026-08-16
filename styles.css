@@ -183,6 +183,22 @@ a { color: var(--primary-2); }
 }
 .home-hero__btn:active { filter: brightness(1.1); }
 /* In tema chiaro il pesca su pesca era illeggibile: serve un arancio scuro. */
+/* Pillole in tema chiaro: i colori pensati per il fondo scuro qui diventano
+   illeggibili — il chip "Fonte" misurava 1,55:1 e i tag 3,34:1, contro una
+   soglia di 4,5:1. Si scuriscono testo e bordo tenendo lo stesso sfondo tenue. */
+:root[data-theme="light"] .tagchip { color: #4a4038; }
+:root[data-theme="light"] .tagchip--ro,
+:root[data-theme="light"] .tagchip b { color: #574c42; }
+:root[data-theme="light"] .tagchip--src { background: rgba(40, 90, 180, 0.10); border-color: rgba(40, 90, 180, 0.34); color: #1f4c96; }
+:root[data-theme="light"] .tagchip--season { background: rgba(30, 110, 30, 0.10); border-color: rgba(30, 110, 30, 0.32); color: #1d5c1d; }
+:root[data-theme="light"] .tagchip--ahead { background: rgba(40, 80, 180, 0.10); border-color: rgba(40, 80, 180, 0.32); color: #23459c; }
+:root[data-theme="light"] .tagchip--allerg { background: rgba(180, 30, 30, 0.10); border-color: rgba(180, 30, 30, 0.34); color: #9d1f1f; }
+:root[data-theme="light"] .season-chip { background: rgba(30, 110, 30, 0.10); border-color: rgba(30, 110, 30, 0.32); color: #1d5c1d; }
+
+/* Anello del focus da tastiera: in tema chiaro l'arancione su crema faceva
+   2,25:1, sotto la soglia di 3:1 per gli indicatori non testuali. */
+:root[data-theme="light"] :focus-visible { outline-color: #8a4a00; }
+
 :root[data-theme="light"] .home-hero__btn {
   color: #9c3f16;
   background: rgba(255, 122, 61, 0.12);
@@ -193,6 +209,10 @@ a { color: var(--primary-2); }
 .bottom-nav {
   position: fixed;
   bottom: 0; left: 0; right: 0;
+  /* Il contenuto è centrato a 900px: senza questo, a schermo largo i cinque
+     pulsanti si spalmavano da bordo a bordo, disallineati di ~180px rispetto
+     alla colonna sopra. La barra deve seguire il contenuto, non la finestra. */
+  margin: 0 auto; max-width: 900px;
   height: calc(var(--nav-h) + var(--safe-bottom));
   padding-bottom: var(--safe-bottom);
   background: var(--nav-bg);
@@ -496,6 +516,7 @@ a { color: var(--primary-2); }
    uno spazio pari alla sua altezza, così l'ultimo pulsante non ci finisce sotto. */
 .rbar {
   position: fixed; left: 0; right: 0;
+  margin: 0 auto; max-width: 900px; /* segue la colonna del contenuto, come .bottom-nav */
   bottom: calc(var(--nav-h) + var(--safe-bottom));
   z-index: 90;
   display: flex; gap: 8px;
@@ -518,7 +539,32 @@ a { color: var(--primary-2); }
 .rbar__b--go { background: var(--primary); border-color: transparent; color: #fff; }
 .rbar__b:active { transform: scale(0.97); }
 .rbar-spacer { height: 64px; }
-.timer-quick { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+.timer-quick { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+
+/* ---------- Bersagli da toccare ----------
+   In cucina si tocca con le mani bagnate, di fretta, spesso senza guardare.
+   Diversi pulsanti misuravano 25-32px, sotto i 44px raccomandati. Invece di
+   ingrandirli — cambiando il disegno di tutta l'app — si allarga l'AREA
+   SENSIBILE con un riquadro invisibile centrato: il pulsante resta piccolo,
+   il dito ha lo spazio che gli serve. */
+.tap44 { position: relative; }
+.tap44::after {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: 44px; height: 44px; transform: translate(-50%, -50%);
+  /* Sotto al contenuto e senza sfondo: si tocca, non si vede. */
+}
+.header-btn, .shop-row .check, .shop-row__del, .star, .super__close { position: relative; }
+.header-btn::after, .shop-row .check::after, .shop-row__del::after, .star::after, .super__close::after {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: 44px; height: 44px; transform: translate(-50%, -50%);
+}
+/* Le stelle del voto sono cinque in fila: un'area di 44px le farebbe
+   accavallare, quindi si allarga solo in altezza e si distanziano un po'. */
+.rating { display: inline-flex; gap: 6px; }
+.star::after { width: 34px; }
+/* Le pastiglie sono testo: qui si può crescere davvero, senza stravolgere. */
+.timer-quick .chip, .season-chip, .filter-chip { min-height: 40px; display: inline-flex; align-items: center; }
+.season-row, .tag-row { gap: 10px; }
 
 /* --- Rifiniture che il browser fa da solo, dove le supporta --- */
 
@@ -1106,6 +1152,10 @@ html.theme-switching::view-transition-new(root) { z-index: 2147483646; }
 :root.power-save .cook__ambient,
 :root.power-save .steam { display: none !important; }
 :root.power-save .rotd::after { animation: none !important; }
+/* Il pallino sulla Guida era l'unica animazione continua che il risparmio
+   batteria non spegneva, e anima box-shadow, cioè ridisegna fuori dal
+   compositore. Vale pochi millisecondi, ma è una riga. */
+:root.power-save .hot-dot::after { animation: none !important; }
 :root.power-save.glass .tool-card,
 :root.power-save.glass .section-card,
 :root.power-save.glass .setting-group,
@@ -1574,6 +1624,12 @@ p, li, .setting-row__desc, .hint, .recipe-item__notes, .steps-list li { text-wra
 .cook__track { height: 5px; background: var(--surface-2); border-radius: 99px; margin: 14px 0; overflow: hidden; }
 .cook__fill { height: 100%; background: var(--primary-grad); transition: width 0.3s ease; }
 .cook__body { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; overflow-y: auto; }
+/* La Modalità cucina ha SEMPRE lo sfondo scuro, in entrambi i temi. Il testo
+   però ereditava il colore del tema: in tema chiaro diventava quasi nero su
+   quasi nero — 1,22:1 misurato, cioè illeggibile. Si leggeva soltanto grazie
+   alle parole degli ingredienti evidenziate in arancione, quindi i passi che
+   non ne contengono sparivano del tutto. Qui il colore va fissato. */
+.cook, .cook__step { color: #efe8dd; }
 .cook__step { font-size: 1.5rem; line-height: 1.5; font-weight: 600; max-width: 640px; }
 .cook--xl .cook__step { font-size: 2.3rem; line-height: 1.45; font-weight: 700; }
 .cook--xl .cook__progress { font-size: 1.05rem; }

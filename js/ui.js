@@ -288,7 +288,7 @@ function openStatsDashboard() {
       ${s.topTags.length ? `<div class="stats-sec"><h3 class="stats-sec__t">🍽️ Le tue portate</h3>${bars(s.topTags, maxTag, "is-tag")}</div>` : ""}
       ${s.topIng.length ? `<div class="stats-sec"><h3 class="stats-sec__t">🥕 Ingredienti del cuore</h3>${bars(s.topIng, maxIng, "is-ing")}</div>` : ""}
       ${s.mostCooked ? `<div class="stats-sec"><h3 class="stats-sec__t">👑 La più cucinata</h3>
-        <div class="stats-top">${s.mostCooked.photo ? `<img src="${escapeHtml(proxiedImg(s.mostCooked.photo))}" alt="" referrerpolicy="no-referrer"/>` : `<span class="stats-top__ph">🍴</span>`}
+        <div class="stats-top">${s.mostCooked.photo ? `<img src="${escapeHtml(proxiedImg(s.mostCooked.photo))}" alt="" referrerpolicy="no-referrer" loading="lazy" decoding="async"/>` : `<span class="stats-top__ph">🍴</span>`}
           <div><div class="stats-top__t">${escapeHtml(s.mostCooked.title)}</div><div class="stats-top__n">cucinata ${s.mostCooked.cookCount} ${s.mostCooked.cookCount === 1 ? "volta" : "volte"}</div></div></div></div>` : ""}
     </div>
     <button class="btn btn--primary btn--block" id="stJrn" style="margin-bottom:8px">📔 Sfoglia l'album di cucina</button>
@@ -594,17 +594,56 @@ function initUsageTracking() {
   }, true);
 }
 
+let modalSeq = 0;
 function openModal(innerHtml) {
   const host = document.getElementById("modalRoot");
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop";
-  backdrop.innerHTML = `<div class="modal"><div class="modal__handle"></div>${innerHtml}</div>`;
+  const tid = "modalTit" + (++modalSeq);
+  // Finestra vera e propria, non un riquadro qualsiasi: prima nessuna aveva un
+  // ruolo, il focus restava sul pulsante di sfondo, con Tab si usciva sotto e
+  // Esc non chiudeva niente. Chi naviga da tastiera o con un lettore di schermo
+  // restava di fatto fuori dalla finestra che aveva appena aperto.
+  backdrop.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-labelledby="${tid}" tabindex="-1"><div class="modal__handle"></div>${innerHtml}</div>`;
+  const el = backdrop.querySelector(".modal");
+  const tit = el.querySelector(".modal__title");
+  if (tit) tit.id = tid; else el.removeAttribute("aria-labelledby");
   host.appendChild(backdrop);
-  const close = () => backdrop.remove();
+
+  const primaEra = document.activeElement;
+  const close = () => {
+    document.removeEventListener("keydown", onKey, true);
+    backdrop.remove();
+    // Il focus torna da dove era partito, altrimenti chiudendo si ricomincia
+    // dall'inizio della pagina.
+    try { if (primaEra && primaEra.isConnected && primaEra.focus) primaEra.focus(); } catch (e) {}
+  };
+  const fuocabili = () => [...el.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])')].filter((x) => x.offsetParent !== null);
+  function onKey(e) {
+    if (!backdrop.isConnected) { document.removeEventListener("keydown", onKey, true); return; }
+    if (document.querySelectorAll("#modalRoot .modal-backdrop").length && host.lastElementChild !== backdrop) return; // agisce solo la finestra in cima
+    if (e.key === "Escape") { e.preventDefault(); close(); return; }
+    if (e.key !== "Tab") return;
+    // Tab non deve uscire dalla finestra e finire sui pulsanti dietro.
+    const f = fuocabili();
+    if (!f.length) { e.preventDefault(); return; }
+    const primo = f[0], ultimo = f[f.length - 1];
+    if (e.shiftKey && (document.activeElement === primo || document.activeElement === el)) { e.preventDefault(); ultimo.focus(); }
+    else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primo.focus(); }
+  }
+  document.addEventListener("keydown", onKey, true);
+  // Il focus entra nella finestra: sul primo campo se c'è, sennò sulla finestra.
+  setTimeout(() => {
+    if (!backdrop.isConnected) return;
+    const f = fuocabili();
+    const campo = f.find((x) => /^(INPUT|TEXTAREA|SELECT)$/.test(x.tagName));
+    (campo || el).focus();
+  }, 30);
+
   backdrop.addEventListener("click", (e) => {
     if (e.target === backdrop) close();
   });
-  return { el: backdrop.querySelector(".modal"), close };
+  return { el, close };
 }
 
 // Chiude tutti i modali aperti (usato quando si esce dai modali per andare in
@@ -1387,7 +1426,7 @@ function openTonightAssistant() {
     const r = c.r;
     reveal.innerHTML = `
       <div class="tn-card">
-        ${r.photo ? `<img src="${escapeHtml(proxiedImg(r.photo))}" alt="" referrerpolicy="no-referrer"/>` : `<div class="tn-card__ph">🍽️</div>`}
+        ${r.photo ? `<img src="${escapeHtml(proxiedImg(r.photo))}" alt="" referrerpolicy="no-referrer" loading="lazy" decoding="async"/>` : `<div class="tn-card__ph">🍽️</div>`}
         <div class="tn-card__body">
           <div class="tn-card__t">${escapeHtml(r.title)}</div>
           ${c.reasons.length ? `<div class="tn-card__why">${c.reasons.slice(0, 3).map((x) => `<span class="tn-why">${escapeHtml(x)}</span>`).join("")}</div>` : ""}
@@ -2104,7 +2143,7 @@ function renderStrumenti() {
     const seed = n.getFullYear() * 1000 + (n.getMonth() * 31 + n.getDate());
     const rotd = allR[seed % allR.length];
     rotdCard = `<button class="rotd" data-recipe="${rotd.id}">
-        ${rotd.photo ? `<img class="rotd__img" src="${escapeHtml(proxiedImg(rotd.photo))}" alt="" referrerpolicy="no-referrer" />` : `<span class="rotd__ph">${iconHtml("fork-knife")}</span>`}
+        ${rotd.photo ? `<img class="rotd__img" src="${escapeHtml(proxiedImg(rotd.photo))}" alt="" referrerpolicy="no-referrer" decoding="async" />` : `<span class="rotd__ph">${iconHtml("fork-knife")}</span>`}
         <span class="rotd__grad"></span>
         ${rotd.photo ? STEAM_HTML : ""}
         <span class="rotd__glare"></span>
@@ -2224,7 +2263,7 @@ function renderStrumenti() {
     ${buildTipBanner()}
     <div class="search-bar search-bar--hero">
       <span class="search-bar__ic">${iconHtml("magnifying-glass")}</span>
-      <input type="search" id="homeSearch" placeholder="Cerca una ricetta o un ingrediente…" value="${escapeHtml(homeQuery)}" />
+      <input type="search" id="homeSearch" placeholder="Cerca ricetta o ingrediente" value="${escapeHtml(homeQuery)}" />
       ${voiceOK ? `<button class="btn mic-btn" id="homeMic" title="Cerca a voce" aria-label="Cerca a voce">🎤</button>` : ""}
     </div>
     ${total ? `<div class="home-bento">
@@ -2248,11 +2287,22 @@ function renderStrumenti() {
   if (rotdEl) rotdEl.addEventListener("click", () => openRecipe(rotdEl.dataset.recipe));
 
   const search = root.querySelector("#homeSearch");
+  // Attesa breve prima di ridisegnare: senza, ogni tasto premuto rifà l'intera
+  // lista. Misurato fino a 32 ms sincroni per battuta su una macchina 3-4 volte
+  // più veloce del telefono di Federica — là sono 80-130 ms, cioè la digitazione
+  // che si impunta. Con 120 ms si ridisegna una volta per parola invece di una
+  // per lettera; l'ultimo tasto arriva sempre, perché il timer riparte a ogni
+  // battuta e l'ultimo scatta comunque.
+  let cercaAttesa = null;
   search.addEventListener("input", () => {
     homeQuery = search.value;
-    // Il filtro "Menu" non si combina con la ricerca testuale: lo azzero.
-    if (homeFilter === "menu") { homeFilter = ""; renderStrumenti(); }
-    else renderHomeBody();
+    clearTimeout(cercaAttesa);
+    cercaAttesa = setTimeout(() => {
+      if (!search.isConnected) return;
+      // Il filtro "Menu" non si combina con la ricerca testuale: lo azzero.
+      if (homeFilter === "menu") { homeFilter = ""; renderStrumenti(); }
+      else renderHomeBody();
+    }, 120);
   });
   root.querySelectorAll(".filter-chip").forEach((c) => c.addEventListener("click", () => {
     homeFilter = homeFilter === c.dataset.filter ? "" : c.dataset.filter;
@@ -2360,7 +2410,7 @@ function renderToolDetail() {
             : "";
           return `
           <div class="recipe-item recipe-item--tap stagger ${r.photo ? "has-thumb" : ""}" data-recipe="${r.id}" style="--i:${i}">
-            ${r.photo ? `<img class="recipe-thumb" src="${escapeHtml(r.photo)}" alt="" />` : ""}
+            ${r.photo ? `<img class="recipe-thumb" src="${escapeHtml(r.photo)}" alt="" loading="lazy" decoding="async" width="60" height="60" />` : ""}
             <div class="recipe-item__main">
               <div class="recipe-item__top">
                 <h3 class="recipe-item__title">${escapeHtml(r.title)}</h3>
@@ -2378,7 +2428,7 @@ function renderToolDetail() {
 
   root.innerHTML = `
     <div class="toolbar">
-      <button class="back-btn" id="back">${iconHtml("arrow-left")}</button>
+      <button class="back-btn" id="back" aria-label="Indietro">${iconHtml("arrow-left")}</button>
       <div class="toolbar__title"><span class="toolbar__icon" style="--ac:${ACCENTS[Math.max(0, store.getTools().findIndex((x) => x.id === tool.id)) % ACCENTS.length]}">${iconHtml(tool.icon)}</span> ${escapeHtml(tool.name)}</div>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:16px">
@@ -2434,8 +2484,13 @@ function renderToolDetail() {
 // origin; per le immagini esterne senza CORS fallisce in silenzio (niente tinta).
 function tintFromImage(url, cb) {
   if (!url) return;
+  // Solo sulle foto NOSTRE (salvate come data:). Su quelle esterne il canvas è
+  // "sporcato" dalle regole di origine e la lettura dei pixel fallisce sempre:
+  // misurato, ogni foto di ricetta veniva scaricata DUE volte — una per
+  // mostrarla, una per una tinta che non si sarebbe mai potuta calcolare.
+  // Ed è il caso normale, perché le ricette di Federica arrivano dai siti.
+  if (!url.startsWith("data:")) return;
   const img = new Image();
-  if (!url.startsWith("data:")) img.crossOrigin = "anonymous";
   img.onload = () => {
     try {
       const c = document.createElement("canvas");
@@ -2542,7 +2597,7 @@ function renderRecipeDetail() {
     : `<div class="hint">Nessun ingrediente salvato. Aggiungili con <b>Modifica</b>.</div>`;
 
   const ratingRow = `<div class="rating" id="rating">${[1, 2, 3, 4, 5]
-    .map((v) => `<button class="star ${v <= (r.rating || 0) ? "is-on" : ""}" data-v="${v}">${iconHtml("star")}</button>`)
+    .map((v) => `<button class="star ${v <= (r.rating || 0) ? "is-on" : ""}" data-v="${v}" aria-label="Vota ${v} ${v === 1 ? "stella" : "stelle"}">${iconHtml("star")}</button>`)
     .join("")}</div>`;
 
   // Costo stimato (scala con le porzioni) e sostituzioni ingredienti.
@@ -2592,12 +2647,12 @@ function renderRecipeDetail() {
   root.innerHTML = `
     <div class="read-progress" aria-hidden="true"></div>
     <div class="toolbar">
-      <button class="back-btn" id="back">${iconHtml("arrow-left")}</button>
+      <button class="back-btn" id="back" aria-label="Indietro">${iconHtml("arrow-left")}</button>
       <div class="toolbar__title" style="flex:1">${r.photo ? "" : escapeHtml(r.title)}</div>
-      <button class="back-btn fav-btn ${r.favorite ? "is-fav" : ""}" id="favBtn" title="Preferito">${iconHtml("heart")}</button>
+      <button class="back-btn fav-btn ${r.favorite ? "is-fav" : ""}" id="favBtn" title="Preferito" aria-pressed="${r.favorite ? "true" : "false"}" aria-label="${r.favorite ? "Togli dai preferiti" : "Aggiungi ai preferiti"}">${iconHtml("heart")}</button>
     </div>
     ${r.photo
-      ? `<div class="recipe-hero"><img src="${escapeHtml(proxiedImg(r.photo))}" alt="" referrerpolicy="no-referrer" style="view-transition-name:vt-hero" /><div class="recipe-hero__grad"></div>${STEAM_HTML}<h2 class="recipe-hero__title">${escapeHtml(r.title)}</h2></div>`
+      ? `<div class="recipe-hero"><img src="${escapeHtml(proxiedImg(r.photo))}" alt="" referrerpolicy="no-referrer" decoding="async" style="view-transition-name:vt-hero" /><div class="recipe-hero__grad"></div>${STEAM_HTML}<h2 class="recipe-hero__title">${escapeHtml(r.title)}</h2></div>`
       : `<div class="recipe-hero recipe-hero--mesh" style="--mh:${(() => { let h = 0; const s = r.title || ""; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 1000; return 12 + (h % 66); })()}"><span class="recipe-hero__meshic">${tool ? iconHtml(tool.icon) : iconHtml("fork-knife")}</span><div class="recipe-hero__grad"></div><h2 class="recipe-hero__title">${escapeHtml(r.title)}</h2></div>`}
     <div class="detail-top">
       ${tool ? `<span class="recipe-tool-chip" style="margin:0">${iconHtml(tool.icon)} ${escapeHtml(tool.name)}</span>` : "<span></span>"}
@@ -4100,7 +4155,7 @@ function openRobotMode(r) {
 
 function openCookReview(r) {
   let rating = r.rating || 0;
-  const stars = () => [1, 2, 3, 4, 5].map((v) => `<button class="star ${v <= rating ? "is-on" : ""}" data-v="${v}">${iconHtml("star")}</button>`).join("");
+  const stars = () => [1, 2, 3, 4, 5].map((v) => `<button class="star ${v <= rating ? "is-on" : ""}" data-v="${v}" aria-label="Vota ${v} ${v === 1 ? "stella" : "stelle"}">${iconHtml("star")}</button>`).join("");
   const m = openModal(`
     <h3 class="modal__title">📝 Com'è venuta?</h3>
     <div class="field"><label>Voto</label><div class="rating" id="rvStars">${stars()}</div></div>
@@ -4810,7 +4865,7 @@ function openCookingMode(recipe) {
     setAmbient(detectCookMethod(steps[idx]) || recipeMethod);
     ui.innerHTML = `
       <div class="cook__bar">
-        <button class="cook__close" id="ckClose">${iconHtml("x")}</button>
+        <button class="cook__close" id="ckClose" aria-label="Chiudi la Modalità cucina">${iconHtml("x")}</button>
         <div class="cook__progress">Passo ${idx + 1} di ${steps.length}</div>
         <button class="cook__close ${xl ? "is-on" : ""}" id="ckXL" title="Testo grande">Aa</button>
         ${SR ? `<button class="cook__close ${voiceOn ? "is-on" : ""}" id="ckVoice" title="Comandi vocali">🎤</button>` : ""}
@@ -5709,7 +5764,7 @@ function openToTry() {
   const list = getToTry();
   const body = list.length
     ? list.map((m) => `<div class="totry-row" data-link="${escapeHtml(m.link)}">
-        ${m.image ? `<img src="${escapeHtml(proxiedImg(m.image))}" alt="" referrerpolicy="no-referrer" />` : `<span class="totry-row__ph">${iconHtml("fork-knife")}</span>`}
+        ${m.image ? `<img src="${escapeHtml(proxiedImg(m.image))}" alt="" referrerpolicy="no-referrer" loading="lazy" decoding="async" />` : `<span class="totry-row__ph">${iconHtml("fork-knife")}</span>`}
         <span class="totry-row__t">${escapeHtml(m.title_it || m.title)}<span class="meal-src meal-src--${m.source}" style="margin-left:6px">${SOURCE_LABEL[m.source] || ""}</span></span>
         <button class="chip" data-act="imp">${iconHtml("plus")} Importa</button>
         <button class="icon-btn icon-btn--danger" data-act="rm">${iconHtml("trash")}</button>
@@ -5857,7 +5912,7 @@ function renderOnlineTab() {
       ${searchable ? `<div class="meal-search">
         <label class="meal-search__lbl">${iconHtml("magnifying-glass")} Cerca una ricetta</label>
         <div class="search-bar search-bar--hero">
-          <input type="search" id="mealSearch" placeholder="Es. pollo, torta, zuppa…" value="${escapeHtml(mealQuery)}" />
+          <input type="search" id="mealSearch" placeholder="Es. pollo, torta…" value="${escapeHtml(mealQuery)}" />
           ${(("webkitSpeechRecognition" in window) || ("SpeechRecognition" in window)) ? `<button class="btn mic-btn" id="mealMic" title="Cerca a voce" aria-label="Cerca a voce">🎤</button>` : ""}
           <button class="btn btn--primary" id="mealSearchBtn">Cerca</button>
         </div>
@@ -6166,10 +6221,10 @@ function shopRow(it) {
   const amount = [qty, it.unit && it.unit !== "q.b." ? it.unit : (it.unit === "q.b." ? "q.b." : "")].filter(Boolean).join(" ");
   return `
     <div class="shop-row ${it.checked ? "is-checked" : ""}${it.checked && it.id === lastShopToggled ? " just-checked" : ""}" data-id="${it.id}">
-      <button class="check" data-act="check">${it.checked ? iconHtml("check") : ""}</button>
+      <button class="check" data-act="check" aria-label="${it.checked ? "Togli la spunta" : "Segna come comprato"}" aria-pressed="${it.checked ? "true" : "false"}">${it.checked ? iconHtml("check") : ""}</button>
       <span class="shop-row__name" data-act="toggle">${escapeHtml(it.name)}</span>
       <button class="shop-row__amt" data-act="qty" title="Modifica quantità">${amount ? escapeHtml(amount) : iconHtml("pencil-simple")}</button>
-      <button class="icon-btn icon-btn--danger shop-row__del" data-act="del">${iconHtml("trash")}</button>
+      <button class="icon-btn icon-btn--danger shop-row__del" data-act="del" aria-label="Elimina dalla lista">${iconHtml("trash")}</button>
     </div>`;
 }
 
@@ -6240,7 +6295,7 @@ function openSupermarketMode() {
     const prevScroll = (el.querySelector(".super__body") || {}).scrollTop || 0;
     el.innerHTML = `
       <div class="super__bar">
-        <button class="super__close" id="suClose">${iconHtml("x")}</button>
+        <button class="super__close" id="suClose" aria-label="Chiudi la Modalità supermercato">${iconHtml("x")}</button>
         <div class="super__title">🛒 Spesa · ${checked}/${total}</div>
       </div>
       <div class="super__track"><div class="super__fill" style="width:${pct}%"></div></div>
@@ -6547,7 +6602,7 @@ function pantryRow(p) {
     <span class="shop-row__name">${escapeHtml(p.name)}</span>
     <button class="shop-row__amt" data-act="qty" title="Quantità">${p.qty ? escapeHtml(p.qty) : iconHtml("pencil-simple")}</button>
     ${expiryBadge(p.expiry)}
-    <button class="icon-btn icon-btn--danger shop-row__del" data-act="del">${iconHtml("trash")}</button>
+    <button class="icon-btn icon-btn--danger shop-row__del" data-act="del" aria-label="Elimina dalla lista">${iconHtml("trash")}</button>
   </div>`;
 }
 
