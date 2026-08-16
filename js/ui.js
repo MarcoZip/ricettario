@@ -5163,7 +5163,9 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
   `);
 
   const titleInput = m.el.querySelector("#rTitle");
-  setTimeout(() => titleInput.focus(), 50);
+  // Niente focus automatico sul titolo: sopra ci sono sette scorciatoie
+  // (importa da link, fotografa, detta a voce, inventa con l'AI…) e molto
+  // spesso la ricetta si comincia da lì, non scrivendo il nome a mano.
 
   // --- Foto ---
   const photoBox = m.el.querySelector("#photoBox");
@@ -6167,7 +6169,9 @@ function openHelpAssistant() {
   m.el.querySelector("#haGuide").onclick = () => { m.close(); openGuide(); };
   const input = m.el.querySelector("#haQ");
   const body = m.el.querySelector("#haBody");
-  setTimeout(() => input.focus(), 50);
+  // Niente focus automatico: sotto ci sono le pastiglie degli argomenti, ed è
+  // da lì che si parte quasi sempre. Aprendo la tastiera si coprirebbero
+  // proprio le scorciatoie che rendono utile questa finestra.
   const showAnswer = (reply, topic) => {
     const hasTour = topic && topic.tour && TOURS[topic.tour];
     body.innerHTML = `<div class="dish-feedback">${escapeHtml(reply).replace(/\n+/g, "<br>")}</div>`

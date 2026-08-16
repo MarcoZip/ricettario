@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.56",
+    d: "2026-08-16",
+    minor: true,
+    items: [
+      "In <b>Nuova ricetta</b> e in <b>Chiedi a Fornelli</b> la tastiera non salta più su appena apri: copriva le scorciatoie che stanno lì sopra — importa da un link, fotografa, detta a voce — e gli argomenti già pronti dell'assistente. Nelle finestre che servono solo a scrivere (il nome, una quantità, una lista da incollare) la tastiera continua invece ad aprirsi da sola, perché lì fa risparmiare un tocco."
+    ]
+  },
+  {
     v: "8.55",
     d: "2026-08-16",
     minor: true,
