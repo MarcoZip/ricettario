@@ -60,8 +60,14 @@
 
   // 2. Giro delle schermate principali. La navigazione ridisegna e ricollega,
   //    quindi da qui in poi i gestori vengono registrati.
-  for (const r of ["strumenti", "scopri", "spesa", "piano", "impostazioni"]) {
+  // ATTENZIONE ai nomi: la v8.37 ha rinominato le ETICHETTE ("Strumenti" →
+  // "Ricette", "Ricettario" → "Scopri") ma NON le rotte interne, che sono
+  // rimaste `strumenti` e `ricettario`. Scrivendo qui "scopri" la schermata
+  // veniva saltata in silenzio e il collaudo copriva 4 sezioni su 5.
+  const rotte = ["strumenti", "ricettario", "spesa", "piano", "impostazioni"];
+  for (const r of rotte) {
     if (await vaiA(r)) controlla(r);
+    else morti.push("ROTTA INESISTENTE: " + r + " — il collaudo non l'ha visitata");
   }
 
   // 3. La scheda ricetta, che è la più ricca di pulsanti.

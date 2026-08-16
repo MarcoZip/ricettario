@@ -6,6 +6,17 @@
 
 export const CHANGELOG = [
   {
+    v: "8.52",
+    d: "2026-08-16",
+    items: [
+      "<b>Il timer avviato in Modalità cucina non si perde più.</b> Uscendo dalla schermata spariva senza dire niente: ora continua fra i timer in alto, con l'avviso \"Il timer continua qui sopra\".",
+      "La ricerca non restituisce più risultati senza senso: cercando <i>mela</i> uscivano le marmellate, <i>pane</i> trovava la pancetta e <i>pera</i> i peperoni. Ora si confrontano le parole intere, e singolare e plurale continuano a valere uguale.",
+      "Dispensa: corretto in entrambi i versi. Se hai <i>latte intero</i> e la ricetta chiede <i>latte</i>, l'app sa che ce l'hai (prima lo faceva ricomprare); se hai <i>latte</i> e serve <i>latte di cocco</i>, quello va in lista.",
+      "La temperatura al cuore torna a comparire sui piatti di carne il cui nome cita un contorno — <i>Cotolette con contorno di verdure</i>, <i>Scaloppine ai funghi e riso</i> — dove era sparita per errore.",
+      "L'allarme del timer ora smette da solo dopo due minuti invece di suonare all'infinito, e zittendolo il timer finito sparisce davvero: prima restava un \"⏱ 0:00\" fisso in ogni schermata."
+    ]
+  },
+  {
     v: "8.51",
     d: "2026-08-09",
     items: [

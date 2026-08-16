@@ -3441,13 +3441,18 @@ function openAskChef(r) {
 let gTimers = []; // { id, label, remaining, running, alarming }
 let gTicker = null, gAlarm = null, gSeq = 0;
 let timersPanelEl = null; // modale Timer aperta (per ridisegnarla a ogni tick)
+// UN SOLO contesto audio, riusato. Crearne uno per ogni bip ne lasciava aperti
+// decine durante un allarme lungo (misurati 40 in quattro minuti): sono risorse
+// che il browser non recupera da solo.
+let beepCtx = null;
 function playBeep() {
   if (getSoundOn()) { playChime(); return; } // "tin" gentile se i micro-suoni sono accesi
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const o = ctx.createOscillator(); const g = ctx.createGain();
-    o.connect(g); g.connect(ctx.destination); o.type = "sine"; o.frequency.value = 880;
-    o.start(); g.gain.setValueAtTime(0.3, ctx.currentTime); o.stop(ctx.currentTime + 0.6);
+    if (!beepCtx) beepCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (beepCtx.state === "suspended") beepCtx.resume();
+    const o = beepCtx.createOscillator(); const g = beepCtx.createGain();
+    o.connect(g); g.connect(beepCtx.destination); o.type = "sine"; o.frequency.value = 880;
+    o.start(); g.gain.setValueAtTime(0.3, beepCtx.currentTime); o.stop(beepCtx.currentTime + 0.6);
   } catch (e) { /* audio non disponibile */ }
 }
 function vibrateAlarm() { hapticPattern([300, 120, 300]); }
@@ -3494,8 +3499,17 @@ function ensureGlobalAlarm() {
   // Il ridisegno del chip va fatto anche qui: quando l'ULTIMO timer finisce, il
   // ticker si ferma e nessuno ridisegna più. Chiudendo il pannello toccando lo
   // sfondo il chip non tornava, e l'allarme suonava senza modo di zittirlo.
-  if (any && !gAlarm) gAlarm = setInterval(() => { playBeep(); vibrateAlarm(); paintTimerWidget(); }, 1700);
-  else if (!any && gAlarm) { clearInterval(gAlarm); gAlarm = null; }
+  if (any && !gAlarm) {
+    // L'allarme si ferma da solo dopo due minuti. Prima suonava all'infinito:
+    // un timer che scade in cucina mentre non c'è nessuno bippava finché
+    // qualcuno non tornava a toccare il telefono. Il timer resta comunque lì,
+    // segnato come finito: si vede, semplicemente smette di strillare.
+    const finoA = Date.now() + 120000;
+    gAlarm = setInterval(() => {
+      if (Date.now() > finoA) { gTimers.forEach((t) => { t.alarming = false; }); ensureGlobalAlarm(); paintTimerWidget(); paintTimersPanel(); saveGTimers(); return; }
+      playBeep(); vibrateAlarm(); paintTimerWidget();
+    }, 1700);
+  } else if (!any && gAlarm) { clearInterval(gAlarm); gAlarm = null; }
 }
 function gTick() {
   for (const t of gTimers) {
@@ -3542,7 +3556,10 @@ function paintTimersPanel() {
     const id = parseInt(row.dataset.id, 10);
     const t = gTimers.find((x) => x.id === id);
     row.querySelector('[data-act="toggle"]').onclick = () => {
-      if (t.alarming) { t.alarming = false; ensureGlobalAlarm(); }
+      // Zittendo un timer già finito lo si toglie anche dall'elenco: prima
+      // restava lì a zero e il chip fluttuante mostrava un "⏱ 0:00" fisso su
+      // tutte le schermate, che spariva solo riavviando l'app.
+      if (t.alarming) { t.alarming = false; if (t.remaining <= 0) gTimers = gTimers.filter((x) => x.id !== id); ensureGlobalAlarm(); }
       else if (t.remaining > 0) {
         if (t.running) { syncTimer(t); t.running = false; }        // in pausa congelo il residuo
         else { t.running = true; t.endsAt = Date.now() + t.remaining * 1000; } // riparto da adesso
@@ -4843,6 +4860,28 @@ function openCookingMode(recipe) {
   function close() {
     if (ticker) clearInterval(ticker);
     if (alarmTicker) clearInterval(alarmTicker);
+    // I timer avviati qui vivevano solo dentro questa schermata: uscendo
+    // sparivano in silenzio, senza avviso e senza chip. Ed è proprio quello che
+    // si usa davvero — la pasta si mette dalla Modalità cucina, non dal pannello
+    // in alto. Ora chi sta ancora contando passa ai timer generali, che si
+    // vedono ovunque, si salvano e sopravvivono a chiusura e aggiornamento.
+    const daSalvare = timers.filter((t) => (t.running && t.remaining > 0) || t.alarming);
+    if (daSalvare.length) {
+      for (const t of daSalvare) {
+        gTimers.push({
+          id: ++gSeq,
+          label: t.label || "Timer",
+          remaining: t.remaining,
+          total: t.total || t.remaining,
+          endsAt: t.endsAt || (Date.now() + t.remaining * 1000),
+          running: !!t.running,
+          alarming: !!t.alarming
+        });
+      }
+      ensureGlobalTicker(); ensureGlobalAlarm(); paintTimerWidget(); saveGTimers();
+      toast(daSalvare.length === 1 ? "Il timer continua qui sopra ⏱" : `${daSalvare.length} timer continuano qui sopra ⏱`, "success");
+    }
+    timers = [];
     release();
     stopSpeak();
     stopVoice();

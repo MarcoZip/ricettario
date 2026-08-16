@@ -199,9 +199,13 @@ export function searchRecipes(q) {
   // equivalenti. Senza, cercare "torta mela" nel PROPRIO ricettario non trovava
   // "Torta di mele" mentre online funzionava — due comportamenti diversi per la
   // stessa cosa scritta nella stessa casella.
+  // Il confronto è per PAROLA, non per sottostringa: cercando "mela" non devono
+  // uscire le marmellate né la pancetta cercando "pane" (vedi stessaParola).
   const contiene = (testo, term) => {
-    const h = normAlimento(testo), t = normAlimento(term);
-    return !!t && (h.includes(t) || h.split(" ").some((w) => w === t));
+    const cercate = paroleDi(term);
+    if (!cercate.length) return false;
+    const parole = paroleDi(testo);
+    return cercate.every((tp) => parole.some((p) => stessaParola(p, tp)));
   };
   const matchesTerm = (r, term) =>
     contiene(r.title || "", term) ||
@@ -570,17 +574,65 @@ function normAlimento(s) {
     .replace(/[àáâä]/g, "a").replace(/[èéêë]/g, "e").replace(/[ìíîï]/g, "i")
     .replace(/[òóôö]/g, "o").replace(/[ùúûü]/g, "u")
     .replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim()
+    // "fichi" → "fici", "maghi" → "magi": in italiano il plurale di fico/mago
+    // infila una h che altrimenti fa sembrare diverse due forme della stessa
+    // parola. Va tolta PRIMA di tagliare la desinenza.
+    .replace(/chi\b/g, "ci").replace(/ghi\b/g, "gi")
     .split(" ").map((w) => (w.length >= 4 ? w.slice(0, -1) : w)).join(" ");
+}
+// Paroline di servizio e unità di misura: non identificano nulla. Si scartano
+// guardando la parola INTERA, prima del taglio della desinenza — altrimenti si
+// perderebbe il caso opposto: "pere" è una parola vera che una volta accorciata
+// diventa "per", e va tenuta.
+const PAROLINE = new Set(["di", "da", "in", "con", "su", "per", "tra", "fra", "a", "al", "allo", "alla", "ai", "agli", "alle",
+  "del", "dello", "della", "dei", "degli", "delle", "dal", "dalla", "nel", "nella", "sul", "sulla",
+  "il", "lo", "la", "i", "gli", "le", "un", "uno", "una", "e", "ed", "o", "che", "non", "piu",
+  "gr", "kg", "ml", "cl", "dl", "qb", "q", "b", "circa", "tipo"]);
+// Solo le lettere e i numeri, senza accenti: la forma "cruda" di ogni parola.
+function paroleCrude(s) {
+  return String(s || "").toLowerCase()
+    .replace(/[àáâä]/g, "a").replace(/[èéêë]/g, "e").replace(/[ìíîï]/g, "i")
+    .replace(/[òóôö]/g, "o").replace(/[ùúûü]/g, "u")
+    .replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim()
+    .split(" ").filter(Boolean);
+}
+// Parole "portanti" di un testo, già ridotte alla forma confrontabile.
+function paroleDi(s) {
+  return paroleCrude(s)
+    .filter((w) => w.length >= 3 && !PAROLINE.has(w))
+    .map((w) => normAlimento(w))
+    .filter(Boolean);
+}
+// Due parole indicano la stessa cosa? Solo se combaciano ESATTAMENTE dopo la
+// normalizzazione (accenti via, h del plurale via, ultima lettera tagliata).
+//
+// Niente tolleranze sulla lunghezza, per quanto sembrino innocue: con la
+// sottostringa "mela" trovava "marMELlata"; concedendo anche solo due caratteri
+// in più, "pane" trovava "panna" e "pera" i "peperoni". Il taglio della
+// desinenza basta già da solo a far combaciare singolare e plurale.
+function stessaParola(a, b) {
+  return !!a && a === b;
 }
 // Confronto ESATTO (a meno di accenti e singolare/plurale). Prima si accettava
 // la sottostringa nei due versi, e "latte di cocco" spariva dalla spesa perché
 // in dispensa c'era del "latte": l'app diceva "è già in dispensa" e l'ingrediente
 // non veniva comprato. Meglio sbagliare comprando due volte la farina che
 // tornare a casa senza il latte di cocco.
+// "Ho già questo ingrediente?" Il confronto è VOLUTAMENTE a senso unico: hai
+// l'ingrediente se in dispensa c'è qualcosa di ALMENO altrettanto specifico.
+//   dispensa "latte intero"  + ricetta "latte"          → sì, ce l'hai
+//   dispensa "latte"         + ricetta "latte di cocco" → no, è un'altra cosa
+// Il verso sbagliato è quello che faceva sparire il latte di cocco dalla spesa;
+// pretendere invece l'uguaglianza esatta faceva ricomprare il latte perché in
+// dispensa era scritto "latte intero".
 export function inPantry(name) {
-  const n = normAlimento(name);
-  if (!n) return false;
-  return state.pantry.some((p) => normAlimento(p.name) === n);
+  const cercate = paroleDi(name);
+  if (!cercate.length) return false;
+  return state.pantry.some((p) => {
+    const hai = paroleDi(p.name);
+    if (!hai.length) return false;
+    return cercate.every((c) => hai.some((h) => stessaParola(c, h)));
+  });
 }
 export async function addPantryItem(name, expiry = null) {
   const clean = (name || "").trim();

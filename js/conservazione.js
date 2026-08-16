@@ -76,9 +76,16 @@ function ingredientiDi(recipe) {
 // è una cotoletta, ma anche un risotto; "impanate" possono essere le melanzane.
 // In caso di dubbio la regola non scatta: meglio non dire niente che dare una
 // temperatura di sicurezza a un piatto che non è carne.
+// Il `not` va provato solo sulla TESTA del titolo, cioè su ciò che nomina il
+// piatto, non sul contorno. "Cotolette con contorno di verdure" è carne, e
+// spegnere la regola per via della parola "verdure" faceva sparire i 74°C
+// proprio dai piatti per cui la regola esiste. Si taglia al primo "con"/"e".
+function testaDelPiatto(testo) {
+  return String(testo || "").split(/\s+(?:con|e|più|piu|accompagnat\w*|servit\w*)\s+/i)[0];
+}
 function combacia(regola, testo) {
   if (!regola.rx.test(testo)) return false;
-  if (regola.not && regola.not.test(testo)) return false;
+  if (regola.not && regola.not.test(testaDelPiatto(testo))) return false;
   return true;
 }
 function trova(tabella, recipe, ripiegoSuIngredienti = true) {
