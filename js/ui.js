@@ -755,6 +755,9 @@ export function mount(rootEl) {
   // Timer lasciati in corso: si riprendono col tempo giusto (vedi syncTimer),
   // e tornando in primo piano si riallineano all'orologio.
   restoreGTimers();
+  // Copia di sicurezza automatica, una volta al giorno, in silenzio. Si fa dopo
+  // qualche secondo per non rubare tempo all avvio.
+  setTimeout(() => { try { store.backupAutomatico(); } catch (e) {} }, 5000);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && gTimers.some((t) => t.running)) gTick();
   });
@@ -2135,7 +2138,10 @@ function renderStrumenti() {
   // Promemoria backup: solo in modalità locale (dati solo sul telefono), se non
   // esporti da oltre 30 giorni e hai qualche ricetta. Posticipabile di 7 giorni.
   let backupBanner = "";
-  if (!info.configured && allR.length >= 3) {
+  // Vale ANCHE in cloud: il backup nel cloud protegge dal telefono rotto, non da
+  // un ripristino sbagliato o da un difetto che cancella i dati. Prima questo
+  // promemoria non compariva mai a chi usa l account, cioè a Federica.
+  if (allR.length >= 3) {
     let lastBk = 0, snooze = 0;
     try { lastBk = Date.parse(localStorage.getItem("ricettario.lastBackup") || "") || 0; snooze = parseInt(localStorage.getItem("ricettario.bkSnooze"), 10) || 0; } catch (e) {}
     if (Date.now() > snooze && (Date.now() - lastBk) > 30 * 86400000) {
@@ -8581,6 +8587,18 @@ function renderImpostazioni() {
         </div>
         <button class="btn" id="pdfBtn">Esporta</button>
       </div>
+      ${(() => {
+        const c = store.copiaSicurezza();
+        if (!c) return "";
+        const q = c.quando ? new Date(c.quando).toLocaleString("it-IT", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }) : "";
+        return `<div class="setting-row">
+        <div>
+          <div class="setting-row__label">Torna com'era</div>
+          <div class="setting-row__desc">Copia di sicurezza ${escapeHtml(c.tipo)} del <b>${escapeHtml(q)}</b>, ${c.ricette} ricette. Serve se un ripristino è andato storto: rimette i dati come stavano.</div>
+        </div>
+        <button class="btn" id="undoRestoreBtn">Ripristina</button>
+      </div>`;
+      })()}
       <div class="setting-row">
         <div>
           <div class="setting-row__label">Cosa usi davvero</div>
@@ -8743,7 +8761,13 @@ function renderImpostazioni() {
         try {
           await store.importData(data, { merge: false });
         } catch (errScrittura) {
-          toast("Ripristino interrotto: controlla la rete e riprova. Il file del backup è a posto.", "error");
+          // NOCOPIA: non siamo riusciti a mettere da parte lo stato attuale, quindi
+          // il ripristino sarebbe stato irreversibile. Meglio non farlo affatto.
+          if (String(errScrittura && errScrittura.message) === "NOCOPIA") {
+            toast("Memoria del telefono piena: non posso preparare la copia di sicurezza, e senza quella non ripristino. Libera spazio e riprova.", "error");
+          } else {
+            toast("Ripristino interrotto: controlla la rete e riprova. Il file del backup è a posto.", "error");
+          }
           fileInput.value = "";
           return;
         }
@@ -8757,6 +8781,25 @@ function renderImpostazioni() {
   });
 
   root.querySelector("#pdfBtn").addEventListener("click", () => exportRecipesPdf());
+
+  const undoRestore = root.querySelector("#undoRestoreBtn");
+  if (undoRestore) undoRestore.addEventListener("click", async () => {
+    const c = store.copiaSicurezza();
+    const ok = await confirmDialog({
+      title: "Tornare com'era?",
+      message: `I dati verranno riportati alla copia di sicurezza${c && c.quando ? " del " + new Date(c.quando).toLocaleString("it-IT") : ""} (${c ? c.ricette : 0} ricette). Quello che hai cambiato dopo andrà perso.`,
+      confirmText: "Torna com'era",
+      danger: true
+    });
+    if (!ok) return;
+    try {
+      const n = await store.ripristinaCopiaSicurezza();
+      toast(`Ripristinate ${n} ricette dalla copia di sicurezza`, "success");
+      navigate("strumenti");
+    } catch (e) {
+      toast(e.message || "Non riuscito", "error");
+    }
+  });
 
   root.querySelector("#usageBtn").addEventListener("click", () => {
     const top = usageTop().filter((x) => x.id && x.n > 0);

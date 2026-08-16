@@ -715,9 +715,74 @@ export function exportData() {
   return { version: 6, exportedAt: now(), tools: state.tools, recipes: state.recipes, shopping: state.shopping, plan: state.plan, pantry: state.pantry, menus: state.menus, events: state.events, freezer: state.freezer };
 }
 
-export async function importData(data, { merge = false } = {}) {
+// ---- Rete di sicurezza dei dati ----
+// Il backup esportato è l'unica copia delle ricette di famiglia, e finora
+// dipendeva dal fatto che qualcuno si ricordasse di premere "Esporta". Qui
+// l'app se ne occupa da sola, e soprattutto rende ANNULLABILE il ripristino,
+// che è l'unica operazione distruttiva dell'app — e quella che ha già ceduto
+// tre volte (v8.32, v8.41, v8.51).
+const BK_AUTO = "ricettario.backupAuto";
+const BK_PRIMA = "ricettario.backupPrimaDelRipristino";
+
+function scriviCopia(chiave, dati) {
+  const testo = JSON.stringify(dati);
+  try {
+    localStorage.setItem(chiave, testo);
+    return true;
+  } catch (e) {
+    // Memoria piena: liberiamo l'altra copia e riproviamo una volta sola.
+    try {
+      localStorage.removeItem(chiave === BK_AUTO ? BK_PRIMA : BK_AUTO);
+      localStorage.setItem(chiave, testo);
+      return true;
+    } catch (e2) { return false; }
+  }
+}
+function leggiCopia(chiave) {
+  try {
+    const d = JSON.parse(localStorage.getItem(chiave) || "null");
+    return d && Array.isArray(d.recipes) ? d : null;
+  } catch (e) { return null; }
+}
+
+// Copia automatica, al massimo una al giorno. Silenziosa: se non entra in
+// memoria pazienza, non è il momento di disturbare l'utente.
+export function backupAutomatico() {
+  if (!state.recipes.length) return false; // niente da salvare (o dati non ancora arrivati)
+  const prec = leggiCopia(BK_AUTO);
+  if (prec && prec.exportedAt && Date.now() - Date.parse(prec.exportedAt) < 24 * 3600000) return false;
+  return scriviCopia(BK_AUTO, exportData());
+}
+
+// { quando, ricette, tipo } della copia più recente disponibile, o null.
+export function copiaSicurezza() {
+  const prima = leggiCopia(BK_PRIMA), auto = leggiCopia(BK_AUTO);
+  const scegli = (d, tipo) => d && { quando: d.exportedAt, ricette: (d.recipes || []).length, tipo };
+  const a = scegli(prima, "prima del ripristino"), b = scegli(auto, "automatica");
+  if (a && b) return Date.parse(a.quando) >= Date.parse(b.quando) ? a : b;
+  return a || b;
+}
+
+// Rimette i dati com'erano. Serve dopo un ripristino andato male.
+export async function ripristinaCopiaSicurezza() {
+  const prima = leggiCopia(BK_PRIMA), auto = leggiCopia(BK_AUTO);
+  const d = (prima && auto) ? (Date.parse(prima.exportedAt) >= Date.parse(auto.exportedAt) ? prima : auto) : (prima || auto);
+  if (!d) throw new Error("Non c'è nessuna copia di sicurezza.");
+  await importData(d, { merge: false, saltaCopia: true });
+  return (d.recipes || []).length;
+}
+
+export async function importData(data, { merge = false, saltaCopia = false } = {}) {
   if (!data || !Array.isArray(data.tools) || !Array.isArray(data.recipes)) {
     throw new Error("File di backup non valido.");
+  }
+  // Prima di sostituire, si mette da parte com'era: così un ripristino sbagliato
+  // si annulla invece di essere definitivo. `saltaCopia` evita che l'annullamento
+  // sovrascriva la copia con lo stato rotto che sta annullando.
+  if (!merge && !saltaCopia && state.recipes.length) {
+    if (!scriviCopia(BK_PRIMA, exportData())) {
+      throw new Error("NOCOPIA");
+    }
   }
   if (merge) {
     const existingTools = new Set(state.tools.map((t) => t.id));

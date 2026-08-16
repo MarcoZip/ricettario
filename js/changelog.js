@@ -6,6 +6,16 @@
 
 export const CHANGELOG = [
   {
+    v: "8.57",
+    d: "2026-08-16",
+    items: [
+      "<b>Ripristinare un backup ora si può annullare.</b> Prima di sostituire i dati l'app mette da parte com'erano: se il file era sbagliato, con <i>Impostazioni → Dati → \"Torna com'era\"</i> rimetti tutto a posto. Finora era un'operazione senza ritorno.",
+      "<b>L'app fa da sola una copia di sicurezza</b>, una volta al giorno, senza chiedere niente. Così una copia esiste anche se non hai mai toccato \"Esporta\".",
+      "Il promemoria \"fai un backup\" ora compare anche a chi usa l'account: prima lo vedeva solo chi tiene le ricette sul solo telefono. Il backup nel cloud protegge dal telefono rotto, non da un file sbagliato.",
+      "Se la memoria del telefono è piena e la copia di sicurezza non si può fare, il ripristino non parte affatto e te lo dice: meglio non farlo che farlo senza rete di sicurezza."
+    ]
+  },
+  {
     v: "8.56",
     d: "2026-08-16",
     minor: true,
