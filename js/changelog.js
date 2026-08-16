@@ -6,6 +6,14 @@
 
 export const CHANGELOG = [
   {
+    v: "8.50",
+    d: "2026-08-09",
+    minor: true,
+    items: [
+      "Lavoro interno: gli errori che avvengono mentre l'app disegna una schermata tornano a essere visibili invece di sparire in silenzio, e c'è ora un controllo automatico che verifica che nessun pulsante resti scollegato. È il tipo di guasto capitato poco fa con \"Cucina\"."
+    ]
+  },
+  {
     v: "8.49",
     d: "2026-08-09",
     items: [

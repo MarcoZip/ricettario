@@ -57,10 +57,15 @@ function withTransition(fn, verso = "") {
   // Toccando due volte in fretta, la seconda transizione annulla la prima e il
   // browser rifiuta le promesse della transizione interrotta. È normale e non è
   // un errore, ma senza questo finisce nella console come guasto non gestito.
+  // ATTENZIONE: si zittiscono solo `finished` e `ready`, che rifiutano quando la
+  // transizione viene interrotta — rumore innocuo. `updateCallbackDone` NO: quello
+  // rifiuta quando il disegno della schermata lancia un errore vero, ed è l'unico
+  // modo per accorgersene. Zittendolo anche quello (come facevo nella v8.44) un
+  // guasto durante il render diventa invisibile in console.
   const zittisci = (t) => {
     try { if (t && t.finished) t.finished.catch(() => {}); } catch (e) {}
     try { if (t && t.ready) t.ready.catch(() => {}); } catch (e) {}
-    try { if (t && t.updateCallbackDone) t.updateCallbackDone.catch(() => {}); } catch (e) {}
+    try { if (t && t.updateCallbackDone) t.updateCallbackDone.catch((e) => console.error("Errore disegnando la schermata:", e)); } catch (e) {}
     return t;
   };
   try {
