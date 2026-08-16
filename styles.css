@@ -564,7 +564,9 @@ a { color: var(--primary-2); }
 /* I due pulsanti dell'header sono attaccati fra loro e al bordo: senza spazio,
    l'area allargata di uno finisce coperta dal vicino e non serve a niente
    (misurata 30px effettivi sul "?" invece di 44). */
-.app-header__status { gap: 14px; padding-right: 4px; }
+/* Lo spazio fra i due pulsanti sta nella regola piu sotto (riga ~1696): messo
+   qui veniva sovrascritto e restava CSS morto, lasciando il timer a 40px. */
+.app-header__status { padding-right: 4px; }
 /* Le stelle del voto sono cinque in fila: un'area di 44px le farebbe
    accavallare, quindi si allarga solo in altezza e si distanziano un po'. */
 .rating { display: inline-flex; gap: 6px; }
@@ -1693,7 +1695,7 @@ p, li, .setting-row__desc, .hint, .recipe-item__notes, .steps-list li { text-wra
 .cook__done-btns { display: flex; flex-direction: column; gap: 10px; }
 
 /* ---------- Pulsante guida nell'header ---------- */
-.app-header__status { display: flex; align-items: center; gap: 10px; }
+.app-header__status { display: flex; align-items: center; gap: 14px; } /* 14 e non 10: serve a non far coprire le aree sensibili da 44px dei due pulsanti */
 .header-btn { width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.08); color: var(--text); font-weight: 800; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; }
 
 /* ---------- Guida ---------- */

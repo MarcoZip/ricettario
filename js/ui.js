@@ -1013,11 +1013,20 @@ function openForgotPassword(prefillEmail) {
   };
 }
 
+// Nelle voci del changelog si usa un po' di grassetto e corsivo per far
+// risaltare la cosa che conta. Il testo viene messo in sicurezza come sempre, e
+// SOLO dopo si riabilitano quei due tag: così nessun contenuto può diventare
+// markup, ma le enfasi si vedono. Prima si leggeva "<b>Corretta la ricerca</b>"
+// per intero, tag compresi, in dodici versioni.
+function clTesto(s) {
+  return escapeHtml(s)
+    .replace(/&lt;(\/?)(b|i)&gt;/g, "<$1$2>");
+}
 function changelogHtml(entries) {
   return entries.map((c) => `
     <div class="cl-entry">
       <div class="cl-ver">v${escapeHtml(c.v)} <span class="cl-date">${escapeHtml(c.d || "")}</span>${c.minor ? `<span class="cl-tag">correzione</span>` : ""}</div>
-      <ul class="cl-list">${(c.items || []).map((i) => `<li>${escapeHtml(i)}</li>`).join("")}</ul>
+      <ul class="cl-list">${(c.items || []).map((i) => `<li>${clTesto(i)}</li>`).join("")}</ul>
     </div>`).join("");
 }
 

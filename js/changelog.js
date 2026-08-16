@@ -6,6 +6,15 @@
 
 export const CHANGELOG = [
   {
+    v: "8.55",
+    d: "2026-08-16",
+    minor: true,
+    items: [
+      "Questa finestra mostrava i comandi del grassetto come se fossero testo — si leggeva <b>così</b>, con le parentesi angolate attorno. Succedeva da dodici versioni: ora le parole in evidenza si vedono come dovevano.",
+      "Il tasto ⏱ in alto torna comodo da centrare: allargando la zona del <b>?</b> gli avevo sottratto qualche millimetro."
+    ]
+  },
+  {
     v: "8.54",
     d: "2026-08-16",
     items: [
