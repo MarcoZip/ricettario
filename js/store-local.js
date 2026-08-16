@@ -159,14 +159,11 @@ export function createLocalAdapter() {
     },
 
     async replaceAll(data) {
-      state.tools = data.tools || [];
-      state.recipes = data.recipes || [];
-      state.shopping = data.shopping || [];
-      state.plan = data.plan || [];
-      state.pantry = data.pantry || [];
-      state.menus = data.menus || [];
-      state.events = data.events || [];
-      state.freezer = data.freezer || [];
+      // Solo le collezioni PRESENTI nel file vengono sostituite. Quelle assenti
+      // restano com'erano: un backup vecchio non conteneva congelatore, menù o
+      // feste, e trattarlo come "liste vuote" li cancellerebbe tutti.
+      const sost = (chiave) => { if (Array.isArray(data[chiave])) state[chiave] = data[chiave]; };
+      ["tools", "recipes", "shopping", "plan", "pantry", "menus", "events", "freezer"].forEach(sost);
       commit();
     }
   };

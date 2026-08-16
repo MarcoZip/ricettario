@@ -6,6 +6,17 @@
 
 export const CHANGELOG = [
   {
+    v: "8.51",
+    d: "2026-08-09",
+    items: [
+      "Corretto un difetto che poteva <b>cancellare dati ripristinando un backup</b>. Un file salvato mesi fa non contiene le funzioni nate dopo (per esempio il congelatore): fino a ieri il ripristino lo trattava come \"lista vuota\" e svuotava quella parte. Ora le sezioni non presenti nel file vengono lasciate come stanno.",
+      "Se il ripristino si interrompe a metà (rete che cade), l'app non dice più \"File non valido\" — che faceva credere di avere un backup rotto — ma spiega che è stato il collegamento, e che il file è a posto.",
+      "Il ripristino ora scrive prima tutti i dati nuovi e cancella solo dopo: se qualcosa si interrompe rimangono in più, non in meno.",
+      "In Impostazioni, accanto a \"Esporta backup\", ora c'è scritto <b>cosa contiene e cosa no</b>: restano fuori note vocali, storico spese, preferenze e codice della Casa condivisa.",
+      "L'app non si blocca più se si importa un file ritoccato a mano con una ricetta senza titolo o uno strumento senza nome."
+    ]
+  },
+  {
     v: "8.50",
     d: "2026-08-09",
     minor: true,

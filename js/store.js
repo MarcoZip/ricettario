@@ -98,7 +98,10 @@ export async function seedDefaults() {
 
 // ---- Letture (sincrone, dallo stato in memoria) ----
 export function getTools() {
-  return [...state.tools].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name));
+  // `a.name || ""`: un backup ritoccato a mano può contenere uno strumento senza
+  // nome, e qui si esplode a OGNI disegno della Home — cioè dopo che l'import ha
+  // già sostituito i dati, lasciando l'app inutilizzabile.
+  return [...state.tools].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || String(a.name || "").localeCompare(String(b.name || "")));
 }
 
 export function getTool(id) {
@@ -665,6 +668,14 @@ export async function importData(data, { merge = false } = {}) {
     for (const t of data.tools) if (!existingTools.has(t.id)) await adapter.addTool(t);
     for (const r of data.recipes) if (!existingRecipes.has(r.id)) await adapter.addRecipe(r);
   } else {
-    await adapter.replaceAll({ tools: data.tools, recipes: data.recipes, shopping: data.shopping || [], plan: data.plan || [], pantry: data.pantry || [], menus: data.menus || [], events: data.events || [], freezer: data.freezer || [] });
+    // ATTENZIONE: NON mettere `|| []` qui. Una collezione ASSENTE dal file e una
+    // collezione VUOTA sono due cose diverse: un backup esportato prima che il
+    // congelatore esistesse non ha quel campo, e trasformarlo in lista vuota
+    // farebbe cancellare tutto il congelatore di oggi. Assente = non toccare.
+    await adapter.replaceAll({
+      tools: data.tools, recipes: data.recipes,
+      shopping: data.shopping, plan: data.plan, pantry: data.pantry,
+      menus: data.menus, events: data.events, freezer: data.freezer
+    });
   }
 }

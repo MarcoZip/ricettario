@@ -193,36 +193,48 @@ export async function createFirebaseAdapter(uid) {
     //    l'unione dei due stati, mentre la finestra di conferma prometteva
     //    "I dati attuali verranno sostituiti". Ora quelli in più si cancellano.
     async replaceAll(data) {
-      const ops = [];
-      // Le collezioni PERSONALI vengono sostituite davvero.
+      const scritture = [], cancellazioni = [];
+      // Le collezioni PERSONALI vengono sostituite davvero — ma solo quelle
+      // PRESENTI nel file. Una collezione assente (backup esportato prima che
+      // quella funzione esistesse) non è una collezione vuota: va lasciata
+      // stare, altrimenti ripristinare un backup di primavera cancella il
+      // congelatore riempito ad agosto.
       const personali = [
-        [toolsCol, data.tools || []],
-        [recipesCol, data.recipes || []],
-        [planCol, data.plan || []],
-        [pantryCol, data.pantry || []],
-        [menusCol, data.menus || []],
-        [freezerCol, data.freezer || []]
+        [toolsCol, data.tools],
+        [recipesCol, data.recipes],
+        [planCol, data.plan],
+        [pantryCol, data.pantry],
+        [menusCol, data.menus],
+        [freezerCol, data.freezer]
       ];
       for (const [col, righe] of personali) {
+        if (!Array.isArray(righe)) continue; // assente nel file: non toccare
         const tenere = new Set(righe.map((x) => x.id));
         const attuali = await getDocs(col);
-        attuali.forEach((d) => { if (!tenere.has(d.id)) ops.push({ del: d.ref }); });
-        righe.forEach((x) => { const { id, ...rest } = x; ops.push({ ref: doc(col, id), data: rest }); });
+        attuali.forEach((d) => { if (!tenere.has(d.id)) cancellazioni.push({ del: d.ref }); });
+        righe.forEach((x) => { const { id, ...rest } = x; scritture.push({ ref: doc(col, id), data: rest }); });
       }
       // Spesa ed eventi in Casa condivisa appartengono anche all'ALTRA persona:
       // qui non si cancella niente, altrimenti ripristinare un backup dal
       // proprio telefono svuoterebbe la lista della spesa del partner. Senza
       // casa condivisa sono collezioni personali e valgono le regole di sopra.
-      const condivise = [[shopTarget, data.shopping || []], [eventsTarget, data.events || []]];
+      const condivise = [[shopTarget, data.shopping], [eventsTarget, data.events]];
       for (const [col, righe] of condivise) {
+        if (!Array.isArray(righe)) continue;
         if (!household) {
           const tenere = new Set(righe.map((x) => x.id));
           const attuali = await getDocs(col);
-          attuali.forEach((d) => { if (!tenere.has(d.id)) ops.push({ del: d.ref }); });
+          attuali.forEach((d) => { if (!tenere.has(d.id)) cancellazioni.push({ del: d.ref }); });
         }
-        righe.forEach((x) => { const { id, ...rest } = x; ops.push({ ref: doc(col, id), data: rest }); });
+        righe.forEach((x) => { const { id, ...rest } = x; scritture.push({ ref: doc(col, id), data: rest }); });
       }
-      // Blocchi da 450 (sotto il tetto di 500) per stare larghi.
+      // PRIMA tutte le scritture, POI le cancellazioni. L'ordine conta: i blocchi
+      // si inviano uno dopo l'altro e la rete può cadere a metà. Cancellando per
+      // prime si resterebbe con i dati vecchi già spariti e quelli del backup non
+      // ancora scritti — un buco. Così invece un'interruzione lascia al massimo
+      // l'unione dei due stati, che è recuperabile.
+      const ops = scritture.concat(cancellazioni);
+      // Blocchi da 450 (sotto il tetto di 500 di Firestore) per stare larghi.
       for (let i = 0; i < ops.length; i += 450) {
         const batch = writeBatch(db);
         for (const op of ops.slice(i, i + 450)) {

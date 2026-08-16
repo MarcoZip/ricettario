@@ -3706,8 +3706,10 @@ function openWeekPlanner(days) {
   try { expiring = store.recipesForExpiring(3).map((r) => r.title); } catch (e) {}
   const matchTitle = (t) => {
     const lt = (t || "").toLowerCase().trim(); if (!lt) return null;
-    return recipes.find((r) => r.title.toLowerCase().trim() === lt)
-      || recipes.find((r) => { const rt = r.title.toLowerCase(); return rt.includes(lt) || lt.includes(rt); });
+    // `r.title || ""`: una ricetta senza titolo (backup ritoccato a mano) faceva
+    // esplodere questa ricerca, e con essa la schermata che la usa.
+    return recipes.find((r) => String(r.title || "").toLowerCase().trim() === lt)
+      || recipes.find((r) => { const rt = String(r.title || "").toLowerCase(); return rt.includes(lt) || lt.includes(rt); });
   };
   const m = openModal(`<h3 class="modal__title">✨ Menù della settimana (AI)</h3><div id="wpBody"></div>`);
   const body = m.el.querySelector("#wpBody");
@@ -7369,7 +7371,7 @@ function openRecipePicker(onPick) {
   const recipes = allRecipes();
   if (!recipes.length) { toast("Aggiungi prima qualche ricetta", "error"); return; }
   const build = (q = "") => {
-    const filt = recipes.filter((r) => r.title.toLowerCase().includes(q.toLowerCase()));
+    const filt = recipes.filter((r) => String(r.title || "").toLowerCase().includes(q.toLowerCase()));
     if (!filt.length) return `<div class="hint">Nessuna ricetta trovata.</div>`;
     return filt.map((r) => {
       const tool = store.getTool(r.toolId);
@@ -8456,7 +8458,7 @@ function renderImpostazioni() {
       <div class="setting-row">
         <div>
           <div class="setting-row__label">Esporta backup</div>
-          <div class="setting-row__desc">Salva tutte le ricette in un file.</div>
+          <div class="setting-row__desc">Salva in un file ricette, strumenti, spesa, dispensa, piano, menù, feste e congelatore. <b>Non</b> contiene le note vocali, lo storico delle spese, le preferenze e il codice della Casa condivisa: su un telefono nuovo vanno reimpostati.</div>
         </div>
         <button class="btn" id="exportBtn">Esporta</button>
       </div>
@@ -8629,7 +8631,17 @@ function renderImpostazioni() {
         danger: true
       });
       if (ok) {
-        await store.importData(data, { merge: false });
+        // Il fallimento della SCRITTURA va distinto da quello della lettura del
+        // file: dire "File non valido" quando è caduta la rete a metà ripristino
+        // fa credere che il backup sia rotto — e magari lo si butta, mentre è
+        // l'unica copia buona.
+        try {
+          await store.importData(data, { merge: false });
+        } catch (errScrittura) {
+          toast("Ripristino interrotto: controlla la rete e riprova. Il file del backup è a posto.", "error");
+          fileInput.value = "";
+          return;
+        }
         toast("Backup importato", "success");
         navigate("strumenti");
       }
