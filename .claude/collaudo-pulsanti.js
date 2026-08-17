@@ -42,6 +42,13 @@
   const vivo = (el) => {
     if (el.onclick) return true;
     for (let n = el; n && n !== document; n = n.parentElement) {
+      // FERMARSI allo sfondo della finestra. Lo sfondo ha SEMPRE un gestore di
+      // clic — serve a chiudere toccando fuori — quindi risalendo oltre, ogni
+      // pulsante dentro qualunque finestra risultava vivo per costruzione: il
+      // controllo era cieco proprio sul caso per cui era stato esteso.
+      // Verificato sabotando il codice: senza questa riga, una finestra con
+      // tutti e 32 i pulsanti scollegati passava con "0 morti".
+      if (n.classList && n.classList.contains("modal-backdrop")) return false;
       if (conGestore.has(n)) return true;
     }
     return false;
@@ -120,13 +127,21 @@
 
   // Finestre raggiungibili dalle altre schermate.
   const altrove = [
-    { rotta: "piano", id: "weekMenuBtn", nome: "Crea il menù" },
+    { rotta: "piano", id: "weekMenuBtn", nome: "Crea il menù", vista: "Settimana" },
     { rotta: "impostazioni", id: "usageBtn", nome: "Cosa usi davvero" }
   ];
   for (const f of altrove) {
-    if (!(await vaiA(f.rotta))) continue;
+    if (!(await vaiA(f.rotta))) { morti.push("ROTTA INESISTENTE: " + f.rotta); continue; }
+    // Il Piano si apre in vista Mese, ma "Crea il menù" vive nella Settimana:
+    // senza questo passaggio la finestra veniva saltata IN SILENZIO.
+    if (f.vista) {
+      const tab = [...document.querySelectorAll("button")].find((x) => x.textContent.trim() === f.vista);
+      if (tab) { tab.click(); await wait(700); }
+    }
     const b = document.getElementById(f.id);
-    if (!b) continue; // può non esserci (es. vista Mese invece di Settimana)
+    // Mai saltare in silenzio: se non si raggiunge, va detto — altrimenti il
+    // collaudo dichiara "tutto a posto" su una finestra che non ha guardato.
+    if (!b) { morti.push("finestra non raggiungibile: " + f.nome + " (#" + f.id + " assente in " + f.rotta + ")"); continue; }
     b.click();
     await wait(900);
     const m = document.querySelector("#modalRoot .modal");
