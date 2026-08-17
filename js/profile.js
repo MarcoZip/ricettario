@@ -8,7 +8,10 @@ export function getNickname() {
 }
 
 export function setNickname(n) {
-  try { localStorage.setItem(NICK, (n || "").trim()); } catch (e) { /* ignora */ }
+  // Il taglio va fatto QUI, non solo col maxlength dei due campi: il nickname
+  // finisce nel saluto in cima alla Home e nelle notifiche della Casa condivisa,
+  // e un valore lunghissimo arrivato per altre vie sfonderebbe l'intestazione.
+  try { localStorage.setItem(NICK, (n || "").trim().slice(0, 24)); } catch (e) { /* ignora */ }
 }
 
 // Foto di copertina personale (data URL compatta). Solo su questo dispositivo.

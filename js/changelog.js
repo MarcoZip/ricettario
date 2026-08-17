@@ -6,6 +6,22 @@
 
 export const CHANGELOG = [
   {
+    v: "8.62",
+    d: "2026-08-17",
+    items: [
+      "<b>Le scadenze in dispensa si possono correggere.</b> Tocca la data (o \"+ scad.\") su una riga della dispensa: pastiglie da 3 giorni, 1 settimana, 1 mese, 6 mesi, o la data esatta. Prima si potevano mettere solo al momento dell'inserimento, e per cambiarle bisognava cancellare l'alimento e riscriverlo — mentre codice a barre, foto del frigo e scontrino non le mettono mai.",
+      "Metti in dispensa: pastiglie \"3 g / 1 sett / 1 mese\" su ogni riga, invece del calendario che costava tre tocchi per alimento.",
+      "Chiudendo una finestra con il tasto Indietro del telefono, con Esc o toccando fuori, l'app se ne accorge: prima certe operazioni restavano appese a metà e un pulsante sembrava morto (capitava con Importa un backup).",
+      "I timer avviati in Modalità cucina sopravvivono anche se il telefono chiude l'app di colpo, e quelli in pausa non vengono più buttati all'uscita.",
+      "L'allarme dei timer in Modalità cucina si ferma da solo dopo due minuti, come già faceva quello generale.",
+      "Il Piano ricorda se stavi usando la vista Mese o Settimana.",
+      "Salvando una ricetta, due tocchi ravvicinati non creano più due copie.",
+      "\"Scala su una quantità\" e \"Adatta alla teglia\" si fermano a un massimo sensato e lo dicono, invece di accettare numeri assurdi: uno zero di troppo finiva nella lista della spesa.",
+      "Un piatto di un menù può di nuovo avere \"0 minuti\" (l'antipasto che arriva già pronto) senza finire fra quelli senza orario.",
+      "Corrette le istruzioni della Guida e dell'assistente che mandavano a cercare pulsanti rinominati o non più esistenti, e aggiunte le spiegazioni di \"Detta a voce\", delle scadenze modificabili, di \"Torna com'era\", delle tabelle di conservazione e della Modalità supermercato."
+    ]
+  },
+  {
     v: "8.61",
     d: "2026-08-17",
     items: [

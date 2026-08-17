@@ -156,6 +156,22 @@ function posNum(v, max) {
   if (!isFinite(n) || n <= 0) return null;
   return max && n > max ? max : n;
 }
+// Dieci ore: un arrosto lungo o una lievitazione ci stanno dentro. Oltre le 24
+// gli orologi dei piani di cottura avvolgono sul giorno e mostrano un'ora
+// credibile ma sbagliata, invece di segnalare l'errore.
+const MAX_MINUTI_PIATTO = 600;
+// Minuti di un piatto: campo vuoto = "non lo so" (null), ma **zero è un valore
+// legittimo** — il piatto portato dall'ospite che arriva già pronto va in
+// tavola all'ora di servizio, non in fondo alla lista "senza tempo". `posNum`
+// qui non va bene: scarta lo zero e lo confonde col vuoto, e chi scriveva 0
+// vedeva il piatto sparire dal piano di battaglia senza capire perché.
+function minutiPiatto(v) {
+  const s = String(v == null ? "" : v).trim();
+  if (s === "") return null;
+  const n = parseInt(s.replace(",", "."), 10);
+  if (!isFinite(n) || n < 0) return null;
+  return Math.min(n, MAX_MINUTI_PIATTO);
+}
 
 // Leggero feedback aptico (vibrazione) sui dispositivi che lo supportano.
 // Vibrazione. Passa TUTTA da qui, così un solo interruttore la spegne davvero e
@@ -410,7 +426,17 @@ let homeQuery = ""; // ricerca nella home
 let homeFilter = ""; // "" | "fav" | "cooked" | "recent" | "menu" | <nome tag>
 let shopTab = "lista"; // scheda Spesa: "lista" | "dispensa"
 let lastShopToggled = null; // id dell'ultimo articolo spuntato (per l'animazione)
-let planView = "month"; // "month" | "week"
+// "month" | "week". La Settimana ha sei pulsanti in esclusiva (crea il menù,
+// prepara in anticipo, coordina i piatti, condividi, bilancio); il Mese ne ha
+// due. Aprendosi sempre sul Mese, chi non toccava "Settimana" non sapeva che
+// l'app pianifica i menù — e le guide dovevano dire ogni volta "vai in Piano,
+// vista Settimana". Ora l'app ricorda l'ultima vista scelta.
+let planView = "month";
+try { if (localStorage.getItem("ricettario.pref.planView") === "week") planView = "week"; } catch (e) {}
+function setPlanView(v) {
+  planView = v === "week" ? "week" : "month";
+  try { localStorage.setItem("ricettario.pref.planView", planView); } catch (e) {}
+}
 let weekAnchor = null; // data di riferimento per la vista settimana
 
 // Stato locale della sezione Scopri (per non perdere i risultati ad ogni render).
@@ -588,6 +614,13 @@ function resetUsage() {
 // pulsante toccato, senza dover modificare le decine di gestori esistenti.
 function initUsageTracking() {
   document.addEventListener("click", (ev) => {
+    // Il collaudo automatico tocca CENTINAIA di pulsanti con `.click()`, e per
+    // il contatore erano tocchi veri: dieci esecuzioni bastavano a far sembrare
+    // molto usate funzioni che nessuno apre. Il conteggio deciderà cosa potare
+    // a settembre — contaminarlo qui vuol dire potare le funzioni sbagliate.
+    if (window.__collaudoInCorso) return;
+    // Nemmeno i clic finti contano: solo quelli con un dito o un mouse dietro.
+    if (ev.isTrusted === false) return;
     const b = ev.target && ev.target.closest ? ev.target.closest("button[id], .bottom-nav__btn") : null;
     if (!b) return;
     trackUse(b.id || (b.dataset && b.dataset.route ? "nav:" + b.dataset.route : ""));
@@ -595,7 +628,7 @@ function initUsageTracking() {
 }
 
 let modalSeq = 0;
-function openModal(innerHtml) {
+function openModal(innerHtml, { onClose } = {}) {
   const host = document.getElementById("modalRoot");
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop";
@@ -611,13 +644,24 @@ function openModal(innerHtml) {
   host.appendChild(backdrop);
 
   const primaEra = document.activeElement;
+  let chiuso = false;
   const close = () => {
+    if (chiuso) return;
+    chiuso = true;
     document.removeEventListener("keydown", onKey, true);
     backdrop.remove();
     // Il focus torna da dove era partito, altrimenti chiudendo si ricomincia
     // dall'inizio della pagina.
     try { if (primaEra && primaEra.isConnected && primaEra.focus) primaEra.focus(); } catch (e) {}
+    // Chi aspettava una risposta da questa finestra deve saperlo ANCHE quando
+    // si chiude con Esc o toccando fuori. Senza questo, una `confirmDialog`
+    // abbandonata restava appesa per sempre e il codice a valle moriva in
+    // silenzio: sull'import di un backup lasciava il campo file sporco, e
+    // riscegliere lo stesso file non faceva più niente — pulsante morto.
+    if (onClose) { try { onClose(); } catch (e) {} }
   };
+  // Serve a closeAllModals per passare da qui invece di strappare via il nodo.
+  backdrop.__chiudi = close;
   const fuocabili = () => [...el.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])')].filter((x) => x.offsetParent !== null);
   function onKey(e) {
     if (!backdrop.isConnected) { document.removeEventListener("keydown", onKey, true); return; }
@@ -647,7 +691,12 @@ function openModal(innerHtml) {
 // Chiude tutti i modali aperti (usato quando si esce dai modali per andare in
 // un'altra schermata, es. la ricerca online dal modale "Importa da video").
 function closeAllModals() {
-  document.querySelectorAll("#modalRoot .modal-backdrop").forEach((b) => b.remove());
+  // Passa dalla chiusura vera di ogni finestra invece di strappare via i nodi:
+  // altrimenti restano i gestori di tastiera, il focus non torna indietro e
+  // chi aspettava una risposta (confirmDialog) resta appeso.
+  document.querySelectorAll("#modalRoot .modal-backdrop").forEach((b) => {
+    if (b.__chiudi) b.__chiudi(); else b.remove();
+  });
 }
 
 export function confirmDialog({ title, message, confirmText = "Conferma", danger = false }) {
@@ -662,9 +711,12 @@ export function confirmDialog({ title, message, confirmText = "Conferma", danger
         <button class="btn" data-act="cancel">Annulla</button>
         <button class="btn ${danger ? "btn--primary" : "btn--primary"}" style="${danger ? "background:var(--danger)" : ""}" data-act="ok">${escapeHtml(confirmText)}</button>
       </div>
-    `);
-    m.el.querySelector('[data-act="cancel"]').onclick = () => { m.close(); resolve(false); };
-    m.el.querySelector('[data-act="ok"]').onclick = () => { m.close(); resolve(true); };
+    `, { onClose: () => resolve(false) });
+    // Prima si risponde, POI si chiude: `close()` fa scattare `onClose`, e se
+    // l'ordine fosse inverso ogni conferma verrebbe letta come un annullamento.
+    // (Le chiamate successive a `resolve` non hanno effetto: la prima vince.)
+    m.el.querySelector('[data-act="cancel"]').onclick = () => { resolve(false); m.close(); };
+    m.el.querySelector('[data-act="ok"]').onclick = () => { resolve(true); m.close(); };
   });
 }
 
@@ -876,7 +928,18 @@ function setupAurora() {
 let activeCookClose = null; // funzione di chiusura della Modalità cucina, se aperta
 function handleAppBack() {
   const modals = document.querySelectorAll("#modalRoot .modal-backdrop");
-  if (modals.length) { modals[modals.length - 1].remove(); return true; }
+  // Deve passare dalla chiusura vera, come Esc e il tocco sullo sfondo: su
+  // Android il tasto Indietro è IL gesto per chiudere, quindi è la via più
+  // battuta di tutte. Strappando via il nodo, una conferma in attesa non
+  // riceveva né sì né no e restava appesa per sempre — sull'import di un backup
+  // il campo file restava sporco e riscegliere lo stesso file non faceva più
+  // niente. (La guardia era stata messa in `closeAllModals` e non qui: stesso
+  // difetto corretto in un punto solo, di nuovo.)
+  if (modals.length) {
+    const ultima = modals[modals.length - 1];
+    if (ultima.__chiudi) ultima.__chiudi(); else ultima.remove();
+    return true;
+  }
   if (activeCookClose) { try { activeCookClose(); } catch (e) {} return true; }
   const guide = document.querySelector(".guide");
   if (guide) { guide.remove(); return true; }
@@ -945,7 +1008,7 @@ function openNicknamePrompt() {
   const m = openModal(`
     <h3 class="modal__title">👋 Come ti chiami?</h3>
     <p class="hint" style="margin-top:-6px">Lo usiamo solo per salutarti nell'app.</p>
-    <div class="field"><input type="text" id="nickInput" placeholder="Es. Paola" /></div>
+    <div class="field"><input type="text" id="nickInput" maxlength="24" placeholder="Es. Paola" /></div>
     <div class="modal__actions"><button class="btn" data-act="skip">Salta</button><button class="btn btn--primary" data-act="save">Salva</button></div>
   `);
   setTimeout(() => { const i = m.el.querySelector("#nickInput"); if (i) i.focus(); }, 50);
@@ -960,7 +1023,7 @@ function openNicknamePrompt() {
 function openChangeNickname() {
   const m = openModal(`
     <h3 class="modal__title">Cambia nickname</h3>
-    <div class="field"><input type="text" id="nkInput" placeholder="Es. Paola" value="${escapeHtml(getNickname())}" /></div>
+    <div class="field"><input type="text" id="nkInput" maxlength="24" placeholder="Es. Paola" value="${escapeHtml(getNickname())}" /></div>
     <div class="modal__actions"><button class="btn" data-act="cancel">Annulla</button><button class="btn btn--primary" data-act="save">Salva</button></div>
   `);
   setTimeout(() => { const i = m.el.querySelector("#nkInput"); if (i) i.focus(); }, 50);
@@ -3560,15 +3623,51 @@ function syncTimer(t) {
 // I timer sopravvivono alla chiusura dell'app e all'aggiornamento automatico:
 // senza questo, pubblicare una versione nuova spegneva il timer del forno.
 const GTIMERS_KEY = "ricettario.timers";
+// I timer della Modalità cucina passavano ai timer generali SOLO uscendo con la
+// X. Se Android chiude la PWA per memoria, o la si scorre via dalle recenti
+// mentre si cucina, il timer della pasta spariva senza traccia — proprio il caso
+// che la persistenza doveva coprire. Ora si salvano man mano, e al prossimo
+// avvio vengono raccolti dai timer generali.
+const CTIMERS_KEY = "ricettario.timers.cucina";
+function salvaTimerCucina(list) {
+  try {
+    const vivi = (list || []).filter((t) => t && ((t.remaining > 0) || t.alarming));
+    if (vivi.length) localStorage.setItem(CTIMERS_KEY, JSON.stringify(vivi));
+    else localStorage.removeItem(CTIMERS_KEY);
+  } catch (e) {}
+}
+function scartaTimerCucina() { try { localStorage.removeItem(CTIMERS_KEY); } catch (e) {} }
 function saveGTimers() {
   try { localStorage.setItem(GTIMERS_KEY, JSON.stringify({ seq: gSeq, list: gTimers })); } catch (e) {}
 }
 function restoreGTimers() {
   let d = null;
-  try { d = JSON.parse(localStorage.getItem(GTIMERS_KEY) || "null"); } catch (e) { return; }
-  if (!d || !Array.isArray(d.list)) return;
-  gSeq = parseInt(d.seq, 10) || 0;
-  gTimers = d.list.filter((t) => t && typeof t === "object");
+  try { d = JSON.parse(localStorage.getItem(GTIMERS_KEY) || "null"); } catch (e) { d = null; }
+  // ATTENZIONE all'ordine. Qui c'era un `return` quando i timer generali non
+  // esistevano, e l'adozione di quelli di cucina stava DOPO: cioè non avveniva
+  // proprio nel caso per cui era stata scritta — chi non ha mai usato il
+  // pannello Timer, avvia la pasta in Modalità cucina e si vede uccidere l'app.
+  // In più la chiave restava lì, e il giorno che nasceva un timer generale il
+  // fantasma di giorni prima veniva adottato. L'adozione va fatta SEMPRE.
+  if (d && Array.isArray(d.list)) {
+    gSeq = parseInt(d.seq, 10) || 0;
+    gTimers = d.list.filter((t) => t && typeof t === "object");
+  } else {
+    gTimers = [];
+  }
+  // Timer rimasti nella Modalità cucina di una sessione chiusa male: la schermata
+  // non c'è più, ma il forno sì. Vengono adottati dai timer generali.
+  try {
+    const c = JSON.parse(localStorage.getItem(CTIMERS_KEY) || "null");
+    if (Array.isArray(c)) {
+      for (const t of c) {
+        if (!t || typeof t !== "object") continue;
+        gTimers.push({ id: ++gSeq, label: t.label || "Timer", remaining: t.remaining, total: t.total || t.remaining, endsAt: t.endsAt, running: !!t.running, alarming: !!t.alarming });
+      }
+    }
+  } catch (e) {}
+  scartaTimerCucina();
+  if (!gTimers.length) { saveGTimers(); return; }
   for (const t of gTimers) {
     syncTimer(t);
     if (t.running && t.remaining <= 0) { t.running = false; t.alarming = true; }
@@ -4291,6 +4390,11 @@ function checkPrepReminders() {
 }
 
 // Scala le dosi su una quantità reale di un ingrediente ("ho 600 g di pollo").
+// Tetto alle porzioni CALCOLATE (peso, teglia). I campi che si scrivono a mano
+// hanno già `posNum`; questi due invece derivano da una divisione, e una cifra
+// sbagliata in ingresso diventa un numero assurdo in uscita.
+const MAX_PORZIONI = 200;
+
 function openScaleByWeight(r, base, ingredients) {
   if (!base) return;
   const scalable = ingredients.filter((it) => it.qty != null && it.unit && it.unit !== "q.b.");
@@ -4309,8 +4413,15 @@ function openScaleByWeight(r, base, ingredients) {
     const it = ingredients[parseInt(sel.value, 10)];
     const have = parseFloat((qtyIn.value || "").replace(",", "."));
     if (!it || !it.qty || !isFinite(have) || have <= 0) { info.textContent = ""; return null; }
-    const serv = Math.max(1, Math.round(base * (have / it.qty)));
-    info.innerHTML = `Diventano <b>${serv}</b> ${serv === 1 ? "porzione" : "porzioni"} circa.`;
+    // Tetto massimo: uno zero di troppo ("6000" invece di "600") faceva
+    // diventare una ricetta per 4 una ricetta per 120, senza dire niente. E il
+    // fattore assurdo finiva davvero nella lista della spesa salvata, perché
+    // "Aggiungi alla spesa" moltiplica per porzioni/base.
+    const grezzo = Math.max(1, Math.round(base * (have / it.qty)));
+    const serv = Math.min(grezzo, MAX_PORZIONI);
+    info.innerHTML = grezzo > serv
+      ? `Verrebbero <b>${grezzo}</b> porzioni: controlla la quantità. Mi fermo a <b>${serv}</b>.`
+      : `Diventano <b>${serv}</b> ${serv === 1 ? "porzione" : "porzioni"} circa.`;
     return serv;
   };
   sel.addEventListener("change", calc);
@@ -4351,9 +4462,12 @@ function openPanScaler(r, base) {
   const recalc = () => {
     const af = area(st.from), at = area(st.to);
     ratio = af > 0 && at > 0 ? at / af : 0;
-    newServ = ratio ? Math.max(1, Math.round(base * ratio)) : 0;
+    // Stesso tetto di "Scala su una quantità": bastava scrivere 0,5 cm invece di
+    // 50 per ottenere un fattore enorme e portarselo nella spesa.
+    const grezzo = ratio ? Math.max(1, Math.round(base * ratio)) : 0;
+    newServ = Math.min(grezzo, MAX_PORZIONI);
     m.el.querySelector("#panResult").innerHTML = ratio
-      ? `<div class="nutri-box"><div class="nutri-row"><span class="nutri-lbl">Fattore dosi</span><span class="nutri-val"><b>×${ratio.toFixed(2)}</b></span></div><div class="nutri-row"><span class="nutri-lbl">Equivale a</span><span class="nutri-val"><b>${newServ}</b> ${newServ === 1 ? "porzione" : "porzioni"} (da ${base})</span></div></div>`
+      ? `<div class="nutri-box"><div class="nutri-row"><span class="nutri-lbl">Fattore dosi</span><span class="nutri-val"><b>×${ratio.toFixed(2)}</b></span></div><div class="nutri-row"><span class="nutri-lbl">Equivale a</span><span class="nutri-val"><b>${newServ}</b> ${newServ === 1 ? "porzione" : "porzioni"} (da ${base})</span></div></div>${grezzo > newServ ? `<div class="hint" style="margin-top:6px">Verrebbero ${grezzo} porzioni: controlla le misure delle teglie (in centimetri).</div>` : ""}`
       : `<div class="hint">Inserisci le misure per vedere il calcolo.</div>`;
     okBtn.disabled = !ratio;
   };
@@ -4815,11 +4929,12 @@ function openCookingMode(recipe) {
     for (const t of timers) {
       if (!t.running) continue;
       syncTimer(t); // dall'orologio, non un battito alla volta (vedi syncTimer)
-      if (t.remaining <= 0) { t.remaining = 0; t.running = false; t.alarming = true; if (getSoundOn()) playChime(); else beep(); vibrateAlarm(); toast(`⏰ ${t.label} finito!`, "success"); }
+      if (t.remaining <= 0) { t.remaining = 0; t.running = false; t.alarming = true; playBeep(); vibrateAlarm(); toast(`⏰ ${t.label} finito!`, "success"); }
     }
     ensureTicker();
     ensureAlarm();
     tickPaint();
+    salvaTimerCucina(timers);
   }
   // Aggiorna SOLO testo e anello dei timer esistenti (così l'anello si anima in
   // modo fluido grazie alla transizione CSS, senza ridisegnare tutto).
@@ -4841,11 +4956,20 @@ function openCookingMode(recipe) {
       const tog = row.querySelector('[data-act="toggle"]'); if (tog) tog.textContent = t.alarming ? "🔕 OK" : (t.running ? "⏸" : "▶");
     }
   }
-  // Allarme ripetuto (suono + vibrazione) finché non lo si ferma toccando il timer.
+  // Allarme ripetuto (suono + vibrazione), con lo STESSO tetto di due minuti dei
+  // timer globali. Qui era rimasto senza: il tetto e il contesto audio riusato
+  // erano stati messi solo di là, e questa è la copia che suona davvero mentre
+  // si cucina. Un timer che scade in cucina senza nessuno vicino strillava
+  // all'infinito, creando un contesto audio ogni 1,7 secondi.
   function ensureAlarm() {
     const any = timers.some((t) => t.alarming);
-    if (any && !alarmTicker) alarmTicker = setInterval(() => { if (getSoundOn()) playChime(); else beep(); vibrateAlarm(); }, 1700);
-    else if (!any && alarmTicker) { clearInterval(alarmTicker); alarmTicker = null; }
+    if (any && !alarmTicker) {
+      const finoA = Date.now() + 120000;
+      alarmTicker = setInterval(() => {
+        if (Date.now() > finoA) { timers.forEach((t) => { t.alarming = false; }); ensureAlarm(); paintTimers(); return; }
+        playBeep(); vibrateAlarm();
+      }, 1700);
+    } else if (!any && alarmTicker) { clearInterval(alarmTicker); alarmTicker = null; }
   }
   function addTimer(mins, label) {
     const m = Math.max(1, parseInt(mins, 10) || 0);
@@ -4855,6 +4979,10 @@ function openCookingMode(recipe) {
     paintTimers();
   }
   function paintTimers() {
+    // Ogni cambiamento (nuovo timer, pausa, cancellazione) finisce subito nella
+    // copia di scorta: se l'app viene chiusa di colpo, al riavvio i timer ancora
+    // vivi vengono adottati dai timer generali invece di sparire.
+    salvaTimerCucina(timers);
     const box = el.querySelector("#ckTimers");
     if (!box) return;
     if (!timers.length) { box.innerHTML = `<div class="cook__notim">Nessun timer attivo</div>`; return; }
@@ -4886,15 +5014,8 @@ function openCookingMode(recipe) {
       row.querySelector('[data-act="del"]').onclick = () => { timers = timers.filter((x) => x.id !== id); ensureTicker(); ensureAlarm(); paintTimers(); };
     });
   }
-  function beep() {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const o = ctx.createOscillator(); const g = ctx.createGain();
-      o.connect(g); g.connect(ctx.destination); o.type = "sine"; o.frequency.value = 880;
-      o.start(); g.gain.setValueAtTime(0.3, ctx.currentTime);
-      o.stop(ctx.currentTime + 0.6);
-    } catch {}
-  }
+  // `beep()` locale rimosso: creava un AudioContext nuovo a ogni bip. Ora si usa
+  // `playBeep()`, lo stesso dei timer globali, che ne riusa uno solo.
 
   function draw() {
     setAmbient(detectCookMethod(steps[idx]) || recipeMethod);
@@ -4955,7 +5076,10 @@ function openCookingMode(recipe) {
     // si usa davvero — la pasta si mette dalla Modalità cucina, non dal pannello
     // in alto. Ora chi sta ancora contando passa ai timer generali, che si
     // vedono ovunque, si salvano e sopravvivono a chiusura e aggiornamento.
-    const daSalvare = timers.filter((t) => (t.running && t.remaining > 0) || t.alarming);
+    // Anche quelli in PAUSA: erano esclusi dal filtro e sparivano in silenzio,
+    // mentre il pannello generale li conserva. Mettere in pausa un timer non
+    // vuol dire buttarlo.
+    const daSalvare = timers.filter((t) => t.remaining > 0 || t.alarming);
     if (daSalvare.length) {
       for (const t of daSalvare) {
         gTimers.push({
@@ -4971,6 +5095,9 @@ function openCookingMode(recipe) {
       ensureGlobalTicker(); ensureGlobalAlarm(); paintTimerWidget(); saveGTimers();
       toast(daSalvare.length === 1 ? "Il timer continua qui sopra ⏱" : `${daSalvare.length} timer continuano qui sopra ⏱`, "success");
     }
+    // Il travaso è avvenuto: la copia di scorta non serve più (e adottarla al
+    // prossimo avvio duplicherebbe gli stessi timer).
+    scartaTimerCucina();
     timers = [];
     release();
     stopSpeak();
@@ -5129,7 +5256,9 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
     </div>` : ""}
     <div class="field">
       <label>Titolo</label>
-      <input type="text" id="rTitle" placeholder="Es. Pollo al limone" value="${escapeHtml(title)}" />
+      <!-- Un titolo chilometrico (capita con l'OCR o un import) sfondava le
+           schede della home: quelle classi non tagliano il testo. -->
+      <input type="text" id="rTitle" maxlength="120" placeholder="Es. Pollo al limone" value="${escapeHtml(title)}" />
     </div>
     <div class="field">
       <label>Foto (facoltativa)</label>
@@ -5400,7 +5529,8 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
   if (rGenerate) rGenerate.addEventListener("click", () => openGenerateRecipe(m.el.querySelector("#rIngredients").value.trim(), (data) => fillForm(data, { replaceTitle: true })));
 
   m.el.querySelector('[data-act="cancel"]').onclick = m.close;
-  m.el.querySelector('[data-act="save"]').onclick = async () => {
+  const saveRecipeBtn = m.el.querySelector('[data-act="save"]');
+  saveRecipeBtn.onclick = async () => {
     const data = {
       title: titleInput.value.trim(),
       toolId: m.el.querySelector("#rTool").value,
@@ -5427,6 +5557,12 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       const newIng = data.ingredients.map((i) => i.raw || ingredientText(i)).join("\n");
       if (oldIng !== newIng || (recipe.servings || null) !== data.servings) data.nutrition = null;
     }
+    // La finestra si chiude solo DOPO che il server ha confermato: in cloud
+    // passano anche mezzo secondo, e due tocchi ravvicinati creavano due ricette
+    // con id diversi — un doppione che poi va trovato e cancellato a mano.
+    // Il pulsante si riabilita solo se qualcosa va storto.
+    if (saveRecipeBtn.disabled) return;
+    saveRecipeBtn.disabled = true;
     try {
       if (editing) await store.updateRecipe(recipe.id, data);
       else await store.addRecipe(data);
@@ -5435,6 +5571,7 @@ function openRecipeForm({ recipe = null, toolId = null, prefill = null } = {}) {
       else celebrateSave(data.title);
       render();
     } catch (e) {
+      saveRecipeBtn.disabled = false;
       toast("Errore nel salvataggio", "error");
     }
   };
@@ -6108,19 +6245,20 @@ function renderSitiTab() {
 const GUIDE_SECTIONS = [
   { icon: "cooking-pot", title: "Le tue ricette", text: "Organizza le ricette per strumento di cottura. Crea uno strumento (forno, friggitrice ad aria…) e salva sotto le ricette con foto, link, ingredienti, porzioni, passi e categorie." },
   { icon: "calendar-dots", title: "Oggi si mangia", text: "In cima alla schermata Ricette trovi le ricette che hai pianificato per oggi: toccale per aprirle al volo." },
-  { icon: "image", title: "Aggiungi senza fatica", text: "Nel form ricetta: incolla un link e tocca \"Importa\", \"Scansiona da una foto\" per leggere da un libro o quaderno, \"Importa da video social\" per TikTok/Instagram/YouTube, oppure \"Inventa una ricetta (AI)\" dagli ingredienti che hai. O salvale da \"Scopri\"." },
+  { icon: "image", title: "Aggiungi senza fatica", text: "In \"Nuova ricetta\", sotto \"Non hai voglia di scrivere?\": \"Fotografa\" legge la ricetta da un libro o quaderno, \"Detta a voce\" la scrive mentre la racconti, \"Inventa (AI)\" la crea dagli ingredienti che hai. Più in basso: incolla un link e tocca \"Importa ingredienti dal link\", oppure \"Importa da video social\" per TikTok/Instagram/YouTube. O salvale da \"Scopri\"." },
   { icon: "sparkle", title: "Aiuto AI", text: "Aiuti intelligenti (gratis): \"Inventa una ricetta\" dagli ingredienti, \"Chiedi allo chef\" per dubbi e sostituzioni, \"Giudica la foto del piatto\" che valuta la riuscita, \"Adatta la ricetta\" (vegano/leggero…), \"Modalità robot\" per Companion/Bimby, \"Fotografa il frigo\" e il menù della settimana. Sono un aiuto, non infallibili." },
   { icon: "book-open", title: "Scopri", text: "Cerca idee online o tra i siti italiani; tocca \"Salva\" per aggiungerle a uno dei tuoi strumenti. Le ricette online sono in inglese: al salvataggio vengono tradotte in italiano in automatico." },
   { icon: "fork-knife", title: "Porzioni su misura", text: "Apri una ricetta e cambia il numero di persone con + e −: le quantità degli ingredienti si ricalcolano da sole." },
   { icon: "carrot", title: "Valori nutrizionali", text: "In una ricetta tocca \"Calcola\" sotto gli ingredienti: l'app stima calorie e macronutrienti (proteine, carboidrati, grassi) per porzione e totali. Per ciò che non conosce cerca online su Open Food Facts e ti mostra anche cosa non ha conteggiato. È una stima: cambia con il numero di porzioni." },
-  { icon: "heart", title: "Trova al volo", text: "Dalla schermata Ricette cerca per nome o ingrediente e usa i filtri: Preferiti, Più cucinate, Di recente, per tempo (≤15 e ≤30 min) e le categorie. Indica il tempo di preparazione nella ricetta (modifica) per usare i filtri rapidi. Dai un voto a stelle e \"Segna come cucinata\" per il conto." },
-  { icon: "shopping-cart-simple", title: "Spesa & Dispensa", text: "Aggiungi gli ingredienti alla lista della spesa (uniti e per reparto). Tocca il nome per spuntare un articolo e la quantità per modificarla. Con \"Spesa fatta\" passa tutto in dispensa. In Dispensa tieni ciò che hai già — con la scadenza, e l'app ti avvisa quando qualcosa sta per scadere — e \"Cosa posso cucinare\" suggerisce le ricette con quello che hai." },
-  { icon: "fire", title: "Modalità cucina", text: "Apri una ricetta e tocca \"Cucina\" nella barra in basso: istruzioni passo-passo, più timer con nome (pasta, forno…), lettura vocale (🔊) e schermo sempre acceso. Tocca un ingrediente nel passo per vedere la quantità. Col microfono 🎤 vai avanti/indietro a voce, avvii timer e puoi anche fare domande (\"posso sostituire il burro?\") con risposta a voce." },
+  { icon: "heart", title: "Trova al volo", text: "Dalla schermata Ricette cerca per nome o ingrediente e usa i filtri: Preferiti, Più cucinate, Di recente, per tempo (≤15 e ≤30 min) e le categorie. Indica il tempo di preparazione nella ricetta (modifica) per usare i filtri rapidi. Dai un voto a stelle e tocca \"Fatta\" nella barra in basso della ricetta per il conto." },
+  { icon: "shopping-cart-simple", title: "Spesa & Dispensa", text: "Aggiungi gli ingredienti alla lista della spesa (uniti e per reparto). Tocca il nome per spuntare un articolo e la quantità per modificarla. Al supermercato tocca \"Modalità supermercato\" per una lista a schermo intero, ordinata per reparto. Con \"Spesa fatta\" passa tutto in dispensa. In Dispensa tieni ciò che hai già: tocca la data per mettere o correggere la scadenza (pastiglie 3 giorni / 1 settimana / 1 mese / 6 mesi), l'app ti avvisa quando qualcosa sta per scadere, e \"Cosa posso cucinare\" suggerisce le ricette con quello che hai." },
+  { icon: "fire", title: "Cucinare passo-passo", text: "Apri una ricetta e tocca \"Cucina\" nella barra in basso: istruzioni passo-passo, più timer con nome (pasta, forno…), lettura vocale (🔊) e schermo sempre acceso. Tocca un ingrediente nel passo per vedere la quantità. Col microfono 🎤 vai avanti/indietro a voce, avvii timer e puoi anche fare domande (\"posso sostituire il burro?\") con risposta a voce." },
   { icon: "calendar-blank", title: "Pianificazione", text: "Nel calendario (vista Mese o Settimana) assegna le ricette ai giorni in pranzo o cena, usa \"Crea il menù\" per riempire le cene rimaste vuote (scegliendo se farlo con l'assistente, in automatico o a caso) e genera la spesa del mese o della settimana." },
   { icon: "book-bookmark", title: "Menu", text: "Dalla schermata Ricette, filtro \"Menu\": raggruppa più ricette (es. \"Cena con amici\") e genera un'unica lista della spesa." },
   { icon: "arrow-square-out", title: "Condividi", text: "Da una ricetta tocca \"Condividi\" per inviarla a qualcuno (WhatsApp, email…) con ingredienti e preparazione." },
   { icon: "calendar-dots", title: "Promemoria", text: "In Impostazioni attiva i \"Promemoria\": ricevi una notifica delle scadenze in dispensa e del pasto di oggi. Puoi scegliere l'ora dell'avviso e aggiungere un secondo avviso serale con l'anteprima dei pasti di domani. Su iPhone aggiungi prima l'app alla schermata Home." },
-  { icon: "sparkle", title: "Personalizza", text: "In Impostazioni scegli il tema chiaro o scuro. Con l'accesso le ricette sono salvate nel cloud e sincronizzate su tutti i dispositivi; puoi anche esportare un backup." }
+  { icon: "sparkle", title: "Personalizza", text: "In Impostazioni scegli il tema chiaro o scuro. Con l'accesso le ricette sono salvate nel cloud e sincronizzate su tutti i dispositivi; puoi anche esportare un backup. L'app fa anche da sola una copia di sicurezza ogni giorno: se un ripristino va storto, \"Torna com'era\" rimette tutto a posto." },
+  { icon: "thermometer", title: "Quanto dura, e quando è cotto", text: "Quando c'è, in fondo alla ricetta trovi quanti giorni si conserva in frigo, quanti mesi in congelatore e, per le carni, la temperatura al cuore da controllare con un termometro. Sono dati da fonti sulla sicurezza alimentare, non inventati dall'AI: restano comunque indicazioni prudenti." }
 ];
 
 // Mini-motore di "tour guidato": evidenzia elementi e apre le pagine giuste,
@@ -6171,8 +6309,8 @@ const TOURS = {
     { selector: "#householdBtn", title: "Attiva qui", text: "Tocca \"Attiva\", poi \"Crea una casa\": otterrai un codice da dare all'altra persona (che lo inserisce sul suo telefono).", action: () => navigate("impostazioni") }
   ],
   menusett: [
-    { title: "Menù della settimana", text: "Ti porto nel Piano, vista Settimana.", action: () => { planView = "week"; navigate("piano"); } },
-    { selector: "#weekMenuBtn", title: "Crea il menù", text: "Tocca \"Crea il menù\" e scegli come: con l'assistente (con anteprima), in automatico dalle tue preferite, oppure a caso.", action: () => { planView = "week"; navigate("piano"); } }
+    { title: "Menù della settimana", text: "Ti porto nel Piano, vista Settimana.", action: () => { setPlanView("week"); navigate("piano"); } },
+    { selector: "#weekMenuBtn", title: "Crea il menù", text: "Tocca \"Crea il menù\" e scegli come: con l'assistente (con anteprima), in automatico dalle tue preferite, oppure a caso.", action: () => { setPlanView("week"); navigate("piano"); } }
   ],
   frigo: [
     { title: "Fotografa il frigo", text: "Ti porto nella Dispensa.", action: () => { shopTab = "dispensa"; navigate("spesa"); } },
@@ -6649,12 +6787,60 @@ function expiryBadge(ds) {
   const [, m, day] = ds.split("-");
   return `<span class="exp">${day}/${m}</span>`;
 }
+// Giorno di oggi + n, in formato YYYY-MM-DD (ora locale, non UTC: con
+// toISOString un alimento aggiunto di sera scadeva il giorno prima).
+function dataFraGiorni(n) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Le scadenze si potevano mettere SOLO al momento di aggiungere l'alimento, e
+// mai più correggere: il badge era uno <span>, e `store.setPantryExpiry` non era
+// chiamata da nessun punto dell'app. Chi entrava in dispensa dal codice a barre,
+// dalla foto del frigo o dallo scontrino (tutte vie che scrivono expiry = null)
+// poteva solo cancellare l'alimento e riscriverlo — falsando anche il conteggio
+// dei riacquisti. E senza scadenze resta spento tutto l'anti-spreco.
+function openExpiryPicker(id, corrente, nome) {
+  const m = openModal(`
+    <h3 class="modal__title">📅 Scadenza${nome ? " di " + escapeHtml(nome) : ""}</h3>
+    <p class="hint" style="margin-top:-8px;margin-bottom:12px">Scegli una durata rapida oppure la data esatta.</p>
+    <div class="fz-months" style="margin-bottom:12px">
+      <button type="button" class="chip" data-g="3">tra 3 giorni</button>
+      <button type="button" class="chip" data-g="7">tra 1 settimana</button>
+      <button type="button" class="chip" data-g="30">tra 1 mese</button>
+      <button type="button" class="chip" data-g="180">tra 6 mesi</button>
+    </div>
+    <div class="field"><label>Data esatta</label><input type="date" id="expDate" value="${escapeHtml(corrente || "")}" /></div>
+    <div class="modal__actions">
+      ${corrente ? `<button class="btn" data-act="clear">Togli</button>` : `<button class="btn" data-act="cancel">Annulla</button>`}
+      <button class="btn btn--primary" data-act="ok">Salva</button>
+    </div>
+  `);
+  const inp = m.el.querySelector("#expDate");
+  m.el.querySelectorAll("[data-g]").forEach((b) => b.onclick = () => {
+    inp.value = dataFraGiorni(parseInt(b.dataset.g, 10));
+    m.el.querySelectorAll("[data-g]").forEach((x) => x.classList.remove("is-on"));
+    b.classList.add("is-on");
+  });
+  const annulla = m.el.querySelector('[data-act="cancel"]');
+  if (annulla) annulla.onclick = m.close;
+  const togli = m.el.querySelector('[data-act="clear"]');
+  if (togli) togli.onclick = async () => { m.close(); await store.setPantryExpiry(id, null); toast("Scadenza tolta", "success"); };
+  m.el.querySelector('[data-act="ok"]').onclick = async () => {
+    const v = (inp.value || "").trim();
+    m.close();
+    await store.setPantryExpiry(id, v || null);
+    toast(v ? "Scadenza aggiornata" : "Scadenza tolta", "success");
+  };
+}
+
 function pantryRow(p) {
   return `<div class="shop-row" data-id="${p.id}">
     <button class="pan-star ${p.base ? "is-on" : ""}" data-act="base" title="${p.base ? "Scorta di base (avvisa quando finisce)" : "Segna come scorta sempre in casa"}">${p.base ? "⭐" : "☆"}</button>
     <span class="shop-row__name">${escapeHtml(p.name)}</span>
     <button class="shop-row__amt" data-act="qty" title="Quantità">${p.qty ? escapeHtml(p.qty) : iconHtml("pencil-simple")}</button>
-    ${expiryBadge(p.expiry)}
+    <button class="exp-btn" data-act="exp" aria-label="${p.expiry ? "Cambia la scadenza" : "Aggiungi la scadenza"}" title="${p.expiry ? "Cambia la scadenza" : "Aggiungi la scadenza"}">${p.expiry ? expiryBadge(p.expiry) : `<span class="exp exp--empty">+ scad.</span>`}</button>
     <button class="icon-btn icon-btn--danger shop-row__del" data-act="del" aria-label="Elimina dalla lista">${iconHtml("trash")}</button>
   </div>`;
 }
@@ -6666,16 +6852,33 @@ function openPutInPantry(checked) {
     <div class="put-row" data-name="${escapeHtml(s.name)}">
       <span class="put-row__name">${iconHtml("basket")} ${escapeHtml(s.name)}</span>
       <input type="date" class="put-row__date" title="Scadenza (facoltativa)" />
+      <!-- Il calendario di Android costa 3 tocchi per riga: con sei freschi
+           sono venti tocchi, ed è il motivo per cui questo campo resta sempre
+           vuoto. Le pastiglie ne costano uno. Non indoviniamo la data da soli:
+           è sicurezza alimentare, la sceglie chi ha l'alimento in mano. -->
+      <div class="put-row__quick">
+        <button type="button" class="chip chip--xs" data-g="3">3 g</button>
+        <button type="button" class="chip chip--xs" data-g="7">1 sett</button>
+        <button type="button" class="chip chip--xs" data-g="30">1 mese</button>
+      </div>
     </div>`).join("");
   const m = openModal(`
     <h3 class="modal__title">Metti in dispensa</h3>
-    <p class="hint" style="margin-top:-8px;margin-bottom:12px">La scadenza è facoltativa: lasciala vuota se non la sai.</p>
+    <p class="hint" style="margin-top:-8px;margin-bottom:12px">La scadenza è facoltativa: lasciala vuota se non la sai. Le pastiglie la impostano con un tocco.</p>
     <div>${rows}</div>
     <div class="modal__actions">
       <button class="btn" data-act="cancel">Annulla</button>
       <button class="btn btn--primary" data-act="ok">Conferma</button>
     </div>
   `);
+  m.el.querySelectorAll(".put-row").forEach((r) => {
+    const campo = r.querySelector(".put-row__date");
+    r.querySelectorAll("[data-g]").forEach((b) => b.onclick = () => {
+      campo.value = dataFraGiorni(parseInt(b.dataset.g, 10));
+      r.querySelectorAll("[data-g]").forEach((x) => x.classList.remove("is-on"));
+      b.classList.add("is-on");
+    });
+  });
   m.el.querySelector('[data-act="cancel"]').onclick = m.close;
   m.el.querySelector('[data-act="ok"]').onclick = async () => {
     const rowEls = [...m.el.querySelectorAll(".put-row")];
@@ -6778,6 +6981,11 @@ function renderPantry() {
     if (star) star.addEventListener("click", () => {
       const p = store.getPantry().find((x) => x.id === id);
       store.setPantryBase(id, !(p && p.base));
+    });
+    const eb = rowEl.querySelector('[data-act="exp"]');
+    if (eb) eb.addEventListener("click", () => {
+      const p = store.getPantry().find((x) => x.id === id);
+      openExpiryPicker(id, p && p.expiry ? p.expiry : "", p ? p.name : "");
     });
     const qb = rowEl.querySelector('[data-act="qty"]');
     if (qb) qb.addEventListener("click", () => {
@@ -7018,7 +7226,7 @@ function renderPlan() {
     </div>
   `;
 
-  root.querySelectorAll("[data-pv]").forEach((b) => b.addEventListener("click", () => { planView = b.dataset.pv; render(); }));
+  root.querySelectorAll("[data-pv]").forEach((b) => b.addEventListener("click", () => { setPlanView(b.dataset.pv); render(); }));
   root.querySelector("#prevM").addEventListener("click", () => { planMonth--; if (planMonth < 0) { planMonth = 11; planYear--; } render(); });
   root.querySelector("#nextM").addEventListener("click", () => { planMonth++; if (planMonth > 11) { planMonth = 0; planYear++; } render(); });
   root.querySelector("#todayBtn").addEventListener("click", () => { planYear = today.getFullYear(); planMonth = today.getMonth(); render(); });
@@ -7099,7 +7307,7 @@ function renderPlanWeek() {
     </div>
   `;
 
-  root.querySelectorAll("[data-pv]").forEach((b) => b.addEventListener("click", () => { planView = b.dataset.pv; render(); }));
+  root.querySelectorAll("[data-pv]").forEach((b) => b.addEventListener("click", () => { setPlanView(b.dataset.pv); render(); }));
   root.querySelector("#prevW").addEventListener("click", () => { const a = new Date(start); a.setDate(a.getDate() - 7); weekAnchor = a; render(); });
   root.querySelector("#nextW").addEventListener("click", () => { const a = new Date(start); a.setDate(a.getDate() + 7); weekAnchor = a; render(); });
   root.querySelector("#weekToday").addEventListener("click", () => { weekAnchor = startOfWeek(new Date()); render(); });
@@ -7383,7 +7591,9 @@ function openCookTimeline(initial, presetTarget) {
       : `<div class="hint">Nessun piatto. Aggiungine uno qui sotto.</div>`;
     dishesEl.querySelectorAll(".ct-dish__time").forEach((inp) => inp.addEventListener("input", () => {
       const i = parseInt(inp.dataset.i, 10); const v = inp.value.trim();
-      dishes[i].time = v === "" ? null : Math.max(0, parseInt(v, 10) || 0);
+      // Stesso tetto del piatto di un evento: oltre le 24 ore `fmt()` avvolge
+      // col modulo 1440 e restituisce un orario credibile ma di un altro giorno.
+      dishes[i].time = minutiPiatto(v);
       paintLine();
     }));
     dishesEl.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => {
@@ -7830,7 +8040,11 @@ function openEventDishEditor(eventId, dish) {
       recipeId: dish.recipeId || null,
       title: (m.el.querySelector("#dName").value || "").trim() || (dish.title || "Piatto"),
       course: m.el.querySelector("#dCourse").value,
-      time: timeVal === "" ? null : Math.max(0, parseInt(timeVal, 10) || 0),
+      // `posNum` con tetto invece di `Math.max(0, …)`: oltre le 24 ore l'orologio
+      // del "Piano di battaglia" avvolge sul giorno e mostra un'ora plausibile
+      // ma sbagliata, senza dire che si riferisce a ieri. Meglio non farci
+      // arrivare: 600 minuti sono dieci ore, un arrosto lungo ci sta dentro.
+      time: minutiPiatto(timeVal),
       prepDay: reheat ? 0 : (parseInt(m.el.querySelector("#dPrep").value, 10) || 0),
       servedTemp: m.el.querySelector("#dTemp").value,
       usesOven: ovenChk.checked,
@@ -8766,7 +8980,8 @@ function renderImpostazioni() {
     // mentre i dati stanno ancora arrivando dal cloud produce un backup con la
     // dispensa VUOTA — un file che sembra perfetto e che mesi dopo, ripristinato,
     // cancella davvero la dispensa. La guardia era stata messa sulla copia
-    // automatica e sull'import, ma non qui: cioè non nel punto in cui il file nasce.
+    // automatica e sull'import, ma non qui: cioè non nel punto in cui il file
+    // nasce.
     if (!store.datiAttendibili()) {
       toast("I tuoi dati stanno ancora arrivando dal cloud: aspetta qualche secondo, altrimenti il backup uscirebbe incompleto.", "error");
       return;
@@ -8845,6 +9060,8 @@ function renderImpostazioni() {
       // La promessa "puoi tornare indietro un'altra volta" vale solo se lo stato
       // attuale si può davvero mettere da parte. Se una collezione non è
       // raggiungibile non si può, e prometterlo lo stesso è peggio che tacere.
+      // L'avviso era stato aggiunto all'import e non qui: di nuovo lo stesso
+      // rimedio in un punto solo.
       message: `I dati verranno riportati alla copia di sicurezza${c && c.quando ? " del " + new Date(c.quando).toLocaleString("it-IT") : ""} (${c ? c.ricette : 0} ricette).`
         + (store.datiAttendibili()
           ? " Quello che hai ora viene messo da parte: puoi tornare indietro un'altra volta con questo stesso pulsante."

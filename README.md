@@ -144,25 +144,35 @@ con un *Cron Trigger*. È gratuito.
 
 ---
 
-## Ricerca online: GialloZafferano e Spoonacular
+## Ricerca online: GialloZafferano, Spoonacular ed Edamam
 
 La scheda "Cerca online" può cercare su più fonti. Per **GialloZafferano** (in
-italiano) e **Spoonacular** serve ripubblicare il worker `ricette-import` con il
-codice aggiornato di `worker/recipe-extractor.js` (ha i nuovi endpoint
-`/searchgz` e `/spoon`). GialloZafferano funziona subito; Spoonacular è opzionale.
+italiano), **Spoonacular** ed **Edamam** serve ripubblicare il worker
+`ricette-import` con il codice aggiornato di `worker/recipe-extractor.js` (ha i
+nuovi endpoint `/searchgz`, `/spoon` e `/edamam`). GialloZafferano funziona
+subito; Spoonacular ed Edamam sono opzionali (entrambi in inglese, database
+enormi).
 
-**Spoonacular (facoltativo, database enorme in inglese):**
+**Spoonacular (facoltativo):**
 1. Crea una chiave gratuita su [spoonacular.com/food-api](https://spoonacular.com/food-api).
 2. Worker `ricette-import` → **Settings → Variables and Secrets** → **Add** →
    tipo **Secret**, nome **`SPOON_KEY`**, valore = la tua chiave. Ripubblica il worker.
 3. In `js/config.js` metti `SPOONACULAR_ENABLED = true` e ripubblica l'app.
+
+**Edamam (facoltativo):**
+1. Crea un'app gratuita su [developer.edamam.com](https://developer.edamam.com)
+   (piano "Recipe Search API").
+2. Worker `ricette-import` → **Settings → Variables and Secrets** → **Add** →
+   tipo **Secret**: **`EDAMAM_ID`** e **`EDAMAM_KEY`** (e, se richiesto,
+   **`EDAMAM_USER`** = il tuo username Edamam). Ripubblica il worker.
+3. In `js/config.js` metti `EDAMAM_ENABLED = true` e ripubblica l'app.
 
 ---
 
 ## (Admin) Avvisare tutti di una novità (notifica push)
 
 L'amministratore può inviare una notifica push a **tutti** gli utenti iscritti
-(Opzioni → "Avvisa tutti"). Serve una chiave segreta sul worker push:
+(Impostazioni → Amministrazione → "Avvisa tutti"). Serve una chiave segreta sul worker push:
 
 1. Worker **fornelli-push** → **Settings → Variables and Secrets** → **Add** →
    tipo **Secret**: nome **`ADMIN_KEY`**, valore = una password a tua scelta.
@@ -177,7 +187,8 @@ L'amministratore può inviare una notifica push a **tutti** gli utenti iscritti
 
 L'app registra gli accessi di ogni utente in Firestore (`accessStats/{uid}`) e
 l'amministratore (l'email in `firestore.rules`, ora `marcozeta73@gmail.com`) può
-vederli in **Impostazioni → "Accessi utenti (admin)"**.
+vederli in **Impostazioni → Amministrazione → "Accessi utenti"** (la sezione
+Amministrazione compare solo per quell'email).
 
 Perché funzioni serve **ripubblicare le regole**: Firebase Console → Firestore
 Database → **Regole** → incolla il contenuto aggiornato di `firestore.rules` →
@@ -213,6 +224,7 @@ Ricette/
 │  ├─ changelog.js         Storico delle novità (finestra "Novità")
 │  ├─ co2.js                Stima impatto ambientale (CO2) di una ricetta
 │  ├─ config.js            👉 QUI si incolla la configurazione Firebase
+│  ├─ conservazione.js     Tabelle di conservazione (frigo/freezer) e temperatura al cuore
 │  ├─ cost.js              Stima del costo di una ricetta
 │  ├─ diets.js             Motore "sicuro per tutti": allergeni, intolleranze, diete
 │  ├─ icons.js / icons-data.js   Icone (Phosphor) incorporate per l'uso offline

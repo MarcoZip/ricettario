@@ -441,7 +441,7 @@ export async function importFromUrl(url) {
 
   // Siti che bloccano la lettura automatica (sfida anti-bot).
   if (data && data.error === "blocked") {
-    const e = new Error("Questo sito blocca la lettura automatica. Apri la ricetta dal link, poi copia gli ingredienti o usa \"Scansiona da una foto\".");
+    const e = new Error("Questo sito blocca la lettura automatica. Apri la ricetta dal link, poi copia gli ingredienti o usa \"Fotografa\" in cima a Nuova ricetta.");
     e.code = "blocked";
     throw e;
   }
