@@ -45,8 +45,14 @@
   try {
 
   const morti = [];
-  const visti = new Set();
+  // Deduplica per ELEMENTO, non per etichetta. Con la chiave "schermata|etichetta"
+  // le 12 righe della spesa hanno tutte etichetta [check] e ne veniva esaminata
+  // UNA sola: cablando per sbaglio solo la prima riga di una lista — il classico
+  // ciclo che si rompe — 11 righe su 12 restavano morte e lo strumento diceva
+  // "tutto a posto". La Spesa risultava coperta al 33%.
+  const gia = new WeakSet();
   let controllati = 0;
+  const perEtichetta = {}; // per non stampare 12 righe identiche nel risultato
 
   // Un pulsante è "vivo" se ha un gestore suo, oppure la proprietà onclick,
   // oppure un antenato con gestore (delega dell'evento).
@@ -79,11 +85,15 @@
       // mount(), all'avvio, cioè prima che questo controllo inizi a registrare:
       // risulterebbero morti pur non essendolo. Vanno provati a mano.
       if (b.closest(".app-header, .bottom-nav")) return;
-      const chiave = dove + "|" + etichetta(b);
-      if (visti.has(chiave)) return;
-      visti.add(chiave);
+      if (gia.has(b)) return;
+      gia.add(b);
       controllati++;
-      if (!vivo(b)) morti.push(dove + " → " + etichetta(b));
+      if (!vivo(b)) {
+        // Se una lista ha molte righe rotte si stampa una riga sola con il
+        // conteggio, altrimenti l'elenco diventa illeggibile.
+        const k = dove + " → " + etichetta(b);
+        perEtichetta[k] = (perEtichetta[k] || 0) + 1;
+      }
     });
   };
 
@@ -120,13 +130,44 @@
     else morti.push("ROTTA INESISTENTE: " + r + " — il collaudo non l'ha visitata");
   }
 
+  // Schede interne: sono schermate a tutti gli effetti, con pulsanti propri, ma
+  // non si raggiungono dalla barra in basso. La vista Settimana in particolare
+  // veniva attraversata per aprire "Crea il menù" e mai esaminata: quindici
+  // pulsanti — Spesa settimana, Prepara in anticipo, Coordina i piatti,
+  // Condividi il menù — potevano essere tutti scollegati senza che nessuno
+  // se ne accorgesse, a parità di conteggio.
+  const schede = [
+    { rotta: "piano", etichetta: "Settimana", nome: "piano/Settimana", ritorno: "Mese" },
+    { rotta: "spesa", etichetta: "Dispensa", nome: "spesa/Dispensa", ritorno: "Da comprare" }
+  ];
+  for (const s of schede) {
+    if (!(await vaiA(s.rotta))) continue;
+    const trova = (t) => [...document.querySelectorAll("button")].find((x) => x.textContent.trim() === t);
+    const tab = trova(s.etichetta);
+    if (!tab) { morti.push("scheda non raggiungibile: " + s.nome); continue; }
+    tab.click();
+    await wait(800);
+    controlla(s.nome, document, true);
+    // Si TORNA sulla scheda di partenza: lasciare l'app su Dispensa o su
+    // Settimana cambia ciò che vede l'esecuzione successiva — e una prova
+    // fatta sulla schermata sbagliata è una prova che non dimostra niente.
+    const back = trova(s.ritorno);
+    if (back) { back.click(); await wait(600); }
+  }
+
   // ---------- 2. La scheda ricetta ----------
+  // PIÙ di una ricetta: diversi pulsanti compaiono solo per certe ricette
+  // (ingredienti mancanti, video, "Come lo imposto?" solo per gli strumenti
+  // regolabili). Guardandone una sola, quelli non venivano mai visti.
   await vaiA("strumenti");
-  const card = document.querySelector(".rotd, .recipe-item, [data-recipe], .pick-row");
-  if (card) {
-    card.click();
+  const carte = [...document.querySelectorAll(".rotd, [data-recipe], .pick-row")].slice(0, 3);
+  for (let i = 0; i < carte.length; i++) {
+    await vaiA("strumenti");
+    const c = [...document.querySelectorAll(".rotd, [data-recipe], .pick-row")][i];
+    if (!c) continue;
+    c.click();
     await wait(1200);
-    controlla("ricetta", document, true);
+    controlla("ricetta " + (i + 1), document, true);
   }
 
   // ---------- 3. Le finestre ----------
@@ -182,6 +223,9 @@
   }
 
   chiudiFinestre();
+  for (const k of Object.keys(perEtichetta)) {
+    morti.push(perEtichetta[k] > 1 ? k + " (×" + perEtichetta[k] + ")" : k);
+  }
   return {
     controllati,
     pulsantiSenzaGestore: morti,
@@ -192,8 +236,9 @@
     nonCoperti: [
       "finestre che chiamano l'AI, che aprono il selettore di file, la condivisione di sistema e le azioni distruttive: escluse di proposito",
       "Modalità cucina, Modalità supermercato, Guida, pannello Timer",
-      "le schede interne non visitate: Dispensa in Spesa, Giorno nel Piano",
-      "gli elementi cliccabili che non sono <button>"
+      "la vista Giorno del Piano",
+      "gli elementi cliccabili che non sono <button>",
+      "le ricette oltre le prime tre"
     ],
     limite: "verifica che un gestore ESISTA, non che faccia la cosa giusta",
     esito: morti.length ? "❌ CI SONO PULSANTI MORTI" : "✅ tutti i pulsanti hanno un gestore"
