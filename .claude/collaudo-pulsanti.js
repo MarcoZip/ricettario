@@ -243,6 +243,49 @@
   for (const k of Object.keys(perEtichetta)) {
     morti.push(perEtichetta[k] > 1 ? k + " (×" + perEtichetta[k] + ")" : k);
   }
+  // ---------- 4b. La Modalità cucina ----------
+  // È la schermata dove un pulsante morto costa di più: telefono appoggiato
+  // accanto ai fornelli, mani sporche, e nessuna voglia di capire perché
+  // "Avanti" non risponde. Non è una finestra (non passa da openModal), quindi
+  // va raggiunta a parte. Si guarda e si esce subito: NON si arriva all'ultimo
+  // passo, perché "Fine" segnerebbe la ricetta come cucinata.
+  await vaiA("strumenti");
+  const perCucina = [...document.querySelectorAll(".rotd, [data-recipe], .pick-row")][0];
+  if (perCucina) {
+    perCucina.click();
+    await wait(1100);
+    const avvia = document.getElementById("rbarCook");
+    if (!avvia) morti.push("Modalità cucina non raggiungibile: #rbarCook assente (la ricetta non ha passi?)");
+    else {
+      avvia.click();
+      await wait(1100);
+      const cook = document.querySelector(".cook");
+      if (!cook) morti.push("NON SI APRE: Modalità cucina");
+      else {
+        controlla("Modalità cucina", cook, true);
+        const chiudi = cook.querySelector("#ckClose");
+        if (chiudi) chiudi.click(); else cook.remove();
+        await wait(500);
+      }
+    }
+  }
+
+  // ---------- 5. Le superfici attese ----------
+  // Una schermata che sparisce del TUTTO non produce nessun pulsante morto:
+  // semplicemente non ce ne sono da controllare, e l'esito resta verde.
+  // Dimostrato mettendo un `return` in cima al disegno di "Scopri": toccando la
+  // voce non succedeva niente, zero errori in console, e il collaudo diceva
+  // "tutti i pulsanti hanno un gestore". L'unica traccia era una chiave in meno
+  // qui sotto, cioè proprio il calo che il commento dichiarava rumore.
+  const ATTESE = {
+    strumenti: 20, ricettario: 3, spesa: 5, piano: 20, impostazioni: 10,
+    "piano/Settimana": 8, "ricetta 1": 20, "finestra Modifica ricetta": 10
+  };
+  for (const [k, minimo] of Object.entries(ATTESE)) {
+    const n = perSuperficie[k] || 0;
+    if (n < minimo) morti.push("SUPERFICIE SPARITA O QUASI VUOTA: " + k + " — " + n + " pulsanti, ne servono almeno " + minimo);
+  }
+
   // Si torna alla schermata di partenza: chi rilancia deve trovare l'app come
   // l'ha lasciata, non su Impostazioni.
   await vaiA("strumenti");
@@ -259,7 +302,7 @@
     // condizioni. Un calo improvviso a parità di dati è un segnale, non rumore.
     nonCoperti: [
       "finestre che chiamano l'AI, che aprono il selettore di file, la condivisione di sistema e le azioni distruttive: escluse di proposito",
-      "Modalità cucina, Modalità supermercato, Guida, pannello Timer",
+      "Modalità supermercato, Guida, pannello Timer, modalità «Riordina strumenti»",
       "la vista Giorno del Piano",
       "gli elementi cliccabili che non sono <button>",
       "le ricette oltre le prime tre",
