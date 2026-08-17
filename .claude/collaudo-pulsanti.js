@@ -30,7 +30,10 @@
   // prototipo a vicenda: quando il primo finisce ripristina l'originale e il
   // secondo smette di registrare, producendo oltre cento falsi morti. Un elenco
   // così lungo insegna a ignorare lo strumento, che è il danno peggiore.
-  if (window.__collaudoInCorso) return { esito: "⏳ un altro collaudo è già in corso: attendi che finisca" };
+  // Il rifiuto ha la STESSA forma di un esito, e comincia con ❌: chi controlla
+  // `pulsantiSenzaGestore.length` non prende un errore, e chi cerca "❌" non
+  // scambia un rifiuto per un via libera.
+  if (window.__collaudoInCorso) return { controllati: 0, pulsantiSenzaGestore: [], valido: false, esito: "❌ RISULTATO NON VALIDO: un altro collaudo è già in corso, aspetta che finisca e rilancia" };
   window.__collaudoInCorso = true;
 
   // Da qui in avanti registriamo chi riceve un gestore di clic.
@@ -49,6 +52,11 @@
   // oppure un antenato con gestore (delega dell'evento).
   const vivo = (el) => {
     if (el.onclick) return true;
+    // `popovertarget`: il browser apre il riquadro da solo, senza JavaScript.
+    // Non avere un gestore è corretto, non un guasto. In tutta l'app ce n'è uno
+    // solo (la ⓘ dell'impatto ambientale), ma senza questa riga darebbe un
+    // falso allarme — e un falso allarme insegna a ignorare lo strumento.
+    if (el.hasAttribute && el.hasAttribute("popovertarget")) return true;
     for (let n = el; n && n !== document; n = n.parentElement) {
       // FERMARSI allo sfondo della finestra. Lo sfondo ha SEMPRE un gestore di
       // clic — serve a chiudere toccando fuori — quindi risalendo oltre, ogni
@@ -108,7 +116,7 @@
   // `strumenti` e `ricettario`. Scrivendo qui "scopri" la schermata veniva
   // saltata in silenzio e il collaudo copriva 4 sezioni su 5.
   for (const r of ["strumenti", "ricettario", "spesa", "piano", "impostazioni"]) {
-    if (await vaiA(r)) controlla(r, document, false);
+    if (await vaiA(r)) controlla(r, document, true);
     else morti.push("ROTTA INESISTENTE: " + r + " — il collaudo non l'ha visitata");
   }
 
@@ -118,7 +126,7 @@
   if (card) {
     card.click();
     await wait(1200);
-    controlla("ricetta", document, false);
+    controlla("ricetta", document, true);
   }
 
   // ---------- 3. Le finestre ----------
@@ -177,10 +185,16 @@
   return {
     controllati,
     pulsantiSenzaGestore: morti,
-    // Il numero di controlli VARIA fra esecuzioni (dipende da quante ricette ci
-    // sono e da dove era rimasta l'app): non confrontarlo con quello di ieri.
-    // Conta solo che i morti siano zero.
-    nonCoperti: "finestre che chiamano l'AI, che aprono il selettore di file e le azioni distruttive: escluse di proposito, mai controllate",
+    valido: true,
+    // Il numero varia con la quantità di dati (con 0 ricette scende a ~45):
+    // confrontalo solo con un'esecuzione sulla STESSA app nelle stesse
+    // condizioni. Un calo improvviso a parità di dati è un segnale, non rumore.
+    nonCoperti: [
+      "finestre che chiamano l'AI, che aprono il selettore di file, la condivisione di sistema e le azioni distruttive: escluse di proposito",
+      "Modalità cucina, Modalità supermercato, Guida, pannello Timer",
+      "le schede interne non visitate: Dispensa in Spesa, Giorno nel Piano",
+      "gli elementi cliccabili che non sono <button>"
+    ],
     limite: "verifica che un gestore ESISTA, non che faccia la cosa giusta",
     esito: morti.length ? "❌ CI SONO PULSANTI MORTI" : "✅ tutti i pulsanti hanno un gestore"
   };
