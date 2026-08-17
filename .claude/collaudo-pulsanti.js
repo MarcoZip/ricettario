@@ -30,10 +30,12 @@
   // prototipo a vicenda: quando il primo finisce ripristina l'originale e il
   // secondo smette di registrare, producendo oltre cento falsi morti. Un elenco
   // così lungo insegna a ignorare lo strumento, che è il danno peggiore.
-  // Il rifiuto ha la STESSA forma di un esito, e comincia con ❌: chi controlla
-  // `pulsantiSenzaGestore.length` non prende un errore, e chi cerca "❌" non
-  // scambia un rifiuto per un via libera.
-  if (window.__collaudoInCorso) return { controllati: 0, pulsantiSenzaGestore: [], valido: false, esito: "❌ RISULTATO NON VALIDO: un altro collaudo è già in corso, aspetta che finisca e rilancia" };
+  // Il rifiuto ha la STESSA forma di un esito, e comincia con ❌. Ma la lista
+  // NON può essere vuota: un lettore automatico che guardi solo
+  // `pulsantiSenzaGestore.length` leggerebbe zero e concluderebbe "tutto a
+  // posto" — il commento prometteva il contrario di quello che l'oggetto
+  // garantiva. Il rifiuto si dichiara anche lì dentro.
+  if (window.__collaudoInCorso) return { controllati: 0, pulsantiSenzaGestore: ["RISULTATO NON VALIDO: collaudo già in corso, nessun controllo eseguito"], valido: false, esito: "❌ RISULTATO NON VALIDO: un altro collaudo è già in corso, aspetta che finisca e rilancia" };
   window.__collaudoInCorso = true;
 
   // Da qui in avanti registriamo chi riceve un gestore di clic.
@@ -127,9 +129,23 @@
   // "Ricette", "Ricettario" → "Scopri") ma NON le rotte interne, rimaste
   // `strumenti` e `ricettario`. Scrivendo qui "scopri" la schermata veniva
   // saltata in silenzio e il collaudo copriva 4 sezioni su 5.
+  // Alcune schermate ricordano l'ultima scheda usata (Spesa: Da comprare /
+  // Dispensa; Piano: Mese / Settimana, e dalla v8.60 il Piano la PERSISTE fra
+  // un avvio e l'altro). Quindi la schermata che il collaudo trova dipende da
+  // dove è stata lasciata l'app: si è visto un giro chiudersi con "spesa: 7"
+  // invece di 49 perché contava la Dispensa vuota al posto della lista della
+  // spesa piena — e le soglie qui sotto lo lasciavano passare per buono.
+  // Si parte SEMPRE dalla scheda principale, così due esecuzioni sono confrontabili.
+  const SCHEDA_PRINCIPALE = { spesa: "Da comprare", piano: "Mese" };
   for (const r of ["strumenti", "ricettario", "spesa", "piano", "impostazioni"]) {
-    if (await vaiA(r)) controlla(r, document, true);
-    else morti.push("ROTTA INESISTENTE: " + r + " — il collaudo non l'ha visitata");
+    if (!(await vaiA(r))) { morti.push("ROTTA INESISTENTE: " + r + " — il collaudo non l'ha visitata"); continue; }
+    const principale = SCHEDA_PRINCIPALE[r];
+    if (principale) {
+      const t = [...document.querySelectorAll("button")].find((x) => x.textContent.trim() === principale);
+      if (!t) morti.push("scheda principale non trovata: " + r + " → " + principale);
+      else if (!t.classList.contains("is-active")) { t.click(); await wait(700); }
+    }
+    controlla(r, document, true);
   }
 
   // Schede interne: sono schermate a tutti gli effetti, con pulsanti propri, ma
@@ -240,9 +256,6 @@
   }
 
   chiudiFinestre();
-  for (const k of Object.keys(perEtichetta)) {
-    morti.push(perEtichetta[k] > 1 ? k + " (×" + perEtichetta[k] + ")" : k);
-  }
   // ---------- 4b. La Modalità cucina ----------
   // È la schermata dove un pulsante morto costa di più: telefono appoggiato
   // accanto ai fornelli, mani sporche, e nessuna voglia di capire perché
@@ -270,6 +283,37 @@
     }
   }
 
+  // ---------- 4c. "Nuova ricetta" ----------
+  // Il giro delle finestre apre "Modifica ricetta" e si ferma lì. Ma le tre
+  // scorciatoie in cima esistono SOLO in "Nuova ricetta" (`!editing`), e sono
+  // proprio il blocco rimaneggiato di recente: un guasto lì era invisibile.
+  // È esattamente il difetto della v8.59 (cablaggio senza guardia) visto
+  // dall'altro lato dello stesso `if`.
+  await vaiA("strumenti");
+  const nuova = document.getElementById("addRecipeBtn") ||
+    [...document.querySelectorAll("button")].find((b) => /nuova ricetta/i.test(b.textContent || ""));
+  if (!nuova) morti.push("finestra non raggiungibile: Nuova ricetta (nessun pulsante che la apra in strumenti)");
+  else {
+    nuova.click();
+    await wait(900);
+    const mn = finestraInCima();
+    if (!mn) morti.push("NON SI APRE: Nuova ricetta");
+    else {
+      controlla("finestra Nuova ricetta", mn, true);
+      chiudiFinestre();
+      await wait(300);
+    }
+  }
+
+  // Il travaso dei pulsanti senza gestore nell'esito va fatto QUI, dopo che
+  // TUTTE le superfici sono state percorse. Stava prima della Modalità cucina:
+  // un pulsante morto lì finiva in `perEtichetta` e non veniva mai riportato —
+  // entrava nel conteggio ma l'esito restava "0 morti". La superficie
+  // dichiarata "quella dove costa di più" era coperta solo di nome.
+  for (const k of Object.keys(perEtichetta)) {
+    morti.push(perEtichetta[k] > 1 ? k + " (×" + perEtichetta[k] + ")" : k);
+  }
+
   // ---------- 5. Le superfici attese ----------
   // Una schermata che sparisce del TUTTO non produce nessun pulsante morto:
   // semplicemente non ce ne sono da controllare, e l'esito resta verde.
@@ -279,7 +323,10 @@
   // qui sotto, cioè proprio il calo che il commento dichiarava rumore.
   const ATTESE = {
     strumenti: 20, ricettario: 3, spesa: 5, piano: 20, impostazioni: 10,
-    "piano/Settimana": 8, "ricetta 1": 20, "finestra Modifica ricetta": 10
+    "piano/Settimana": 8, "ricetta 1": 20, "finestra Modifica ricetta": 10,
+    // Senza un minimo qui, una Modalità cucina che non si apre più (o si apre
+    // vuota) non lascerebbe traccia nell'esito.
+    "Modalità cucina": 5, "finestra Nuova ricetta": 8
   };
   for (const [k, minimo] of Object.entries(ATTESE)) {
     const n = perSuperficie[k] || 0;
