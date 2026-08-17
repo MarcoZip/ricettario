@@ -10,6 +10,9 @@ export function applyTheme(t) {
   document.documentElement.setAttribute("data-theme", v);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", v === "light" ? "#fbf7f2" : "#14110d");
+  // Il colore d'accento dipende dal tema (vedi ACCENT_PRESETS): cambiando tema
+  // va riapplicato, altrimenti resta la tinta dell'altro fondo.
+  applyAccent();
 }
 
 export function setTheme(t) {
@@ -19,13 +22,22 @@ export function setTheme(t) {
 
 // ---- Colore d'accento (personalizzazione) ----
 const ACCENT_KEY = "ricettario.accent";
+// `p2` è la tinta CHIARA dell'accento e nell'app fa soprattutto da colore del
+// TESTO (una sessantina di regole: titoli di sezione, titoli di gruppo della
+// scheda ricetta, numeri delle statistiche, pulsanti "fantasma"…). Era nata per
+// il fondo quasi nero del tema scuro, e in tema chiaro restava identica: 1,70:1
+// su bianco, 1,43:1 sui pannelli — cioè invisibile, per tutti e sei i colori.
+// `p2light` è la stessa tinta portata sopra il 4,5:1 sui tre fondi chiari.
+// Nota: `applyAccent` scrive queste variabili IN LINEA sull'elemento <html>,
+// quindi vincono su qualunque foglio di stile — un rimedio scritto solo nel CSS
+// non avrebbe avuto alcun effetto. Il posto giusto è qui.
 export const ACCENT_PRESETS = {
-  arancione: { p: "#ff7a3d", p2: "#ffb86b", label: "Arancione" },
-  rosso: { p: "#ef4d4d", p2: "#ff9090", label: "Rosso" },
-  verde: { p: "#2fb96b", p2: "#86e0aa", label: "Verde" },
-  blu: { p: "#3b82f6", p2: "#93c5fd", label: "Blu" },
-  viola: { p: "#8b5cf6", p2: "#c4b5fd", label: "Viola" },
-  rosa: { p: "#ec4899", p2: "#f9a8d4", label: "Rosa" }
+  arancione: { p: "#ff7a3d", p2: "#ffb86b", p2light: "#a8490c", label: "Arancione" },
+  rosso: { p: "#ef4d4d", p2: "#ff9090", p2light: "#b3222d", label: "Rosso" },
+  verde: { p: "#2fb96b", p2: "#86e0aa", p2light: "#1d7346", label: "Verde" },
+  blu: { p: "#3b82f6", p2: "#93c5fd", p2light: "#1d5fbf", label: "Blu" },
+  viola: { p: "#8b5cf6", p2: "#c4b5fd", p2light: "#6d3fd4", label: "Viola" },
+  rosa: { p: "#ec4899", p2: "#f9a8d4", p2light: "#b4276c", label: "Rosa" }
 };
 
 export function getAccent() {
@@ -42,10 +54,22 @@ function hexToRgb(hex) {
 export function applyAccent(name) {
   const a = ACCENT_PRESETS[name || getAccent()] || ACCENT_PRESETS.arancione;
   const s = document.documentElement.style;
+  const chiaro = document.documentElement.getAttribute("data-theme") === "light";
+  // Il testo prende la tinta adatta al fondo; sfumature e aloni restano quelli
+  // vivaci di sempre, perché lì il colore fa da decorazione e non da testo.
   s.setProperty("--primary", a.p);
-  s.setProperty("--primary-2", a.p2);
+  s.setProperty("--primary-2", chiaro ? (a.p2light || a.p2) : a.p2);
   s.setProperty("--primary-rgb", hexToRgb(a.p2));
   s.setProperty("--primary-grad", `linear-gradient(135deg, ${a.p2}, ${a.p})`);
+  // Alcune schermate hanno SEMPRE il fondo scuro, anche in tema chiaro (cucina,
+  // supermercato, guida): lì serve la tinta vivace. La passo a parte così il CSS
+  // può rimetterla per tutto il sottoalbero con una riga sola.
+  s.setProperty("--primary-2-scuro", a.p2);
+  // …e dentro quelle schermate ci sono schede CHIARE (le 16 della Guida), che
+  // devono riprendersi la tinta del tema. Senza questa, il CSS potrebbe solo
+  // scrivere un colore fisso, che funzionerebbe con l'arancione e non con gli
+  // altri cinque accenti.
+  s.setProperty("--primary-2-tema", chiaro ? (a.p2light || a.p2) : a.p2);
 }
 
 export function setAccent(name) {

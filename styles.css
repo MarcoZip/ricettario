@@ -48,6 +48,10 @@ html[data-theme="light"] {
   --surface-3: #e6ddcf;
   --text: #2c2420;
   --text-soft: #8a7d72;
+  /* Nota: --primary-2 NON si corregge qui. `applyAccent` (js/theme.js) lo
+     scrive come stile in linea sull'elemento <html>, e uno stile in linea batte
+     qualunque regola di questo foglio: il rimedio scritto qui sarebbe stato
+     codice morto. La tinta adatta al fondo chiaro sta in ACCENT_PRESETS.p2light. */
   --danger: #d23b3b;
   --accent: #2f9e6f;
   --border: #ece3d8;
@@ -132,6 +136,10 @@ a { color: var(--primary-2); }
   border: 1px solid var(--border);
 }
 .badge--cloud { background: rgba(54, 209, 183, 0.14); color: #6fe6cd; border-color: rgba(54, 209, 183, 0.3); }
+/* #6fe6cd è una tinta da fondo scuro: in tema chiaro misurava 1,30:1. È
+   l'unico elemento che sta a schermo SEMPRE, su ogni schermata. Preesistente,
+   non di questa versione, ma costa una riga. */
+:root[data-theme="light"] .badge--cloud { color: #0f6b58; }
 .badge--local { background: var(--surface-2); color: var(--text-soft); }
 .badge--offline { background: rgba(255, 184, 107, 0.14); color: #ffcf94; border-color: rgba(255, 184, 107, 0.3); }
 
@@ -788,6 +796,25 @@ mark {
   border: 1px solid rgba(255, 184, 107, 0.28); border-radius: 999px; padding: 6px 12px;
   font-size: 0.78rem; font-weight: 800; text-decoration: none;
 }
+/* Stato "scelta": ESISTEVA solo per .filter-chip, .diet-chip e .allerg-chip.
+   Il codice che mette e toglie `is-on` sulle pastiglie generiche (scadenze,
+   mesi di congelamento, durate) era quindi muto: si toccava e non cambiava
+   niente, cioè nessuna conferma di aver registrato il tocco. */
+.chip.is-on { background: var(--primary-grad); color: #2a1606; border-color: transparent; }
+/* Come per .tagchip qui sopra: #ffd9a8 è una tinta da fondo scuro e su fondo
+   chiaro misurava 1,01:1 — invisibile. Riguarda anche le pastiglie delle
+   scadenze, cioè la scorciatoia principale di questa versione. */
+:root[data-theme="light"] .chip { background: rgba(168, 73, 12, 0.10); border-color: rgba(168, 73, 12, 0.30); color: #8a3c0a; }
+:root[data-theme="light"] .chip.is-on { background: var(--primary-grad); color: #2a1606; border-color: transparent; }
+/* …tranne dentro le SUPERFICI SEMPRE SCURE — vedi il blocco "fondo scuro in
+   entrambi i temi" più sotto. `.chip` usa colori letterali, quindi la variabile
+   non la raggiunge e va elencata a parte. */
+:root[data-theme="light"] .cook .chip,
+:root[data-theme="light"] .super .chip,
+:root[data-theme="light"] .guide .chip { background: rgba(255, 184, 107, 0.14); border-color: rgba(255, 184, 107, 0.28); color: #ffd9a8; }
+:root[data-theme="light"] .cook .chip.is-on,
+:root[data-theme="light"] .super .chip.is-on,
+:root[data-theme="light"] .guide .chip.is-on { background: var(--primary-grad); color: #2a1606; border-color: transparent; }
 
 .site-card {
   background: var(--card-grad);
@@ -1636,12 +1663,37 @@ p, li, .setting-row__desc, .hint, .recipe-item__notes, .steps-list li { text-wra
 .cook__track { height: 5px; background: var(--surface-2); border-radius: 99px; margin: 14px 0; overflow: hidden; }
 .cook__fill { height: 100%; background: var(--primary-grad); transition: width 0.3s ease; }
 .cook__body { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; overflow-y: auto; }
-/* La Modalità cucina ha SEMPRE lo sfondo scuro, in entrambi i temi. Il testo
-   però ereditava il colore del tema: in tema chiaro diventava quasi nero su
-   quasi nero — 1,22:1 misurato, cioè illeggibile. Si leggeva soltanto grazie
-   alle parole degli ingredienti evidenziate in arancione, quindi i passi che
-   non ne contengono sparivano del tutto. Qui il colore va fissato. */
-.cook, .cook__step { color: #efe8dd; }
+/* ============================================================
+   SUPERFICI CON FONDO SCURO IN ENTRAMBI I TEMI
+   ------------------------------------------------------------
+   Sono QUATTRO, ed è l'elenco completo: Modalità cucina (.cook),
+   Modalità supermercato (.super), Guida (.guide) e la casella di un giorno
+   pianificato nel calendario (.cal-cell.has-plan). Il loro sfondo è fissato a
+   mano e NON segue il tema, quindi ogni colore che il tema chiaro scurisce —
+   perché lo pensa su fondo bianco — qui diventa illeggibile.
+
+   Questo difetto è tornato QUATTRO volte, e ogni volta l'ho rattoppato
+   sull'elemento che era saltato fuori: prima `.cook`, poi `.cook__step`, poi
+   `.chip` dentro `.cook`, poi i badge di scadenza. Finché il rimedio è per
+   elemento, il prossimo esemplare esiste sempre. Il rimedio giusto è per
+   SUPERFICIE, ed è questo blocco: chi aggiunge una superficie a fondo scuro
+   fisso la aggiunge QUI, e non deve più pensarci.
+
+   Nota: non si può ridefinire `--text` su queste superfici, perché dentro
+   .super le righe degli articoli sono schede CHIARE che lo usano davvero. */
+.cook, .super, .guide { --primary-2: var(--primary-2-scuro, #ffb86b); }
+.cook, .cook__step, .super, .guide, .cal-cell.has-plan { color: #efe8dd; }
+/* Questi due dichiarano il colore per conto proprio, quindi non ereditano.
+   `.super__close` è la X per USCIRE dal supermercato: invisibile, non si esce. */
+.super__close, .super__title { color: #efe8dd; }
+/* ---- E le SCHEDE CHIARE che vivono DENTRO quelle superfici scure ----
+   "Superficie a fondo scuro" non vuol dire che tutto ciò che sta dentro abbia
+   fondo scuro. Le righe della Modalità supermercato (.super__item) se la cavano
+   da sole perché dichiarano `color: var(--text)`; le 16 schede della Guida no,
+   ed ereditavano il crema qui sopra finendo a 1,22:1 su fondo bianco — titoli
+   spariti nella schermata che si apre al primo avvio dopo un aggiornamento.
+   Chi aggiunge una scheda chiara dentro una superficie scura la elenca QUI. */
+.guide-card { color: var(--text); --primary-2: var(--primary-2-tema, #a8490c); }
 .cook__step { font-size: 1.5rem; line-height: 1.5; font-weight: 600; max-width: 640px; }
 .cook--xl .cook__step { font-size: 2.3rem; line-height: 1.45; font-weight: 700; }
 .cook--xl .cook__progress { font-size: 1.05rem; }
@@ -1831,6 +1883,19 @@ p, li, .setting-row__desc, .hint, .recipe-item__notes, .steps-list li { text-wra
 .exp { font-size: 0.74rem; font-weight: 800; padding: 4px 9px; border-radius: 999px; background: var(--surface-2); color: var(--text-soft); white-space: nowrap; }
 .exp--warn { background: rgba(255, 184, 107, 0.16); color: #ffcf94; }
 .exp--bad { background: rgba(255, 94, 108, 0.16); color: #ffb3bb; }
+/* Stessa famiglia di .chip e .tagchip: tinte da fondo scuro rimaste tali sul
+   chiaro — misurati 1,25:1 su "scade oggi / tra N g" e 1,34:1 su "scaduto".
+   Il badge che avvisa che qualcosa sta per andare a male era invisibile
+   proprio quando ha qualcosa da dire, e questa è la versione che rende le
+   scadenze modificabili: senza questo, la funzione resta a metà. */
+:root[data-theme="light"] .exp { color: #5c5148; }
+:root[data-theme="light"] .exp--warn { background: rgba(160, 95, 10, 0.14); color: #7a4408; }
+:root[data-theme="light"] .exp--bad { background: rgba(190, 40, 50, 0.12); color: #9d1f1f; }
+/* La scadenza è diventata toccabile: il pulsante non deve avere aspetto proprio
+   (il badge dentro fa già da etichetta), ma serve un'area comoda per il dito —
+   almeno 44px di altezza come tutti gli altri comandi. */
+.exp-btn { background: none; border: 0; padding: 4px 0; min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+.exp--empty { background: transparent; border: 1px dashed var(--border); color: var(--text-soft); font-weight: 700; }
 .have-badge { display: inline-block; margin-left: 8px; font-size: 0.75rem; font-weight: 800; color: var(--primary-2); background: rgba(255, 184, 107, 0.14); border-radius: 999px; padding: 2px 9px; }
 /* "Svuota la dispensa": righe ricetta + ingredienti mancanti + avanzi */
 .cks-list { display: flex; flex-direction: column; gap: 6px; }
@@ -1902,7 +1967,14 @@ p, li, .setting-row__desc, .hint, .recipe-item__notes, .steps-list li { text-wra
 .fest-up__row { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-bottom: 7px; color: var(--text); }
 .fest-up__name { font-weight: 700; }
 .fest-up__when { color: var(--text-soft); font-size: 0.82rem; white-space: nowrap; }
-.put-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+/* Riga a due piani: nome + calendario sopra, pastiglie rapide sotto. Le
+   pastiglie vanno a capo da sole quando il nome è lungo, invece di stringere
+   il campo data fino a renderlo illeggibile. */
+.put-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.put-row__quick { display: flex; gap: 6px; flex-basis: 100%; }
+/* 44px come tutti gli altri comandi: sono pastiglie da toccare con le mani
+   occupate, non decorazioni. */
+.chip--xs { padding: 5px 10px; font-size: 0.75rem; min-height: 44px; }
 .put-row:last-child { border-bottom: none; }
 .put-row__name { flex: 1; font-weight: 600; display: flex; align-items: center; gap: 8px; min-width: 0; }
 .put-row__name .ic { color: var(--primary-2); flex-shrink: 0; }

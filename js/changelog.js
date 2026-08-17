@@ -6,6 +6,16 @@
 
 export const CHANGELOG = [
   {
+    v: "8.61",
+    d: "2026-08-17",
+    items: [
+      "<b>In tema chiaro molti testi erano quasi invisibili.</b> Il colore dell'app era nato per il fondo scuro e non era mai stato adattato: i titoli delle sezioni in Impostazioni, i tre titoli di gruppo della scheda ricetta, i pulsanti − e + delle porzioni e quelli \"leggeri\" si leggevano a fatica. Vale per tutti e sei i colori scegliibili.",
+      "<b>Le schermate che restano scure anche col tema chiaro ora sono leggibili.</b> Sono quattro — Modalità cucina, Modalità supermercato, Guida e il giorno pianificato nel calendario — e ci finivano dentro colori pensati per il fondo bianco. Al supermercato erano illeggibili i nomi dei reparti e <b>la X per uscire</b>; nella Guida i titoli di tutte e sedici le schede.",
+      "I badge delle scadenze in dispensa (\"scade oggi\", \"scaduto\") si vedono: erano fra i meno leggibili di tutti, proprio quelli che devono avvisarti.",
+      "L'indicatore \"Cloud ✓\" in alto, che sta a schermo su ogni schermata, era quasi invisibile in tema chiaro."
+    ]
+  },
+  {
     v: "8.60",
     d: "2026-08-17",
     items: [
