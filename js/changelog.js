@@ -6,6 +6,17 @@
 
 export const CHANGELOG = [
   {
+    v: "8.60",
+    d: "2026-08-17",
+    items: [
+      "<b>La copia di sicurezza non può più fotografare i dati a metà.</b> Con l'account, dispensa, piano e congelatore arrivano dal cloud pochi istanti dopo le ricette: la copia automatica scattava prima e li salvava vuoti, e un \"Torna com'era\" li avrebbe cancellati davvero, mostrando intanto un numero di ricette giusto.",
+      "<b>Anche \"Torna com'era\" ora si annulla.</b> Prima era definitivo, e puntava per sempre alla copia del primo ripristino fatto: a mesi di distanza avrebbe riportato l'app com'era allora. Ora le due copie si scambiano.",
+      "Il backup manuale non si può più esportare mentre i dati stanno ancora arrivando dal cloud: usciva un file all'apparenza perfetto ma con la dispensa vuota.",
+      "Se qualcosa non è raggiungibile, il ripristino si può fare lo stesso ma l'app avvisa prima che non potrà annullarlo, invece di rifiutarsi o di fingere.",
+      "La copia automatica del giorno non salta più in silenzio su rete lenta: riprova per due minuti e mezzo invece di rinunciare al primo tentativo."
+    ]
+  },
+  {
     v: "8.59",
     d: "2026-08-16",
     items: [

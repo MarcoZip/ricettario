@@ -1,8 +1,14 @@
 // Backend di salvataggio CLOUD tramite Firebase Firestore.
 // Caricato dinamicamente solo quando la configurazione è presente.
 // I dati di ogni utente vivono sotto:  users/{uid}/tools  e  users/{uid}/recipes
-// Firestore tiene una cache offline locale: l'app funziona anche senza rete e
-// sincronizza automaticamente appena torna online.
+// ATTENZIONE — la cache offline NON è attiva. Qui c'era scritto il contrario
+// ("l'app funziona anche senza rete"), ma `getFirestore()` con l'SDK 10 usa la
+// cache in MEMORIA: chiusa l'app, i dati non ci sono più. In modalità cloud
+// senza rete il ricettario si apre VUOTO — con lo schermo davanti ai fornelli.
+// Per attivarla davvero servirebbe `initializeFirestore(app, { localCache:
+// persistentLocalCache() })`, che è una modifica a questo adapter: da fare solo
+// dopo aver messo in piedi una prova su un account Firebase di servizio,
+// perché qui non è mai stato eseguito un collaudo.
 
 import { firebaseConfig } from "./config.js";
 
@@ -42,6 +48,33 @@ export async function createFirebaseAdapter(uid) {
   let freezer = [];
   let onChange = () => {};
 
+  // Quali delle 8 collezioni hanno già ricevuto il loro PRIMO snapshot.
+  // In cloud i dati non arrivano tutti insieme: ogni collezione ha il suo
+  // ascolto e arriva per conto suo. Finché non sono arrivate tutte, lo stato
+  // è a metà — e una copia di sicurezza scattata adesso fotograferebbe una
+  // dispensa vuota che al ripristino cancellerebbe quella vera.
+  const arrivate = new Set();
+  const inErrore = new Set();
+  const TOTALE_COLLEZIONI = 8;
+  function segna(nome) { arrivate.add(nome); inErrore.delete(nome); }
+  // Un ascolto che fallisce (regola negata, codice Casa sbagliato, rete caduta)
+  // non consegnerà MAI il suo primo elenco. Senza questo, `caricamentoCompleto()`
+  // resterebbe falso per sempre e chi aspetta di essere "pronto" aspetterebbe in
+  // eterno: la copia automatica non si farebbe mai, e — molto peggio — il
+  // ripristino da file resterebbe murato dietro un messaggio che dice "aspetta
+  // qualche secondo", cioè una bugia. Un errore è una risposta: la collezione
+  // smette di essere "in arrivo" e diventa "non disponibile".
+  function segnaErrore(nome, err) {
+    inErrore.add(nome);
+    arrivate.add(nome);
+    console.warn("Fornelli: la collezione «" + nome + "» non è raggiungibile.", err && err.code ? err.code : err);
+    emit();
+  }
+  // Ascolto con gestione dell'errore: prima nessuno degli otto ce l'aveva.
+  function ascolta(rif, nome, applica) {
+    onSnapshot(rif, (snap) => { applica(snap); segna(nome); emit(); }, (err) => segnaErrore(nome, err));
+  }
+
   function emit() {
     onChange({ tools: [...tools], recipes: [...recipes], shopping: [...shopping], plan: [...plan], pantry: [...pantry], menus: [...menus], events: [...events], freezer: [...freezer] });
   }
@@ -53,39 +86,24 @@ export async function createFirebaseAdapter(uid) {
       onChange = cb;
       // Due listener in tempo reale: ogni modifica (anche da un altro
       // dispositivo) aggiorna subito l'interfaccia.
-      onSnapshot(toolsCol, (snap) => {
-        tools = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        emit();
-      });
-      onSnapshot(recipesCol, (snap) => {
-        recipes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        emit();
-      });
-      onSnapshot(shopTarget, (snap) => {
-        shopping = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        emit();
-      });
-      onSnapshot(planCol, (snap) => {
-        plan = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        emit();
-      });
-      onSnapshot(pantryCol, (snap) => {
-        pantry = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        emit();
-      });
-      onSnapshot(menusCol, (snap) => {
-        menus = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        emit();
-      });
-      onSnapshot(eventsTarget, (snap) => {
-        events = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        emit();
-      });
-      onSnapshot(freezerCol, (snap) => {
-        freezer = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        emit();
-      });
+      ascolta(toolsCol, "tools", (s) => { tools = s.docs.map((d) => ({ id: d.id, ...d.data() })); });
+      ascolta(recipesCol, "recipes", (s) => { recipes = s.docs.map((d) => ({ id: d.id, ...d.data() })); });
+      ascolta(shopTarget, "shopping", (s) => { shopping = s.docs.map((d) => ({ id: d.id, ...d.data() })); });
+      ascolta(planCol, "plan", (s) => { plan = s.docs.map((d) => ({ id: d.id, ...d.data() })); });
+      ascolta(pantryCol, "pantry", (s) => { pantry = s.docs.map((d) => ({ id: d.id, ...d.data() })); });
+      ascolta(menusCol, "menus", (s) => { menus = s.docs.map((d) => ({ id: d.id, ...d.data() })); });
+      ascolta(eventsTarget, "events", (s) => { events = s.docs.map((d) => ({ id: d.id, ...d.data() })); });
+      ascolta(freezerCol, "freezer", (s) => { freezer = s.docs.map((d) => ({ id: d.id, ...d.data() })); });
     },
+
+    // Vero quando TUTTE le collezioni hanno dato una risposta — un elenco oppure
+    // un errore. Serve a chi deve fotografare lo stato completo (la copia di
+    // sicurezza): prima di questo momento una collezione vuota non significa
+    // "non c'è niente", significa "non è ancora arrivato".
+    caricamentoCompleto() { return arrivate.size >= TOTALE_COLLEZIONI; },
+    // Le collezioni che hanno risposto con un errore: sono "note" ma il loro
+    // contenuto NON è attendibile. Chi sta per sovrascrivere i dati deve saperlo.
+    collezioniInErrore() { return [...inErrore]; },
 
     async addTool(tool) {
       const { id, ...data } = tool;

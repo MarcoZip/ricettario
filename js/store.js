@@ -723,6 +723,9 @@ export function exportData() {
 // tre volte (v8.32, v8.41, v8.51).
 const BK_AUTO = "ricettario.backupAuto";
 const BK_PRIMA = "ricettario.backupPrimaDelRipristino";
+// Deposito di passaggio: ci si mette lo stato attuale mentre "Torna com'era" è
+// in corso, e diventa la copia automatica solo a operazione riuscita.
+const BK_TEMP = "ricettario.backupInCorso";
 
 function scriviCopia(chiave, dati) {
   const testo = JSON.stringify(dati);
@@ -735,6 +738,14 @@ function scriviCopia(chiave, dati) {
     // in corso. Mai il contrario — un salvataggio automatico che non entra in
     // memoria non deve cancellare la rete di sicurezza, e succederebbe proprio
     // quando la memoria è piena, cioè quando le cose vanno già male.
+    // Prima però si butta SEMPRE l'eventuale copia di passaggio rimasta da un
+    // ripristino andato male: è la sola che non serve più a nessuno, e finché
+    // restava lì occupava spazio a danno delle due che contano.
+    let liberato = false;
+    try { if (localStorage.getItem(BK_TEMP) != null) { localStorage.removeItem(BK_TEMP); liberato = true; } } catch (e2) {}
+    if (liberato) {
+      try { localStorage.setItem(chiave, testo); return true; } catch (e3) { /* ancora piena */ }
+    }
     if (chiave !== BK_PRIMA) return false;
     try {
       localStorage.removeItem(BK_AUTO);
@@ -750,10 +761,56 @@ function leggiCopia(chiave) {
   } catch (e) { return null; }
 }
 
+// Vero quando lo stato in memoria è completo, cioè quando è lecito fotografarlo.
+// In cloud le 8 collezioni arrivano da 8 ascolti separati: per qualche istante
+// dopo l'avvio ci possono essere le ricette e non ancora la dispensa. Una copia
+// scattata in quel momento avrebbe `pantry: []` — non "assente", VUOTA — e al
+// ripristino cancellerebbe davvero la dispensa. La distinzione "assente ≠ vuoto"
+// della v8.51 qui non protegge: protegge dai campi mancanti, non dai campi
+// presenti e sbagliati.
+export function statoCompleto() {
+  return !adapter || !adapter.caricamentoCompleto ? true : adapter.caricamentoCompleto();
+}
+
+// Più esigente di `statoCompleto()`: tutte le collezioni hanno risposto **e**
+// nessuna ha risposto con un errore. Una collezione che il server ha negato è
+// in memoria come lista vuota: perfetta da guardare, disastrosa da fotografare.
+// Le due domande vanno tenute separate — "posso procedere?" e "mi posso fidare
+// di quello che vedo?" — altrimenti un errore permanente murerebbe il
+// ripristino d'emergenza, che è esattamente il momento in cui serve.
+export function datiAttendibili() {
+  if (!statoCompleto()) return false;
+  if (!adapter || !adapter.collezioniInErrore) return true;
+  return adapter.collezioniInErrore().length === 0;
+}
+
 // Copia automatica, al massimo una al giorno. Silenziosa: se non entra in
 // memoria pazienza, non è il momento di disturbare l'utente.
+// Ritorna: true se scritta, "attendi" se i dati non sono ancora tutti arrivati
+// (chi chiama deve riprovare), false se non serve o non si può.
+// C'è qualcosa che si può perdere? Guarda TUTTE le collezioni, non solo le
+// ricette: chi ha zero ricette ma la dispensa e il piano pieni ha comunque
+// qualcosa da perdere. Serve a tutti e tre i punti che decidono se fare una
+// copia — prima era scritta in uno solo, ed è la classica correzione applicata
+// all'esemplare invece che alla classe.
+function qualcosaDaPerdere() {
+  return !!(state.recipes.length || state.tools.length || state.shopping.length ||
+    state.plan.length || state.pantry.length || state.menus.length || state.events.length || state.freezer.length);
+}
+
 export function backupAutomatico() {
-  if (!state.recipes.length) return false; // niente da salvare (o dati non ancora arrivati)
+  if (!statoCompleto()) return "attendi";
+  // Meglio nessuna copia che una copia falsa. Ma va detto: con una collezione
+  // stabilmente irraggiungibile la copia giornaliera si fermerebbe per sempre,
+  // ed è proprio il silenzio il difetto che continua a ripresentarsi qui.
+  if (!datiAttendibili()) {
+    if (!backupAutomatico._avvisato) {
+      backupAutomatico._avvisato = true;
+      console.warn("Fornelli: copia di sicurezza sospesa — alcuni dati non sono raggiungibili, una copia adesso sarebbe incompleta.");
+    }
+    return false;
+  }
+  if (!qualcosaDaPerdere()) return false; // niente da salvare
   const prec = leggiCopia(BK_AUTO);
   if (prec && prec.exportedAt && Date.now() - Date.parse(prec.exportedAt) < 24 * 3600000) return false;
   return scriviCopia(BK_AUTO, exportData());
@@ -773,10 +830,41 @@ export function copiaSicurezza() {
 }
 
 // Rimette i dati com'erano. Serve dopo un ripristino andato male.
+// Le due copie si SCAMBIANO invece di perderne una: lo stato attuale prende il
+// posto della copia automatica, e "prima del ripristino" viene consumata. Senza
+// questo, "Torna com'era" sarebbe a sua volta irreversibile, e — siccome
+// BK_PRIMA aveva priorità assoluta e non scadeva mai — un ripristino fatto a
+// gennaio avrebbe continuato a essere la destinazione del pulsante ad agosto,
+// oscurando per mesi la copia automatica fresca. Corretto un difetto e creato
+// il suo simmetrico: qui si chiudono tutti e due.
 export async function ripristinaCopiaSicurezza() {
-  const d = leggiCopia(BK_PRIMA) || leggiCopia(BK_AUTO); // stessa priorità di copiaSicurezza()
+  const prima = leggiCopia(BK_PRIMA);
+  const d = prima || leggiCopia(BK_AUTO); // stessa priorità di copiaSicurezza()
   if (!d) throw new Error("Non c'è nessuna copia di sicurezza.");
-  await importData(d, { merge: false, saltaCopia: true });
+  // Lo stato attuale diventa la nuova copia automatica: così anche l'annullamento
+  // si annulla. Ma si scrive PRIMA su una chiave temporanea e la si promuove solo
+  // a ripristino riuscito: scrivendo subito su BK_AUTO, un ripristino che cade a
+  // metà (rete) bruciava l'unica rete di sicurezza di chi non ha BK_PRIMA — al
+  // secondo tentativo "Torna com'era" avrebbe rimesso proprio lo stato rotto.
+  let temporanea = false;
+  if (datiAttendibili() && qualcosaDaPerdere()) temporanea = scriviCopia(BK_TEMP, exportData());
+  try {
+    await importData(d, { merge: false, saltaCopia: true });
+    // Da qui in poi il ripristino è riuscito: si può riorganizzare la rete.
+    if (temporanea) {
+      try { localStorage.setItem(BK_AUTO, localStorage.getItem(BK_TEMP)); } catch (e) {}
+    }
+    // Consumata: ha fatto il suo lavoro. Da adesso la copia giusta è quella
+    // automatica, che segue l'uso reale invece di restare ferma a mesi fa.
+    if (prima) { try { localStorage.removeItem(BK_PRIMA); } catch (e) {} }
+  } finally {
+    // In un `finally`: se il ripristino fallisce, la copia di passaggio va tolta
+    // comunque. Lasciata lì restava quasi un mega di roba che nessuno legge e
+    // nessuno cancella — e siccome `scriviCopia` fa spazio sacrificando SOLO la
+    // copia automatica, l'immondizia sarebbe sopravvissuta alla rete di
+    // sicurezza vera. È il difetto B3 della v8.59, riaperto da una chiave nuova.
+    try { localStorage.removeItem(BK_TEMP); } catch (e) {}
+  }
   return (d.recipes || []).length;
 }
 
@@ -784,10 +872,18 @@ export async function importData(data, { merge = false, saltaCopia = false } = {
   if (!data || !Array.isArray(data.tools) || !Array.isArray(data.recipes)) {
     throw new Error("File di backup non valido.");
   }
+  // Sostituire mentre i dati stanno ancora arrivando è pericoloso due volte:
+  // la copia di sicurezza fotograferebbe uno stato a metà, e il confronto con
+  // quello che c'è già sarebbe fatto su collezioni non ancora consegnate.
+  if (!merge && !statoCompleto()) throw new Error("NONPRONTO");
   // Prima di sostituire, si mette da parte com'era: così un ripristino sbagliato
   // si annulla invece di essere definitivo. `saltaCopia` evita che l'annullamento
   // sovrascriva la copia con lo stato rotto che sta annullando.
-  if (!merge && !saltaCopia && state.recipes.length) {
+  // Se una collezione ha risposto con un errore, la copia sarebbe falsa: meglio
+  // NON scriverla che scriverne una che al prossimo "Torna com'era" cancella la
+  // dispensa. Non si blocca il ripristino — si è già avvisato l'utente che
+  // l'annullamento non sarà disponibile (vedi la conferma in ui.js).
+  if (!merge && !saltaCopia && qualcosaDaPerdere() && datiAttendibili()) {
     if (!scriviCopia(BK_PRIMA, exportData())) {
       throw new Error("NOCOPIA");
     }

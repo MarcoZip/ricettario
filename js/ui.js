@@ -654,7 +654,10 @@ export function confirmDialog({ title, message, confirmText = "Conferma", danger
   return new Promise((resolve) => {
     const m = openModal(`
       <h3 class="modal__title">${escapeHtml(title)}</h3>
-      <p style="margin-top:-6px;color:var(--text-soft)">${escapeHtml(message)}</p>
+      <!-- pre-line: gli avvisi vanno a capo davvero. Senza, il "⚠️ Attenzione"
+           finiva attaccato alla frase precedente e dello stesso colore, cioè
+           invisibile proprio quando conta. -->
+      <p style="margin-top:-6px;color:var(--text-soft);white-space:pre-line">${escapeHtml(message)}</p>
       <div class="modal__actions">
         <button class="btn" data-act="cancel">Annulla</button>
         <button class="btn ${danger ? "btn--primary" : "btn--primary"}" style="${danger ? "background:var(--danger)" : ""}" data-act="ok">${escapeHtml(confirmText)}</button>
@@ -757,7 +760,26 @@ export function mount(rootEl) {
   restoreGTimers();
   // Copia di sicurezza automatica, una volta al giorno, in silenzio. Si fa dopo
   // qualche secondo per non rubare tempo all avvio.
-  setTimeout(() => { try { store.backupAutomatico(); } catch (e) {} }, 5000);
+  // In cloud i dati arrivano a pezzi: se a 5 secondi non sono ancora tutti qui,
+  // `backupAutomatico` risponde "attendi" e si riprova più tardi invece di
+  // rinunciare per tutta la sessione (com'era: un solo tentativo, e su rete
+  // lenta la copia del giorno non veniva MAI fatta, in silenzio).
+  // Le attese sono CUMULATIVE (ogni tentativo pianifica il successivo da quando
+  // fallisce): 5, 20, 60 e 150 secondi dall'avvio. Oltre, si rinuncia fino al
+  // prossimo avvio — e lo si scrive in console, invece di tacere.
+  const tentativiCopia = [5000, 15000, 40000, 90000];
+  const provaCopia = (i) => {
+    if (i >= tentativiCopia.length) {
+      console.warn("Fornelli: copia di sicurezza automatica saltata — i dati non sono arrivati tutti entro due minuti e mezzo.");
+      return;
+    }
+    setTimeout(() => {
+      let esito = false;
+      try { esito = store.backupAutomatico(); } catch (e) {}
+      if (esito === "attendi") provaCopia(i + 1);
+    }, tentativiCopia[i]);
+  };
+  provaCopia(0);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && gTimers.some((t) => t.running)) gTick();
   });
@@ -8740,6 +8762,15 @@ function renderImpostazioni() {
   wireNotify();
 
   root.querySelector("#exportBtn").addEventListener("click", () => {
+    // Il file esportato è "l'unica copia delle ricette di famiglia": generarlo
+    // mentre i dati stanno ancora arrivando dal cloud produce un backup con la
+    // dispensa VUOTA — un file che sembra perfetto e che mesi dopo, ripristinato,
+    // cancella davvero la dispensa. La guardia era stata messa sulla copia
+    // automatica e sull'import, ma non qui: cioè non nel punto in cui il file nasce.
+    if (!store.datiAttendibili()) {
+      toast("I tuoi dati stanno ancora arrivando dal cloud: aspetta qualche secondo, altrimenti il backup uscirebbe incompleto.", "error");
+      return;
+    }
     const data = store.exportData();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
@@ -8759,11 +8790,16 @@ function renderImpostazioni() {
     try {
       const text = await file.text();
       const data = JSON.parse(text);
+      // Se qualcosa non è raggiungibile, il ripristino si può fare lo stesso —
+      // è proprio il momento in cui serve — ma la rete di sicurezza non ci sarà,
+      // e va detto PRIMA, non dopo.
+      const senzaRete = !store.datiAttendibili();
       const ok = await confirmDialog({
         title: "Importare il backup?",
-        message: getHousehold()
+        message: (getHousehold()
           ? "Ricette, strumenti, dispensa, piano, menù e congelatore verranno sostituiti con quelli del file: quello che hai ora e non è nel backup viene eliminato. La lista della spesa e i menù delle feste della Casa condivisa non vengono toccati, perché sono anche dell'altra persona: da lì il backup viene solo aggiunto."
-          : "I dati attuali verranno sostituiti con quelli del file: quello che hai ora e non è nel backup viene eliminato.",
+          : "I dati attuali verranno sostituiti con quelli del file: quello che hai ora e non è nel backup viene eliminato.")
+          + (senzaRete ? "\n\n⚠️ Attenzione: in questo momento non riesco a leggere tutti i tuoi dati, quindi NON potrò preparare la copia per annullare. Questa operazione sarà definitiva." : ""),
         confirmText: "Importa",
         danger: true
       });
@@ -8777,8 +8813,13 @@ function renderImpostazioni() {
         } catch (errScrittura) {
           // NOCOPIA: non siamo riusciti a mettere da parte lo stato attuale, quindi
           // il ripristino sarebbe stato irreversibile. Meglio non farlo affatto.
-          if (String(errScrittura && errScrittura.message) === "NOCOPIA") {
+          const causa = String(errScrittura && errScrittura.message);
+          if (causa === "NOCOPIA") {
             toast("Memoria del telefono piena: non posso preparare la copia di sicurezza, e senza quella non ripristino. Libera spazio e riprova.", "error");
+          } else if (causa === "NONPRONTO") {
+            // I dati del cloud non sono ancora arrivati tutti: sostituire adesso
+            // vorrebbe dire confrontare il backup con metà dei tuoi dati.
+            toast("I tuoi dati stanno ancora arrivando dal cloud. Aspetta qualche secondo e riprova.", "error");
           } else {
             toast("Ripristino interrotto: controlla la rete e riprova. Il file del backup è a posto.", "error");
           }
@@ -8801,7 +8842,13 @@ function renderImpostazioni() {
     const c = store.copiaSicurezza();
     const ok = await confirmDialog({
       title: "Tornare com'era?",
-      message: `I dati verranno riportati alla copia di sicurezza${c && c.quando ? " del " + new Date(c.quando).toLocaleString("it-IT") : ""} (${c ? c.ricette : 0} ricette). Quello che hai cambiato dopo andrà perso.`,
+      // La promessa "puoi tornare indietro un'altra volta" vale solo se lo stato
+      // attuale si può davvero mettere da parte. Se una collezione non è
+      // raggiungibile non si può, e prometterlo lo stesso è peggio che tacere.
+      message: `I dati verranno riportati alla copia di sicurezza${c && c.quando ? " del " + new Date(c.quando).toLocaleString("it-IT") : ""} (${c ? c.ricette : 0} ricette).`
+        + (store.datiAttendibili()
+          ? " Quello che hai ora viene messo da parte: puoi tornare indietro un'altra volta con questo stesso pulsante."
+          : "\n\n⚠️ Attenzione: in questo momento non riesco a leggere tutti i tuoi dati, quindi NON posso mettere da parte quello che hai ora. Questa operazione sarà definitiva."),
       confirmText: "Torna com'era",
       danger: true
     });
@@ -8811,7 +8858,12 @@ function renderImpostazioni() {
       toast(`Ripristinate ${n} ricette dalla copia di sicurezza`, "success");
       navigate("strumenti");
     } catch (e) {
-      toast(e.message || "Non riuscito", "error");
+      // I codici interni non devono mai arrivare sotto gli occhi di chi usa
+      // l'app: qui compariva un toast rosso con scritto "NONPRONTO".
+      const causa = String(e && e.message);
+      if (causa === "NONPRONTO") toast("I tuoi dati stanno ancora arrivando dal cloud. Aspetta qualche secondo e riprova.", "error");
+      else if (causa === "NOCOPIA") toast("Memoria del telefono piena: libera spazio e riprova.", "error");
+      else toast("Non riuscito: controlla la rete e riprova.", "error");
     }
   });
 

@@ -45,6 +45,10 @@ export function createLocalAdapter() {
       onChange({ tools: [...state.tools], recipes: [...state.recipes], shopping: [...state.shopping], plan: [...state.plan], pantry: [...state.pantry], menus: [...state.menus], events: [...state.events], freezer: [...state.freezer] });
     },
 
+    // In locale si legge tutto in un colpo solo: appena l'adapter esiste, lo
+    // stato è già completo. (In cloud invece arriva a pezzi — vedi store-firebase.)
+    caricamentoCompleto() { return true; },
+
     async addTool(tool) {
       state.tools.push(tool);
       commit();
