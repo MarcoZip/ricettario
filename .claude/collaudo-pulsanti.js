@@ -26,12 +26,20 @@
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const conGestore = new WeakSet();
 
+  // Una sola esecuzione per volta. Due collaudi sovrapposti si innestano sul
+  // prototipo a vicenda: quando il primo finisce ripristina l'originale e il
+  // secondo smette di registrare, producendo oltre cento falsi morti. Un elenco
+  // così lungo insegna a ignorare lo strumento, che è il danno peggiore.
+  if (window.__collaudoInCorso) return { esito: "⏳ un altro collaudo è già in corso: attendi che finisca" };
+  window.__collaudoInCorso = true;
+
   // Da qui in avanti registriamo chi riceve un gestore di clic.
   const orig = EventTarget.prototype.addEventListener;
   EventTarget.prototype.addEventListener = function (tipo, fn, opz) {
     if (tipo === "click") conGestore.add(this);
     return orig.call(this, tipo, fn, opz);
   };
+  try {
 
   const morti = [];
   const visti = new Set();
@@ -79,6 +87,20 @@
     return true;
   };
   const chiudiFinestre = () => document.querySelectorAll("#modalRoot .modal-backdrop").forEach((x) => x.remove());
+  // La finestra da guardare è quella IN CIMA, come fa l'app stessa
+  // (js/ui.js: "agisce solo la finestra in cima"). Con un semplice
+  // querySelector si prendeva la più in basso: bastava una finestra rimasta
+  // aperta perché il collaudo ispezionasse quella al posto di "Modifica
+  // ricetta", cioè proprio dove viveva il guasto.
+  const finestraInCima = () => {
+    const b = [...document.querySelectorAll("#modalRoot .modal-backdrop")].pop();
+    return b ? b.querySelector(".modal") : null;
+  };
+
+  // Si comincia da zero: una finestra rimasta aperta (per esempio "Novità",
+  // che si apre da sola dopo ogni cambio di versione — cioè proprio quando si
+  // esegue questo collaudo) falsava tutto il resto.
+  chiudiFinestre();
 
   // ---------- 1. Le schermate ----------
   // ATTENZIONE ai nomi: la v8.37 ha rinominato le ETICHETTE ("Strumenti" →
@@ -118,7 +140,7 @@
     if (!b) { morti.push("finestra non raggiungibile: " + f.nome + " (#" + f.id + " assente)"); continue; }
     b.click();
     await wait(900);
-    const m = document.querySelector("#modalRoot .modal");
+    const m = finestraInCima();
     if (!m) { morti.push("NON SI APRE: " + f.nome); continue; }
     controlla("finestra " + f.nome, m, true); // dentro le finestre: TUTTI i pulsanti
     chiudiFinestre();
@@ -144,18 +166,29 @@
     if (!b) { morti.push("finestra non raggiungibile: " + f.nome + " (#" + f.id + " assente in " + f.rotta + ")"); continue; }
     b.click();
     await wait(900);
-    const m = document.querySelector("#modalRoot .modal");
+    const m = finestraInCima();
     if (!m) { morti.push("NON SI APRE: " + f.nome); continue; }
     controlla("finestra " + f.nome, m, true);
     chiudiFinestre();
     await wait(300);
   }
 
-  EventTarget.prototype.addEventListener = orig;
   chiudiFinestre();
   return {
     controllati,
     pulsantiSenzaGestore: morti,
+    // Il numero di controlli VARIA fra esecuzioni (dipende da quante ricette ci
+    // sono e da dove era rimasta l'app): non confrontarlo con quello di ieri.
+    // Conta solo che i morti siano zero.
+    nonCoperti: "finestre che chiamano l'AI, che aprono il selettore di file e le azioni distruttive: escluse di proposito, mai controllate",
+    limite: "verifica che un gestore ESISTA, non che faccia la cosa giusta",
     esito: morti.length ? "❌ CI SONO PULSANTI MORTI" : "✅ tutti i pulsanti hanno un gestore"
   };
+  } finally {
+    // In un `finally`: se l'esecuzione si interrompe a metà, il prototipo va
+    // comunque rimesso a posto. Lasciandolo alterato, il collaudo successivo
+    // non registra più niente e segnala oltre cento falsi morti.
+    EventTarget.prototype.addEventListener = orig;
+    window.__collaudoInCorso = false;
+  }
 })();
