@@ -52,7 +52,8 @@
   // "tutto a posto". La Spesa risultava coperta al 33%.
   const gia = new WeakSet();
   let controllati = 0;
-  const perEtichetta = {}; // per non stampare 12 righe identiche nel risultato
+  const perEtichetta = {};   // per non stampare 12 righe identiche nel risultato
+  const perSuperficie = {};  // quanti pulsanti per schermata/finestra: un calo qui è un segnale, non rumore
 
   // Un pulsante è "vivo" se ha un gestore suo, oppure la proprietà onclick,
   // oppure un antenato con gestore (delega dell'evento).
@@ -88,6 +89,7 @@
       if (gia.has(b)) return;
       gia.add(b);
       controllati++;
+      perSuperficie[dove] = (perSuperficie[dove] || 0) + 1;
       if (!vivo(b)) {
         // Se una lista ha molte righe rotte si stampa una riga sola con il
         // conteggio, altrimenti l'elenco diventa illeggibile.
@@ -205,20 +207,35 @@
     if (!(await vaiA(f.rotta))) { morti.push("ROTTA INESISTENTE: " + f.rotta); continue; }
     // Il Piano si apre in vista Mese, ma "Crea il menù" vive nella Settimana:
     // senza questo passaggio la finestra veniva saltata IN SILENZIO.
+    // Cambio di vista TEMPORANEO: si torna sempre da dove si è partiti. Averlo
+    // messo solo nell'altro ciclo lasciava il Piano in Settimana, e dalla
+    // seconda esecuzione in poi la vista Mese — 35 pulsanti, tutto il
+    // calendario — non veniva più esaminata. Stessa app rotta: primo giro ❌ 35
+    // morti, secondo giro ✅. Il ritorno va fatto ovunque si cambi vista.
+    let vistaDaRipristinare = null;
     if (f.vista) {
-      const tab = [...document.querySelectorAll("button")].find((x) => x.textContent.trim() === f.vista);
+      const trova = (t) => [...document.querySelectorAll("button")].find((x) => x.textContent.trim() === t);
+      const attiva = document.querySelector(".tab-btn.is-active, .seg__b.is-active");
+      vistaDaRipristinare = attiva ? attiva.textContent.trim() : f.ritorno || null;
+      const tab = trova(f.vista);
       if (tab) { tab.click(); await wait(700); }
     }
+    const tornaIndietro = async () => {
+      if (!vistaDaRipristinare) return;
+      const t = [...document.querySelectorAll("button")].find((x) => x.textContent.trim() === vistaDaRipristinare);
+      if (t) { t.click(); await wait(600); }
+    };
     const b = document.getElementById(f.id);
     // Mai saltare in silenzio: se non si raggiunge, va detto — altrimenti il
     // collaudo dichiara "tutto a posto" su una finestra che non ha guardato.
-    if (!b) { morti.push("finestra non raggiungibile: " + f.nome + " (#" + f.id + " assente in " + f.rotta + ")"); continue; }
+    if (!b) { morti.push("finestra non raggiungibile: " + f.nome + " (#" + f.id + " assente in " + f.rotta + ")"); await tornaIndietro(); continue; }
     b.click();
     await wait(900);
     const m = finestraInCima();
-    if (!m) { morti.push("NON SI APRE: " + f.nome); continue; }
+    if (!m) { morti.push("NON SI APRE: " + f.nome); await tornaIndietro(); continue; }
     controlla("finestra " + f.nome, m, true);
     chiudiFinestre();
+    await tornaIndietro();
     await wait(300);
   }
 
@@ -226,8 +243,15 @@
   for (const k of Object.keys(perEtichetta)) {
     morti.push(perEtichetta[k] > 1 ? k + " (×" + perEtichetta[k] + ")" : k);
   }
+  // Si torna alla schermata di partenza: chi rilancia deve trovare l'app come
+  // l'ha lasciata, non su Impostazioni.
+  await vaiA("strumenti");
   return {
     controllati,
+    // Il totale da solo non dice niente: se una superficie sparisce dal giro
+    // (è già successo con la vista Mese) il totale cala e sembra rumore. Qui si
+    // vede QUALE superficie ha quanti pulsanti, e un calo diventa leggibile.
+    perSuperficie,
     pulsantiSenzaGestore: morti,
     valido: true,
     // Il numero varia con la quantità di dati (con 0 ricette scende a ~45):
@@ -238,7 +262,10 @@
       "Modalità cucina, Modalità supermercato, Guida, pannello Timer",
       "la vista Giorno del Piano",
       "gli elementi cliccabili che non sono <button>",
-      "le ricette oltre le prime tre"
+      "le ricette oltre le prime tre",
+      "la barra in alto e quella in basso (⏱, ?, le 5 voci di navigazione): collegate all'avvio, prima che il controllo cominci a registrare — vanno provate a mano",
+      "le superfici SENZA DATI: una lista vuota non ha righe da controllare e produce un ✅ che non significa nulla — guarda perSuperficie",
+      "un gestore aggiunto e poi rimosso (si annota addEventListener, non removeEventListener)"
     ],
     limite: "verifica che un gestore ESISTA, non che faccia la cosa giusta",
     esito: morti.length ? "❌ CI SONO PULSANTI MORTI" : "✅ tutti i pulsanti hanno un gestore"
