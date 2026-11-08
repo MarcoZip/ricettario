@@ -4727,6 +4727,194 @@ function buildAmbientBits(method) {
   return html;
 }
 
+// ---------------- Comandi vocali della Modalità cucina ----------------
+// Pensati per le MANI UNTE: si parla, non si tocca. Due regole, nate dai
+// difetti della versione precedente (verificati provando le frasi):
+//  1. Vale solo il comando detto DA SOLO ("avanti"), non la parola dentro una
+//     frase. Prima "vai a prendere il sale" portava al passo successivo e
+//     "torna a mescolare" a quello prima; e il telefono che leggeva ad alta
+//     voce "continua a mescolare" poteva sentirsi da solo e saltare un passo.
+//  2. Le parole sono quelle che si dicono davvero. "prossimo", "precedente",
+//     "zitto" NON funzionavano: le radici erano scritte con \b da tutte e due
+//     le parti, e "prossim\b" non riconosce "prossimo".
+// La funzione è pura (niente stato, niente schermo): decide cosa fare, e
+// chi la chiama lo fa. Così si può provare con le frasi scritte.
+const VOCE_NUMERI = { un: 1, uno: 1, una: 1, due: 2, tre: 3, quattro: 4, cinque: 5, sei: 6, sette: 7, otto: 8, nove: 9, dieci: 10, undici: 11, dodici: 12, tredici: 13, quattordici: 14, quindici: 15, sedici: 16, diciassette: 17, diciotto: 18, diciannove: 19, venti: 20, venticinque: 25, trenta: 30, trentacinque: 35, quaranta: 40, quarantacinque: 45, cinquanta: 50, cinquantacinque: 55, sessanta: 60, novanta: 90 };
+const VOCE_FRASI = {
+  avanti: ["avanti", "vai avanti", "vai", "prossimo", "il prossimo", "prossimo passo", "passo successivo", "successivo", "continua", "dopo", "fatto", "next"],
+  indietro: ["indietro", "torna indietro", "vai indietro", "torna", "precedente", "il precedente", "passo precedente"],
+  ripeti: ["ripeti", "rileggi", "leggi", "leggilo", "ripeti il passo", "di nuovo", "ancora", "come", "cosa", "non ho capito", "puoi ripetere", "puoi rileggere", "rileggimelo"],
+  // Chiudere la ricetta SCRIVE nel diario (la segna come cucinata). All'ultimo
+  // passo quindi non bastano le parole generiche ("vai", "dopo", "fatto"),
+  // che si dicono anche per caso: servono queste, esplicite.
+  fine: ["fine", "finito", "ho finito", "abbiamo finito", "e pronto", "piatto pronto"],
+  basta: ["basta", "stop", "ferma", "fermati", "zitto", "zitta", "silenzio", "spegni", "spegnilo", "spegnila", "spegni la sveglia", "spegni il timer", "spegni l allarme", "ok", "va bene", "smetti"],
+  ingredienti: ["ingredienti", "gli ingredienti", "leggi gli ingredienti", "dimmi gli ingredienti", "quali sono gli ingredienti", "cosa serve", "cosa mi serve", "cosa ci vuole", "lista ingredienti"],
+  statoTimer: ["timer", "i timer", "quanto manca", "quanto tempo manca", "quanto manca al timer", "a che punto e il timer", "quanto tempo"]
+};
+// L'elenco di frasi esatte qui sopra NON basta: alla prima prova con frasi
+// naturali ne falliva quasi la metà ("il prossimo passo", "andiamo avanti",
+// "basta così", "ripetilo"). Quindi, per i quattro comandi di base, vale anche
+// una regola: frase BREVE, con una parola-comando e tutte le altre "vuote".
+// "Vai a prendere il sale" resta fuori perché "prendere" e "sale" non lo sono.
+const VOCE_CHIAVI = {
+  avanti: new Set(["avanti", "prossimo", "prossima", "successivo", "dopo", "poi", "continua", "continuiamo", "prosegui", "proseguiamo", "next", "fatto"]),
+  indietro: new Set(["indietro", "precedente", "prima"]),
+  ripeti: new Set(["ripeti", "ripetilo", "ripetimelo", "ripetere", "rileggi", "rileggilo", "rileggimelo", "rileggere", "leggi", "leggilo", "leggimelo"]),
+  basta: new Set(["basta", "stop", "ferma", "fermati", "zitto", "zitta", "silenzio", "spegni", "spegnilo", "spegnila", "smetti", "sveglia", "allarme"])
+};
+// Niente "di": "prima di tutto", detto a qualcuno, non deve tornare indietro.
+const VOCE_NEUTRE = new Set(["il", "lo", "la", "l", "al", "allo", "alla", "i", "gli", "le", "un", "una", "passo", "vai", "andiamo", "torna", "tornare", "torniamo", "adesso", "ora", "per", "favore", "grazie", "tutto", "cosi", "ok", "dai", "su", "nuovo", "puoi", "mi", "me", "e", "ho", "allora", "pure", "questo", "aspetta"]);
+const VOCE_RIEMPITIVI_QUANTO = new Set(["ne", "metto", "metti", "serve", "servono", "ci", "vuole", "vogliono", "va", "vanno", "devo", "mettere", "di", "del", "dello", "della", "dei", "degli", "delle", "il", "lo", "la", "i", "gli", "le", "l", "e", "c", "mi", "me", "per", "ricetta"]);
+function normVoce(s) {
+  let t = String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/['’]/g, " ").replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+  t = t.replace(/\b(\w+)( \1\b)+/g, "$1"); // "avanti avanti" -> "avanti"
+  const prima = /^(ok|okay|ehi|hey|allora|dai|su|fornelli|ascolta|senti)\s+/;
+  const dopo = /\s+(per favore|grazie|dai|ok)$/;
+  let prec;
+  do { prec = t; t = t.replace(prima, "").replace(dopo, ""); } while (t !== prec);
+  return t;
+}
+function radiceVoce(w) { return w.length >= 4 ? w.slice(0, -1) : w; }
+function numeroVoce(w) {
+  if (/^\d+$/.test(w)) return parseInt(w, 10);
+  if (VOCE_NUMERI[w]) return VOCE_NUMERI[w];
+  // Numeri composti: "ventidue", "ventuno", "trentotto". Mancavano, e
+  // "timer ventidue minuti" rispondeva addirittura "nessun timer attivo".
+  const m = String(w || "").match(/^(vent|trent|quarant|cinquant|sessant)[ai]?(uno|due|tre|quattro|cinque|sei|sette|otto|nove)$/);
+  if (!m) return null;
+  return { vent: 20, trent: 30, quarant: 40, cinquant: 50, sessant: 60 }[m[1]] + VOCE_NUMERI[m[2]];
+}
+// Minuti detti a voce: "10 minuti", "dieci minuti", "mezz ora", "un ora e mezza",
+// "un quarto d ora", "1 ora e 20". Null se non c'è una durata.
+function minutiDaVoce(t) {
+  let m = t.match(/(\S+) or[ae] e mezz[ao]/);
+  if (m && numeroVoce(m[1])) return numeroVoce(m[1]) * 60 + 30;
+  m = t.match(/(\S+) or[ae](?: e (\S+)(?: minut\w*)?)?/);
+  if (m && numeroVoce(m[1])) return numeroVoce(m[1]) * 60 + (m[2] && numeroVoce(m[2]) ? numeroVoce(m[2]) : 0);
+  if (/\bmezz ?ora\b/.test(t)) return 30;
+  if (/\btre quarti d ora\b/.test(t)) return 45;
+  if (/\bquarto d ora\b/.test(t)) return 15;
+  m = t.match(/(\S+) (?:minut\w*|min)\b/);
+  if (m && numeroVoce(m[1])) return numeroVoce(m[1]);
+  return null;
+}
+function trovaIngredienteVoce(parole, ingredienti) {
+  const cercate = parole.filter((w) => w.length >= 3).map(radiceVoce);
+  if (!cercate.length) return null;
+  let best = null, bestScore = 0;
+  for (const it of ingredienti || []) {
+    if (!it || !it.name) continue;
+    const nome = cleanIngName(it.name).normalize("NFD").replace(/[̀-ͯ]/g, "");
+    const sue = nome.split(" ").filter((w) => w.length >= 3 && !ING_STOP.has(w)).map(radiceVoce);
+    const score = cercate.filter((c) => sue.includes(c)).length;
+    if (score > bestScore || (score === bestScore && score > 0 && best && nome.length < cleanIngName(best.name).length)) { best = it; bestScore = score; }
+  }
+  return bestScore > 0 ? best : null;
+}
+function interpretaVoce(testo, ctx = {}) {
+  const grezzo = String(testo || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9 ]+/g, " ").trim();
+  const chiamato = /^(ok |ehi |hey )?fornelli\b/.test(grezzo); // "Fornelli, posso…": domanda rivolta all'app
+  const t = normVoce(testo);
+  if (!t) return { tipo: "nulla", breve: false, testo: "" };
+  for (const [tipo, frasi] of Object.entries(VOCE_FRASI)) if (frasi.includes(t)) return { tipo };
+  const parole = t.split(" ");
+  if (parole.length <= 5) {
+    const classi = new Set();
+    let estranee = 0;
+    for (const w of parole) {
+      let k = null;
+      for (const [c, set] of Object.entries(VOCE_CHIAVI)) if (set.has(w)) k = c;
+      if (k) classi.add(k); else if (!VOCE_NEUTRE.has(w)) estranee++;
+    }
+    if (!estranee && classi.size === 1) return { tipo: [...classi][0] };
+    if (!estranee && !classi.size && parole.some((w) => /^torn/.test(w))) return { tipo: "indietro" };
+  }
+  let m = t.match(/^(?:vai al |torna al |al )?passo (\S+)$/);
+  if (m && numeroVoce(m[1])) return { tipo: "passo", n: numeroVoce(m[1]) };
+  // Timer: serve la parola "timer" (o un verbo esplicito: "metti dieci
+  // minuti"). Prima bastava una durata in fondo a una frase breve, e "torno tra
+  // mezz'ora" detto a qualcuno avviava un timer — che chiudendo la cucina
+  // passava ai timer generali e suonava più tardi, senza che nessuno l'avesse
+  // chiesto. Un timer è l'unico comando che fa qualcosa DOPO: un falso
+  // allarme costa più di un comando non capito.
+  m = t.match(/^(?:metti|imposta|avvia|fai partire|fammi)?\s*(?:un |il )?timer\b(.*)$/);
+  if (m) { const min = minutiDaVoce(m[1]) || numeroVoce(m[1].trim().replace(/^(di|da) /, "")); return min ? { tipo: "timer", minuti: min } : { tipo: "statoTimer" }; }
+  m = t.match(/^(?:metti|imposta|avvia|fai partire|conta)\s+(?:un |una |di |per )*(.+)$/);
+  if (m && /^(\S+ )?(\S+ )?(minut\w*|min|or[ae]|mezz[ao]|ora)$/.test(m[1])) { const min = minutiDaVoce(t); if (min) return { tipo: "timer", minuti: min }; }
+  // Il suggerimento "per un timer di' «timer…»" compare solo se la frase è
+  // SOLTANTO una durata ("dieci minuti"): non per "aspetta due minuti" detto a
+  // qualcuno, che non deve accendere niente sullo schermo.
+  const SOLO_DURATA = new Set(["un", "una", "e", "mezza", "mezzo", "mezz", "quarto", "quarti", "d", "ora", "ore", "minuto", "minuti", "min"]);
+  const durataDaSola = parole.length <= 4 && parole.every((w) => SOLO_DURATA.has(w) || numeroVoce(w)) ? minutiDaVoce(t) : null;
+  // "quanto burro?", "quanta farina ci vuole", "quante uova": si risponde dalla
+  // ricetta, subito e senza internet. Prima finiva all'intelligenza artificiale.
+  const cucinaRe = /(sostitu|al posto|invece|cottura|cuoc|forno|temperatura|gradi|mescol|impast|lievit|boll|frigg|rosol|soffrigg|pronto|cotto|cotta|cruda|crudo)/;
+  m = t.match(/^quant[oaie] (.+)$/);
+  if (m) {
+    const resto = m[1].split(" ").filter((w) => !VOCE_RIEMPITIVI_QUANTO.has(w));
+    const cucina = !chiamato ? cucinaRe.test(t) : true;
+    if (resto.includes("manca")) return { tipo: "statoTimer" }; // "quanto manca alla pasta"
+    if (resto.length === 1 && resto[0] === "tempo") return { tipo: "statoTimer" };
+    if (!resto.some((w) => /^(tempo|minut\w*|cuoce|cuocere|cottura)$/.test(w)) && resto.length) {
+      const ingrediente = trovaIngredienteVoce(resto, ctx.ingredienti);
+      // Senza un ingrediente della ricetta, allo chef ci va SOLO una domanda di
+      // cucina (o rivolta all'app per nome): prima ci finiva qualsiasi
+      // "quant…", e "quante volte te lo devo dire" faceva rispondere il telefono.
+      return { tipo: "quanto", cosa: resto.join(" "), ingrediente, chef: !ingrediente && !!ctx.ai && cucina, breve: parole.length <= 3 };
+    }
+  }
+  // Domanda libera allo chef: solo se sembra una domanda DI CUCINA (o se si
+  // chiama l'app per nome). Con l'ascolto sempre acceso, "cosa mangiamo
+  // stasera?" detto a qualcuno non deve far rispondere il telefono. E chi
+  // risponde al telefono in cucina ("pronto mamma, come va?") non è una domanda.
+  const sembraDomanda = /\b(come|posso|si puo|devo|perche|quando|cosa|quale|quanto|quanta|e normale|va bene|sostitu\w*|al posto|invece)\b/.test(t);
+  const diCucina = chiamato || (!/^pronto\b/.test(t) && (cucinaRe.test(t) ||
+    !!trovaIngredienteVoce(parole.filter((w) => !ING_STOP.has(w)), ctx.ingredienti)));
+  if (ctx.ai && parole.length >= 3 && sembraDomanda && diCucina) return { tipo: "domanda", testo: String(testo || "").trim() };
+  return { tipo: "nulla", breve: parole.length <= 4, testo: t, durata: durataDaSola || null };
+}
+// Quantità detta per bene: "80 grammi di burro", non "80 g burro".
+const VOCE_UNITA = { g: "grammi", gr: "grammi", kg: "chili", ml: "millilitri", cl: "centilitri", dl: "decilitri", l: "litri", pz: "pezzi" };
+// Molte ricette importate hanno la dose DENTRO il nome ("Burro, 15 gr",
+// "Brodo, 2 l") e il campo quantità vuoto: sono proprio quelle che arrivano da
+// Scopri. Senza questo, "quanto burro?" rispondeva soltanto "burro".
+function dosePerVoce(it) {
+  if (!it) return null;
+  if (it.unit === "q.b.") return { qb: true };
+  if (it.qty != null) return { q: formatQty(it.qty), u: it.unit || "" };
+  const n = String(it.name || "");
+  if (/\bq\.?\s?b\.?/i.test(n)) return { qb: true };
+  const m = n.match(/(\d+(?:[.,]\d+)?)\s*(kg|gr|g|ml|cl|dl|l|cucchiai|cucchiaio|cucchiaini|cucchiaino|bustine|bustina|spicchi|spicchio|fette|fetta|pezzi|pezzo|litri|litro)?\b/i);
+  return m ? { q: m[1].replace(".", ","), u: m[2] || "" } : null;
+}
+function quantitaPerVoce(it) {
+  if (!it) return "";
+  const nome = cleanIngName(it.name) || String(it.name || "");
+  const d = dosePerVoce(it);
+  if (!d) return `Per ${nome} la ricetta non dice la quantità.`;
+  if (d.qb) return nome + ", quanto basta";
+  const u = d.u ? (VOCE_UNITA[String(d.u).toLowerCase()] || d.u) : "";
+  return u ? `${d.q} ${u} di ${nome}` : `${d.q} ${nome}`;
+}
+// "quanto burro", "quanta farina", "quanti tortellini", "quante uova": negli
+// esempi mostrati a schermo l'accordo conta (prima usciva "quanto tortellini?").
+// Le parole in -e sono ambigue (il sale, le mele): come esempio si saltano.
+// Il riconoscimento invece accetta tutte e quattro le forme comunque.
+function quantoPerParola(w) {
+  if (w === "uova") return "quante";
+  if (/o$/.test(w)) return "quanto";
+  if (/a$/.test(w)) return "quanta";
+  if (/i$/.test(w)) return "quanti";
+  return null;
+}
+function minutiParlati(min) {
+  if (min < 60) return `${min} ${min === 1 ? "minuto" : "minuti"}`;
+  const h = Math.floor(min / 60), m = min % 60;
+  return `${h === 1 ? "un'ora" : h + " ore"}${m ? ` e ${m} ${m === 1 ? "minuto" : "minuti"}` : ""}`;
+}
+
 function openCookingMode(recipe) {
   const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
   if (!steps.length) return;
@@ -4805,92 +4993,282 @@ function openCookingMode(recipe) {
     el.querySelector("#ckDone").onclick = close;
   }
 
-  // Comandi vocali: avanti / indietro / timer N minuti / leggi.
-  const NUMWORDS = { uno: 1, una: 1, un: 1, due: 2, tre: 3, quattro: 4, cinque: 5, sei: 6, sette: 7, otto: 8, nove: 9, dieci: 10, undici: 11, dodici: 12, quindici: 15, venti: 20, venticinque: 25, trenta: 30, quaranta: 40, quarantacinque: 45, sessanta: 60 };
-  function handleVoiceCommand(text) {
-    const t = (text || "").toLowerCase();
-    if (/ingredient/.test(t)) {
-      const lines = (recipe.ingredients || []).map((it) => ingredientText(it)).filter(Boolean);
-      speakText(lines.length ? "Ingredienti. " + lines.join(", ") : "Nessun ingrediente nella ricetta");
-      return;
-    }
-    if (/quanto manca|quanto tempo|tempo rimast/.test(t)) {
-      const running = timers.filter((x) => x.running && x.remaining > 0);
-      speakText(running.length ? running.map((x) => `${x.label}: ${Math.ceil(x.remaining / 60)} ${Math.ceil(x.remaining / 60) === 1 ? "minuto" : "minuti"}`).join(". ") : "Nessun timer attivo");
-      return;
-    }
-    if (/\b(avanti|prossim|continua|vai)\b/.test(t)) { goNext(); return; }
-    if (/\b(indietro|precedent|torna)\b/.test(t)) { goPrev(); return; }
-    if (/\b(leggi|ripeti)\b/.test(t)) { speak = true; speakStep(); return; }
-    if (/\b(ferma|stop|basta|zitt)\b/.test(t)) { stopSpeak(); return; }
-    const mt = t.match(/timer\D*(\d+)/) || t.match(/(\d+)\s*minut/);
-    if (mt) { addTimer(parseInt(mt[1], 10), "Voce"); return; }
-    const wm = t.match(/timer\s+([a-zà]+)/);
-    if (wm && NUMWORDS[wm[1]]) { addTimer(NUMWORDS[wm[1]], "Voce"); return; }
-    // Domanda libera allo chef AI: solo se suona come una domanda di cucina.
-    if (isImportConfigured() && t.trim().split(/\s+/).length >= 2 &&
-        /\b(come|quant|perch|posso|possi|devo|dobbiamo|qual|cosa|che cosa|quando|si pu|va bene|sostitu|invece di|al posto|meglio|serve|bisogna)\b/.test(t)) {
-      answerQuestion(text); return;
+  // ---- Voce a mani libere: ascolto, lettura, e il riquadro che dice cosa ha capito ----
+  // Le parole le capisce `interpretaVoce` (qui sopra, fuori da questa funzione);
+  // qui si ascolta, si esegue, e si mostra cosa è successo. Con le mani unte non
+  // si guarda il telefono per capire se ha sentito: lo si deve VEDERE di sfuggita.
+  const VOCE_PREF = "ricettario.pref.cookVoice"; // "1" la vuole, "0" ha detto no, assente = mai chiesto
+  const prefVoce = () => { try { return localStorage.getItem(VOCE_PREF); } catch (e) { return null; } };
+  const salvaPrefVoce = (v) => { try { localStorage.setItem(VOCE_PREF, v); } catch (e) {} };
+  let voceMsg = null;      // { testo, tipo: "ok" | "dubbio" | "errore" }
+  let voceMsgTimer = null;
+  let riavvii = [];        // istanti degli ultimi riavvii, contro i cicli stretti
+  let riavvioTimer = null;
+  let erroreRete = false;
+  let parlaId = 0;         // ogni lettura ha il suo numero: vedi parla()
+
+  function eseguiVoce(testo) {
+    erroreRete = false;
+    const a = interpretaVoce(testo, { ingredienti: recipe.ingredients || [], ai: isImportConfigured() });
+    switch (a.tipo) {
+      case "avanti":
+        // All'ultimo passo "avanti" chiuderebbe la ricetta e la SEGNEREBBE come
+        // cucinata nel diario: con il microfono sempre acceso, un "vai" o un
+        // "dopo" detti a qualcuno basterebbero. Lì serve "ho finito".
+        if (idx === steps.length - 1) { mostraVoce("È l'ultimo passo: di' «ho finito» per chiudere la ricetta", "dubbio", 3500); break; }
+        capito("avanti"); goNext();
+        break;
+      case "fine":
+        if (idx === steps.length - 1) { capito("fine"); goNext(); }
+        else { capito("avanti"); goNext(); } // "finito" a metà ricetta: questo passo è fatto
+        break;
+      case "indietro":
+        if (idx === 0) mostraVoce("Sei già al primo passo", "dubbio");
+        else { capito("indietro"); goPrev(); }
+        break;
+      case "ripeti": capito("ripeto"); parla(steps[idx]); break;
+      case "passo":
+        if (a.n >= 1 && a.n <= steps.length) { capito("passo " + a.n); idx = a.n - 1; haptic(6); playFlip(); draw(); speakStep(); }
+        else mostraVoce(`La ricetta ha ${steps.length} passi`, "dubbio");
+        break;
+      case "basta":
+        // Prima l'allarme: era l'unica cosa che si poteva spegnere solo
+        // toccando "🔕 OK", cioè proprio quando si hanno le mani occupate.
+        if (timers.some((t) => t.alarming)) { timers.forEach((t) => { t.alarming = false; }); ensureAlarm(); paintTimers(); capito("allarme spento"); }
+        else if (speaking) { stopSpeak(); capito("basta"); }
+        break; // un "ok" detto a qualcuno, con niente da spegnere, non fa niente
+      case "ingredienti": {
+        const righe = (recipe.ingredients || []).map(quantitaPerVoce).filter(Boolean);
+        capito("ingredienti");
+        parla(righe.length ? "Ingredienti. " + righe.join(". ") : "Nella ricetta non ci sono ingredienti.");
+        break;
+      }
+      case "statoTimer": {
+        const vivi = timers.filter((x) => x.remaining > 0 && !x.alarming);
+        capito("timer");
+        parla(vivi.length ? vivi.map((x) => `${x.label}: ${minutiParlati(Math.max(1, Math.ceil(x.remaining / 60)))}${x.running ? "" : ", in pausa"}`).join(". ") : "Nessun timer attivo.");
+        break;
+      }
+      case "timer":
+        addTimer(a.minuti, stepTimerLabel(steps[idx], idx + 1));
+        capito("timer " + fmtDur(a.minuti));
+        parla(`Timer di ${minutiParlati(a.minuti)} partito.`);
+        break;
+      case "quanto":
+        if (a.ingrediente) { capito(ingredientText(a.ingrediente)); parla(quantitaPerVoce(a.ingrediente)); }
+        else if (a.chef) answerQuestion(testo);
+        else if (a.breve) mostraVoce(`Non trovo «${a.cosa}» negli ingredienti`, "dubbio");
+        break;
+      case "domanda": answerQuestion(testo); break;
+      default:
+        // Si mostra solo quello che è BREVE: serve a capire quali parole
+        // funzionano, non a trascrivere sullo schermo le chiacchiere in cucina.
+        // Una durata detta da sola non fa partire un timer, ma insegna come farlo.
+        if (a.durata) mostraVoce(`Per un timer di' «timer ${minutiParlati(a.durata)}»`, "dubbio", 3500);
+        else if (a.breve) mostraVoce(`Non ho capito «${a.testo}» — prova «avanti» o «ripeti»`, "dubbio", 3000);
     }
   }
-  // Risponde a voce a una domanda libera, mettendo in pausa l'ascolto mentre
-  // parla (così il microfono non capta la voce dell'assistente).
-  function speakAndWait(txt) {
-    return new Promise((res) => {
-      if (!window.speechSynthesis || !txt) { res(); return; }
-      try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(txt); u.lang = "it-IT"; u.onend = res; u.onerror = res; window.speechSynthesis.speak(u); }
-      catch (e) { res(); }
-    });
+  function capito(t) { haptic(10); mostraVoce("✓ " + t, "ok", 1600); }
+  function mostraVoce(testo, tipo, durata = 2400) {
+    voceMsg = { testo, tipo };
+    clearTimeout(voceMsgTimer);
+    voceMsgTimer = setTimeout(() => { voceMsg = null; paintVoce(); }, durata);
+    paintVoce();
   }
+
+  // Risponde a voce a una domanda libera. Mentre aspetta la risposta il
+  // microfono resta acceso; mentre la LEGGE va in pausa (ci pensa parla()).
   async function answerQuestion(text) {
     if (asking) return;
-    asking = true; speaking = true;
-    try { if (vrec) vrec.stop(); } catch (e) {}
+    asking = true;
+    mostraVoce("💬 Chiedo allo chef…", "ok", 9000);
     try {
       const ctx = { title: recipe.title, ingredients: (recipe.ingredients || []).map((i) => ingredientText(i)).filter(Boolean) };
       const q = `${text} (Sto cucinando "${recipe.title}", passo ${idx + 1} di ${steps.length}: "${steps[idx]}".)`;
       const ans = await askChef(q, ctx);
       // Se nel frattempo la Modalità cucina è stata chiusa, tacere: altrimenti
       // il telefono si metteva a leggere la risposta a schermata già chiusa.
-      if (!el.isConnected) { asking = false; speaking = false; return; }
+      if (!el.isConnected) { asking = false; return; }
       toast("💬 " + ans.slice(0, 90), "success");
-      await speakAndWait(ans);
-    } catch (e) { if (el.isConnected) await speakAndWait("Scusa, non riesco a rispondere ora."); }
-    asking = false; speaking = false;
-    if (voiceOn) { try { startVoice(); } catch (e) {} } // riprende l'ascolto
+      await parla(ans);
+    } catch (e) { if (el.isConnected) await parla("Scusa, non riesco a rispondere ora."); }
+    asking = false;
   }
-  function startVoice() {
-    if (!SR) return;
+
+  function avviaAscolto() {
+    if (!SR || !voiceOn || speaking || vrec || !el.isConnected) return;
+    if (document.visibilityState !== "visible") return;
+    let r;
     try {
-      vrec = new SR();
-      vrec.lang = "it-IT";
-      vrec.continuous = true;
-      vrec.interimResults = false;
-      vrec.onresult = (e) => { for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) handleVoiceCommand(e.results[i][0].transcript); };
-      vrec.onend = () => { if (voiceOn && !speaking) { try { vrec.start(); } catch (e) {} } };
-      vrec.onerror = (e) => { if (e && e.error === "not-allowed") { voiceOn = false; toast("Permesso microfono negato", "error"); draw(); } };
-      vrec.start();
-    } catch (e) { voiceOn = false; }
+      r = new SR();
+      r.lang = "it-IT";
+      r.continuous = true;
+      r.interimResults = false;
+      r.maxAlternatives = 1;
+      r.onresult = (e) => {
+        for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) eseguiVoce(e.results[i][0].transcript);
+      };
+      r.onerror = (e) => {
+        const err = e && e.error;
+        r.__errore = err;
+        if (err === "not-allowed" || err === "service-not-allowed") {
+          voiceOn = false;
+          // Si smette di riprovare a ogni apertura: con il permesso negato il
+          // messaggio d'errore ricompariva ogni volta. Toccando 🎤 si riprova.
+          salvaPrefVoce("0");
+          draw(); // pulsante 🎤 e riquadro coerenti subito (aria-pressed compreso)
+          mostraVoce("Il microfono non è permesso: va consentito nelle impostazioni del browser", "errore", 7000);
+        } else if (err === "network") { erroreRete = true; paintVoce(); }
+        // "no-speech" e "aborted" sono normali: ci pensa onend a ripartire.
+      };
+      r.onend = () => {
+        if (vrec === r) vrec = null;
+        // Una sessione finita SENZA errore di rete vuol dire che la rete è
+        // tornata. Prima l'avviso rosso restava acceso finché non si diceva
+        // una frase, e ogni riavvio aspettava 4 secondi invece di uno sbuffo.
+        if (r.__errore !== "network" && erroreRete) erroreRete = false;
+        if (!voiceOn || speaking || !el.isConnected) { paintVoce(); return; }
+        // Su Android l'ascolto si chiude da solo dopo qualche secondo di
+        // silenzio: si riparte. Ma non in un ciclo stretto — se il servizio
+        // chiude subito (rete assente) si aspetta invece di martellare.
+        const now = Date.now();
+        riavvii = riavvii.filter((x) => now - x < 10000);
+        riavvii.push(now);
+        clearTimeout(riavvioTimer);
+        riavvioTimer = setTimeout(avviaAscolto, erroreRete ? 4000 : (riavvii.length > 6 ? 3000 : 150));
+      };
+      vrec = r;
+      r.start();
+    } catch (e) {
+      // Se l'avvio fallisce si riprova fra poco: prima il microfono restava
+      // spento mentre il riquadro continuava a dire "Ti ascolto".
+      if (vrec === r) vrec = null;
+      if (voiceOn) { clearTimeout(riavvioTimer); riavvioTimer = setTimeout(avviaAscolto, 1500); }
+    }
+    paintVoce();
   }
-  function stopVoice() { voiceOn = false; if (vrec) { try { vrec.stop(); } catch (e) {} vrec = null; } }
+  function sospendiAscolto() {
+    clearTimeout(riavvioTimer);
+    const r = vrec;
+    vrec = null;
+    if (r) { try { r.onend = null; r.abort(); } catch (e) {} }
+  }
+  function attivaVoce() {
+    if (!SR) return;
+    voiceOn = true;
+    salvaPrefVoce("1");
+    avviaAscolto();
+  }
+  function stopVoice() { voiceOn = false; sospendiAscolto(); clearTimeout(voceMsgTimer); }
   function toggleVoice() {
-    voiceOn = !voiceOn;
-    if (voiceOn) { startVoice(); toast("A voce: \"avanti\", \"indietro\", \"timer 10 minuti\", o fai una domanda (\"posso sostituire il burro?\")", "success"); }
-    else stopVoice();
+    if (voiceOn) { stopVoice(); salvaPrefVoce("0"); mostraVoce("Voce spenta. Tocca 🎤 per riaccenderla", "dubbio", 2600); }
+    else attivaVoce();
     draw();
   }
 
-  function speakStep() {
-    if (!speak || !window.speechSynthesis) return;
-    try {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(steps[idx]);
-      u.lang = "it-IT";
-      window.speechSynthesis.speak(u);
-    } catch {}
+  // Tutto quello che il telefono DICE passa da qui. Mentre parla, il microfono
+  // va in pausa: altrimenti sente la propria voce. Prima la pausa c'era solo
+  // per le risposte dello chef, non per la lettura dei passi.
+  function parla(txt) {
+    return new Promise((res) => {
+      if (!window.speechSynthesis || !txt) { res(); return; }
+      const mio = ++parlaId;
+      let finito = false;
+      const fine = () => {
+        if (finito) return;
+        finito = true;
+        clearTimeout(scorta);
+        // `cancel()` di una lettura precedente fa scattare il SUO onend: senza
+        // questo controllo la vecchia lettura riaccendeva il microfono mentre
+        // quella nuova stava ancora parlando.
+        if (mio === parlaId) {
+          speaking = false;
+          paintVoce();
+          if (voiceOn) { clearTimeout(riavvioTimer); riavvioTimer = setTimeout(avviaAscolto, 250); }
+        }
+        res();
+      };
+      // Su Android `onend` a volte non arriva: senza questa scorta il
+      // microfono resterebbe in pausa per sempre.
+      const scorta = setTimeout(fine, Math.min(60000, 2000 + String(txt).length * 85));
+      speaking = true;
+      sospendiAscolto();
+      paintVoce();
+      try {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(txt);
+        u.lang = "it-IT";
+        u.onend = fine;
+        u.onerror = fine;
+        window.speechSynthesis.speak(u);
+      } catch (e) { fine(); }
+    });
   }
-  function stopSpeak() { try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch {} }
-  function speakText(txt) { if (!window.speechSynthesis || !txt) return; try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(txt); u.lang = "it-IT"; window.speechSynthesis.speak(u); } catch {} }
+  function speakStep() { if (speak) parla(steps[idx]); }
+  function stopSpeak() {
+    parlaId++; // le letture in corso non riaccendono più niente
+    try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch {}
+    if (speaking) {
+      speaking = false;
+      paintVoce();
+      if (voiceOn) { clearTimeout(riavvioTimer); riavvioTimer = setTimeout(avviaAscolto, 250); }
+    }
+  }
+
+  // Suggerimento cucito sul passo: se il passo ha una durata propone il
+  // timer, se nomina un ingrediente propone "quanto…?". Così le parole che
+  // funzionano si imparano guardando, senza studiare l'app.
+  function suggerimentoVoce() {
+    if (idx === steps.length - 1) return "«ho finito» · «indietro» · «ripeti»";
+    const s = steps[idx] || "";
+    const ds = parseDurations(s);
+    if (ds.length) return `«avanti» · «timer ${minutiParlati(ds[0])}»`;
+    const low = s.toLowerCase();
+    for (const it of recipe.ingredients || []) {
+      const d = dosePerVoce(it);
+      if (!it || !it.name || !d || d.qb) continue;
+      const w = cleanIngName(it.name).split(" ").filter((x) => x.length >= 4 && !ING_STOP.has(x))[0];
+      if (w && low.includes(w) && quantoPerParola(w)) return `«avanti» · «${quantoPerParola(w)} ${w}?»`;
+    }
+    return "«avanti» · «indietro» · «ripeti»";
+  }
+  function esempioQuanto() {
+    for (const x of recipe.ingredients || []) {
+      const d = dosePerVoce(x);
+      if (!x || !x.name || !d || d.qb) continue;
+      const w = cleanIngName(x.name).split(" ").filter((y) => y.length >= 3 && !ING_STOP.has(y))[0];
+      if (w && quantoPerParola(w)) return `«${quantoPerParola(w)} ${w}?»`;
+    }
+    // Niente ripiego: con "«ripeti»" la frase diventava "di' «ripeti» per le
+    // dosi". Se non c'è un ingrediente adatto, quella parte non si scrive.
+    return "";
+  }
+  function paintVoce() {
+    const slot = el.querySelector("#ckVoce");
+    if (!slot) return;
+    if (!SR) { slot.innerHTML = ""; return; }
+    const msg = voceMsg ? `<span class="cvoce__msg cvoce__msg--${voceMsg.tipo}" role="status">${escapeHtml(voceMsg.testo)}</span>` : "";
+    if (!voiceOn) {
+      if (prefVoce() === null) {
+        slot.innerHTML = `<div class="cvoce cvoce--invito">
+          <div class="cvoce__t">🎤 Cucina a mani libere</div>
+          <div class="cvoce__d">Attiva la voce e non devi più toccare il telefono. Di' <b>«avanti»</b> per il passo dopo, ${esempioQuanto() ? `<b>${escapeHtml(esempioQuanto())}</b> per le dosi, ` : ""}<b>«timer dieci minuti»</b>, e <b>«basta»</b> per spegnere la sveglia.</div>
+          <div class="cvoce__btns"><button class="btn btn--primary" id="cvSi">Attiva la voce</button><button class="btn" id="cvNo">No, grazie</button></div>
+        </div>`;
+        slot.querySelector("#cvSi").onclick = () => { attivaVoce(); draw(); };
+        slot.querySelector("#cvNo").onclick = () => { salvaPrefVoce("0"); paintVoce(); };
+      } else slot.innerHTML = msg ? `<div class="cvoce">${msg}</div>` : "";
+      return;
+    }
+    const stato = erroreRete ? "errore" : (speaking ? "pausa" : "ascolto");
+    const testo = erroreRete ? "Serve internet per la voce — riprovo" : (speaking ? "Leggo… poi ti ascolto" : "Ti ascolto");
+    slot.innerHTML = `<div class="cvoce cvoce--${stato}">
+      <span class="cvoce__dot" aria-hidden="true"></span>
+      <span class="cvoce__testo">${testo}</span>
+      ${speaking || erroreRete ? "" : `<span class="cvoce__hint">di' ${escapeHtml(suggerimentoVoce())}</span>`}
+      ${msg}
+    </div>`;
+  }
 
   // Tieni acceso lo schermo, se supportato.
   // `chiusa` serve contro una corsa: la richiesta del wake lock è asincrona, e
@@ -4913,9 +5291,12 @@ function openCookingMode(recipe) {
   // Tornando in primo piano i setInterval possono aver perso battiti: si
   // riallinea subito all'orologio, così l'allarme scatta anche "in ritardo".
   function onVis() {
-    if (document.visibilityState !== "visible") return;
+    // In secondo piano il microfono si spegne: niente ascolto quando non si
+    // vede la schermata. Tornando, riparte da solo se la voce era accesa.
+    if (document.visibilityState !== "visible") { sospendiAscolto(); return; }
     if (!wakeLock) lock();
     if (timers.some((t) => t.running)) tickAll();
+    if (voiceOn && !speaking) avviaAscolto();
   }
   lock();
 
@@ -5024,10 +5405,11 @@ function openCookingMode(recipe) {
         <button class="cook__close" id="ckClose" aria-label="Chiudi la Modalità cucina">${iconHtml("x")}</button>
         <div class="cook__progress">Passo ${idx + 1} di ${steps.length}</div>
         <button class="cook__close ${xl ? "is-on" : ""}" id="ckXL" title="Testo grande">Aa</button>
-        ${SR ? `<button class="cook__close ${voiceOn ? "is-on" : ""}" id="ckVoice" title="Comandi vocali">🎤</button>` : ""}
+        ${SR ? `<button class="cook__close ${voiceOn ? "is-on" : ""}" id="ckVoice" title="${voiceOn ? "Spegni i comandi vocali" : "Accendi i comandi vocali"}" aria-label="${voiceOn ? "Spegni i comandi vocali" : "Accendi i comandi vocali"}" aria-pressed="${voiceOn}">🎤</button>` : ""}
         <button class="cook__close ${speak ? "is-on" : ""}" id="ckSpeak" title="Leggi ad alta voce">🔊</button>
       </div>
       <div class="cook__track"><div class="cook__fill" style="width:${((idx + 1) / steps.length) * 100}%"></div></div>
+      <div class="cook__voce" id="ckVoce"></div>
       ${idx === 0 && ultimaNota(recipe) ? `<div class="cook__last">📝 <b>L'ultima volta avevi scritto:</b> ${escapeHtml(ultimaNota(recipe))}</div>` : ""}
       <div class="cook__body"><div class="cook__step">${buildStepHtml(steps[idx], recipe.ingredients)}</div></div>
       <div class="cook__timers" id="ckTimers"></div>
@@ -5066,6 +5448,7 @@ function openCookingMode(recipe) {
       setTimeout(() => pop.remove(), 2600);
     }));
     paintTimers();
+    paintVoce();
   }
 
   function close() {
@@ -5108,7 +5491,11 @@ function openCookingMode(recipe) {
   }
   activeCookClose = close;
 
+  // Chi ha già scelto la voce la ritrova accesa: con le mani unte, dover
+  // toccare 🎤 ogni volta che si apre la cucina era già il primo ostacolo.
+  if (SR && prefVoce() === "1") voiceOn = true;
   draw();
+  if (voiceOn) avviaAscolto();
 }
 
 // ---------------- Form: strumento ----------------
@@ -6252,7 +6639,7 @@ const GUIDE_SECTIONS = [
   { icon: "carrot", title: "Valori nutrizionali", text: "In una ricetta tocca \"Calcola\" sotto gli ingredienti: l'app stima calorie e macronutrienti (proteine, carboidrati, grassi) per porzione e totali. Per ciò che non conosce cerca online su Open Food Facts e ti mostra anche cosa non ha conteggiato. È una stima: cambia con il numero di porzioni." },
   { icon: "heart", title: "Trova al volo", text: "Dalla schermata Ricette cerca per nome o ingrediente e usa i filtri: Preferiti, Più cucinate, Di recente, per tempo (≤15 e ≤30 min) e le categorie. Indica il tempo di preparazione nella ricetta (modifica) per usare i filtri rapidi. Dai un voto a stelle e tocca \"Fatta\" nella barra in basso della ricetta per il conto." },
   { icon: "shopping-cart-simple", title: "Spesa & Dispensa", text: "Aggiungi gli ingredienti alla lista della spesa (uniti e per reparto). Tocca il nome per spuntare un articolo e la quantità per modificarla. Al supermercato tocca \"Modalità supermercato\" per una lista a schermo intero, ordinata per reparto. Con \"Spesa fatta\" passa tutto in dispensa. In Dispensa tieni ciò che hai già: tocca la data per mettere o correggere la scadenza (pastiglie 3 giorni / 1 settimana / 1 mese / 6 mesi), l'app ti avvisa quando qualcosa sta per scadere, e \"Cosa posso cucinare\" suggerisce le ricette con quello che hai." },
-  { icon: "fire", title: "Cucinare passo-passo", text: "Apri una ricetta e tocca \"Cucina\" nella barra in basso: istruzioni passo-passo, più timer con nome (pasta, forno…), lettura vocale (🔊) e schermo sempre acceso. Tocca un ingrediente nel passo per vedere la quantità. Col microfono 🎤 vai avanti/indietro a voce, avvii timer e puoi anche fare domande (\"posso sostituire il burro?\") con risposta a voce." },
+  { icon: "fire", title: "Cucinare passo-passo", text: "Apri una ricetta e tocca \"Cucina\" nella barra in basso: istruzioni passo-passo, più timer con nome (pasta, forno…), lettura vocale (🔊) e schermo sempre acceso. Tocca un ingrediente nel passo per vedere la quantità. Con le mani sporche usa la voce: attivala la prima volta, poi si riaccende da sola. Di' \"avanti\", \"indietro\", \"ripeti\", \"quanto burro?\", \"timer dieci minuti\", \"basta\" per spegnere la sveglia, e \"ho finito\" all'ultimo passo. Puoi anche fare domande allo chef, con risposta a voce." },
   { icon: "calendar-blank", title: "Pianificazione", text: "Nel calendario (vista Mese o Settimana) assegna le ricette ai giorni in pranzo o cena, usa \"Crea il menù\" per riempire le cene rimaste vuote (scegliendo se farlo con l'assistente, in automatico o a caso) e genera la spesa del mese o della settimana." },
   { icon: "book-bookmark", title: "Menu", text: "Dalla schermata Ricette, filtro \"Menu\": raggruppa più ricette (es. \"Cena con amici\") e genera un'unica lista della spesa." },
   { icon: "arrow-square-out", title: "Condividi", text: "Da una ricetta tocca \"Condividi\" per inviarla a qualcuno (WhatsApp, email…) con ingredienti e preparazione." },

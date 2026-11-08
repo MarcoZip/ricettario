@@ -6,6 +6,16 @@
 
 export const CHANGELOG = [
   {
+    v: "8.63",
+    d: "2026-11-08",
+    items: [
+      "<b>Cucina a mani libere.</b> In Modalità cucina puoi fare tutto a voce, senza toccare il telefono con le mani sporche: «avanti», «indietro», «ripeti», «timer dieci minuti», «quanto manca», «quanto burro?» (ti dice la dose della ricetta) e «basta» per spegnere la sveglia del timer. All'ultimo passo di' «ho finito».",
+      "La prima volta che apri la cucina ti chiede se vuoi attivare la voce. Poi si accende da sola ogni volta; la spegni toccando 🎤.",
+      "In alto vedi sempre se ti sta ascoltando e cosa ha capito. Mentre il telefono ti legge un passo il microfono si mette in pausa, così non si sente da solo. E le chiacchiere in cucina non fanno partire niente: valgono solo i comandi detti da soli.",
+      "I passi molto lunghi non vengono più tagliati in alto: si legge dall'inizio."
+    ]
+  },
+  {
     v: "8.62",
     d: "2026-08-17",
     items: [

@@ -1662,7 +1662,12 @@ p, li, .setting-row__desc, .hint, .recipe-item__notes, .steps-list li { text-wra
 .cook__progress { font-weight: 800; color: var(--primary-2); }
 .cook__track { height: 5px; background: var(--surface-2); border-radius: 99px; margin: 14px 0; overflow: hidden; }
 .cook__fill { height: 100%; background: var(--primary-grad); transition: width 0.3s ease; }
-.cook__body { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; overflow-y: auto; }
+/* `safe center`, non `center`: con un passo più lungo dello spazio, la
+   centratura semplice faceva uscire il testo SOPRA il riquadro, e le prime
+   righe non si raggiungevano nemmeno scorrendo (misurato: 39 px tagliati su un
+   passo di una ricetta importata). Con "safe", se il testo non ci sta parte
+   dall'alto e si scorre normalmente; se ci sta, resta centrato come prima. */
+.cook__body { flex: 1; display: flex; align-items: safe center; justify-content: center; text-align: center; overflow-y: auto; }
 /* ============================================================
    SUPERFICI CON FONDO SCURO IN ENTRAMBI I TEMI
    ------------------------------------------------------------
@@ -1721,6 +1726,37 @@ p, li, .setting-row__desc, .hint, .recipe-item__notes, .steps-list li { text-wra
 /* Cucina viva: sfondo ambientale legato al metodo di cottura */
 .cook__ambient { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
 .cook__ui { position: relative; z-index: 1; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* ---- Voce a mani libere ----
+   Il riquadro dice in ogni momento se il telefono sta ascoltando, se sta
+   leggendo (e quindi NON ascolta), e cosa ha appena capito. Con le mani unte
+   non si fanno prove: bisogna vederlo di sfuggita, da un metro.
+   Colori fissi: la Modalità cucina è sempre scura, in entrambi i temi. */
+.cook__voce:empty { display: none; }
+.cook__voce { margin: 10px 0 0; }
+.cvoce { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 10px 14px; border-radius: 16px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.10); color: #efe8dd; font-size: 0.95rem; }
+.cvoce__dot { width: 12px; height: 12px; border-radius: 50%; background: #4ade80; flex-shrink: 0; }
+.cvoce--ascolto .cvoce__dot { animation: cvocePulse 1.6s ease-out infinite; }
+.cvoce--pausa .cvoce__dot { background: #ffb86b; }
+.cvoce--errore .cvoce__dot { background: #ff5e6c; }
+.cvoce__testo { font-weight: 800; }
+.cvoce__hint { color: #cfc5b7; font-size: 0.88rem; }
+.cvoce__msg { flex-basis: 100%; font-weight: 800; font-size: 1.2rem; line-height: 1.3; }
+.cvoce__msg--ok { color: #7fe6cf; animation: cvoceFlash 0.35s var(--spring); }
+.cvoce__msg--dubbio { color: #ffcf94; font-size: 1rem; }
+.cvoce__msg--errore { color: #ffb3bb; font-size: 1rem; }
+.cvoce--invito { flex-direction: column; align-items: stretch; gap: 8px; padding: 14px; }
+.cvoce__t { font-weight: 800; font-size: 1.08rem; }
+.cvoce__d { color: #ddd4c7; line-height: 1.45; }
+.cvoce__d b { color: #ffd9a8; }
+.cvoce__btns { display: flex; gap: 8px; }
+.cvoce__btns .btn { flex: 1; min-height: 48px; }
+@keyframes cvocePulse {
+  0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.55); }
+  70% { box-shadow: 0 0 0 12px rgba(74, 222, 128, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+}
+@keyframes cvoceFlash { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .cvoce--ascolto .cvoce__dot, .cvoce__msg--ok { animation: none; } }
 .cook__ambient::before { content: ""; position: absolute; inset: 0; opacity: 0; transition: opacity 0.8s ease; }
 .cook__ambient[data-method="forno"]::before { opacity: 1; background: radial-gradient(120% 70% at 50% 108%, rgba(255,120,40,0.30), rgba(255,80,20,0.06) 45%, transparent 70%); }
 .cook__ambient[data-method="padella"]::before { opacity: 1; background: radial-gradient(120% 55% at 50% 112%, rgba(255,140,50,0.26), transparent 60%); }
